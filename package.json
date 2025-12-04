@@ -3,19 +3,27 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
+		"deploy": "npm run build:views && wrangler deploy",
+		"dev": "npm run build:views && wrangler dev",
+		"start": "npm run dev",
+		"build:views": "tsx --tsconfig scripts/tsconfig.json scripts/build-views.ts",
+		"build:static": "npm run build:views && tsx --tsconfig scripts/tsconfig.json scripts/prerender.ts",
+		"preview:static": "npm run build:static && python3 -m http.server 4173 -d www",
 		"test": "vitest",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
+		"@types/node": "^24.10.1",
 		"@cloudflare/vitest-pool-workers": "^0.8.19",
+		"@vue/compiler-sfc": "^3.5.25",
+		"tsx": "^4.21.0",
 		"typescript": "^5.5.2",
 		"vitest": "~3.2.0",
 		"wrangler": "^4.53.0"
 	},
 	"dependencies": {
-		"hono": "^4.10.7"
+		"@vue/server-renderer": "^3.5.25",
+		"hono": "^4.10.7",
+		"vue": "^3.5.25"
 	}
 }

@@ -1,3 +1,5 @@
+# Generated Vue SSR artifacts
+src/.generated/
 # Logs
 
 logs
