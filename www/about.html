@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About</title>
+  <style>
+.page {
+	min-height: 100vh;
+	margin: 0;
+	padding: 64px 24px;
+	display: grid;
+	gap: 16px;
+	place-content: start;
+	background: radial-gradient(circle at 20% 20%, #fff7ed, #e0f2fe);
+	font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	color: #111827;
+}
+
+h1 {
+	margin: 0;
+	font-size: 2.25rem;
+}
+
+p {
+	margin: 0;
+	max-width: 540px;
+	line-height: 1.6;
+}
+</style>
+</head>
+<body>
+  <div id="app"><main class="page"><h1>About</h1><p>這個頁面示範第二個獨立 Vue SFC，沒有使用 router 或 App.vue。</p></main></div>
+</body>
+</html>

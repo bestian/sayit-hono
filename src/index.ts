@@ -1,11 +1,20 @@
 import { Hono } from 'hono';
+import AboutView, { styles as AboutViewStyles } from './.generated/views/AboutView';
+import HomeView, { styles as HomeViewStyles } from './.generated/views/HomeView';
+import { renderHtml } from './ssr/render';
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.get('/', (c) => {
-	// 可以透過 c.env 訪問環境變數和 bindings (例如: c.env.DB, c.env.SPEECH_AN)
-	// 可以透過 c.req 訪問 request
-	return c.text('Hello Hono!');
+app.get('/', async (c) => {
+	const html = await renderHtml(HomeView, { title: 'Home', styles: HomeViewStyles });
+	return c.html(html);
 });
+
+app.get('/about', async (c) => {
+	const html = await renderHtml(AboutView, { title: 'About', styles: AboutViewStyles });
+	return c.html(html);
+});
+
+app.notFound((c) => c.text('Not Found', 404));
 
 export default app;
