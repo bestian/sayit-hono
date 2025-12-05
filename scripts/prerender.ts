@@ -12,6 +12,7 @@ type PageSpec = {
 	component: Component;
 	components: Record<string, Component>;
 	aliases?: string[];
+	props?: Record<string, unknown>;
 };
 
 function mergeStyles(...styles: Array<string | undefined>) {
@@ -28,8 +29,8 @@ async function loadCompiledEntries() {
 	return { views, components };
 }
 
-async function renderPage({ component, title, styles, filename, components, aliases }: PageSpec) {
-	const html = await renderHtml(component, { title, styles, components });
+async function renderPage({ component, title, styles, filename, components, aliases, props }: PageSpec) {
+	const html = await renderHtml(component, { title, styles, components, props });
 
 	const outDir = path.resolve('www');
 	await mkdir(outDir, { recursive: true });
@@ -47,6 +48,22 @@ async function prerender() {
 	const sharedComponents = { Navbar: components.Navbar, Footer: components.Footer };
 	const sharedStyles = mergeStyles(components.NavbarStyles, components.FooterStyles);
 
+	const speechIndexUrl =
+		process.env.SPEECH_INDEX_URL ?? 'https://sayit-backend.audreyt.workers.dev/api/speech_index.json';
+	let speechIndex: Array<{ filename: string; display_name: string }> = [];
+	let speechSource = speechIndexUrl;
+
+	try {
+		const res = await fetch(speechIndexUrl);
+		if (!res.ok) {
+			throw new Error(`Unexpected status ${res.status}`);
+		}
+		speechIndex = await res.json();
+	} catch (error) {
+		console.warn(`[prerender] 無法取得 speech index，將輸出空列表：${String(error)}`);
+		speechSource = `${speechIndexUrl} (fetch failed)`;
+	}
+
 	const pages: PageSpec[] = [
 		{
 			filename: 'index.html',
@@ -62,6 +79,15 @@ async function prerender() {
 			component: views.AboutView,
 			components: sharedComponents,
 			aliases: ['about/index.html']
+		},
+		{
+			filename: 'speeches.html',
+			title: 'Speeches',
+			styles: mergeStyles(views.SpeechesViewStyles, sharedStyles),
+			component: views.SpeechesView,
+			components: sharedComponents,
+			props: { speeches: speechIndex, source: speechSource },
+			aliases: ['speeches/index.html']
 		}
 	];
 

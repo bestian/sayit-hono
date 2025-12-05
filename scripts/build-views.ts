@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compileTemplate, parse } from '@vue/compiler-sfc';
+import { compileScript, compileTemplate, parse } from '@vue/compiler-sfc';
 
 const VIEWS_DIR = path.resolve('src/views');
 const COMPONENTS_DIR = path.resolve('src/components');
@@ -33,16 +33,31 @@ async function compileSfc(file: string, target: CompileTarget) {
 	const name = path.basename(file, '.vue');
 	const id = `${name}-ssr`;
 
-	const { code: templateCode } = compileTemplate({
-		source: descriptor.template.content,
-		filename: file,
-		id,
-		ssr: true
-	});
-
 	const styles = (descriptor.styles ?? []).map((style) => style.content).join('\n');
+	const hasScript = Boolean(descriptor.script || descriptor.scriptSetup);
 
-	const output = `${header}import { defineComponent } from 'vue';
+	let output: string;
+
+	if (hasScript) {
+		const compiledScript = compileScript(descriptor, {
+			id,
+			inlineTemplate: true,
+			templateOptions: { ssr: true }
+		});
+
+		output = `${header}${compiledScript.content}
+
+export const styles = ${JSON.stringify(styles)};
+`;
+	} else {
+		const { code: templateCode } = compileTemplate({
+			source: descriptor.template.content,
+			filename: file,
+			id,
+			ssr: true
+		});
+
+		output = `${header}import { defineComponent } from 'vue';
 ${templateCode}
 
 const _sfc_main = defineComponent({ name: '${name}' });
@@ -51,6 +66,7 @@ _sfc_main.ssrRender = ssrRender;
 export const styles = ${JSON.stringify(styles)};
 export default _sfc_main;
 `;
+	}
 
 	await writeFile(path.join(target.outDir, `${name}.ts`), output, 'utf8');
 	return `export { default as ${name}, styles as ${name}Styles } from './${name}.ts';`;

@@ -23,6 +23,7 @@ type RenderOptions = {
 	title: string;
 	styles?: string;
 	components?: Record<string, Component>;
+	props?: Record<string, unknown>;
 };
 
 function wrapHtml(appHtml: string, { title, styles }: RenderOptions) {
@@ -41,8 +42,8 @@ function wrapHtml(appHtml: string, { title, styles }: RenderOptions) {
 </html>`;
 }
 
-export async function renderHtml(component: Component, { title, styles, components }: RenderOptions) {
-	const app = createSSRApp(component);
+export async function renderHtml(component: Component, { title, styles, components, props }: RenderOptions) {
+	const app = createSSRApp(component, props);
 
 	if (components) {
 		for (const [name, instance] of Object.entries(components)) {

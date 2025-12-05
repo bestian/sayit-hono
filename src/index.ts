@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 
-const app = new Hono<{ Bindings: Env }>();
+type WorkerEnv = {
+	ASSETS: Fetcher;
+	DB: D1Database;
+};
+
+const app = new Hono<{ Bindings: WorkerEnv }>();
 
 async function serveAsset(c: any, path?: string) {
 	const url = new URL(c.req.url);
@@ -12,6 +17,32 @@ app.get('/', (c) => serveAsset(c, '/index.html'));
 
 // 僅支援 /about，不做 /about/ 的重新導向
 app.get('/about', (c) => serveAsset(c, '/about.html'));
+app.get('/about/', (c) => serveAsset(c, '/about/index.html'));
+
+// Speeches 靜態頁
+app.get('/speeches', (c) => serveAsset(c, '/speeches.html'));
+app.get('/speeches/', (c) => serveAsset(c, '/speeches/index.html'));
+
+// D1 speech_index API
+app.get('/api/speech_index.json', async (c) => {
+	try {
+		const result = await c.env.DB.prepare('SELECT filename, display_name FROM speech_index ORDER BY id ASC').all();
+
+		if (!result.success) {
+			return c.json({ error: 'Database query failed' }, 500);
+		}
+
+		const rows = result.results.map((row: any) => ({
+			filename: row.filename,
+			display_name: row.display_name
+		}));
+
+		return c.json(rows, 200);
+	} catch (error) {
+		console.error('[speech_index] query failed', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
 
 // 直接映射根層靜態檔案
 app.get('/favicon.ico', (c) => serveAsset(c, '/favicon.ico'));
