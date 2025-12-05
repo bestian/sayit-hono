@@ -1,24 +1,70 @@
-import { env, createExecutionContext, waitOnExecutionContext, SELF } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { createExecutionContext } from 'cloudflare:test';
+import { describe, expect, it } from 'vitest';
 import worker from '../src/index';
 
-// For now, you'll need to do something like this to get a correctly-typed
-// `Request` to pass to `worker.fetch()`.
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
-describe('Hello World worker', () => {
-	it('responds with Hello World! (unit style)', async () => {
-		const request = new IncomingRequest('http://example.com');
-		// Create an empty context to pass to `worker.fetch()`.
-		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, env, ctx);
-		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
-		await waitOnExecutionContext(ctx);
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
+function createEnv() {
+	const okPaths = new Set([
+		'/',
+		'/index.html',
+		'/about',
+		'/about.html',
+		'/about/',
+		'/about/index.html',
+		'/speeches',
+		'/speeches.html',
+		'/speeches/',
+		'/speeches/index.html',
+		'/favicon.ico',
+		'/robots.txt'
+	]);
+
+	return {
+		ASSETS: {
+			// 僅對已知靜態路徑回傳 200，其餘回傳 404
+			fetch: (url: string) => {
+				const pathname = new URL(url).pathname;
+				if (okPaths.has(pathname)) {
+					return new Response(`asset:${pathname}`, { status: 200 });
+				}
+				return new Response('Not Found', { status: 404 });
+			}
+		},
+		DB: {
+			prepare: () => ({
+				all: async () => ({
+					success: true,
+					results: [{ filename: 'demo.an', display_name: 'Demo Speech' }]
+				})
+			})
+		}
+	};
+}
+
+async function request(path: string, env = createEnv()) {
+	const req = new IncomingRequest(`https://example.com${path}`);
+	const ctx = createExecutionContext();
+	const res = await worker.fetch(req, env, ctx);
+	return { res, ctx };
+}
+
+describe('Worker routes', () => {
+	it.each(['/', '/about', '/about/', '/speeches', '/speeches/'])('serves static asset: %s', async (path) => {
+		const { res } = await request(path);
+		expect(res.status).toBe(200);
+		expect(await res.text()).toContain('asset:');
 	});
 
-	it('responds with Hello World! (integration style)', async () => {
-		const response = await SELF.fetch('https://example.com');
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
+	it('returns speech index from D1', async () => {
+		const { res } = await request('/api/speech_index.json');
+		expect(res.status).toBe(200);
+		const json = await res.json();
+		expect(json).toEqual([{ filename: 'demo.an', display_name: 'Demo Speech' }]);
+	});
+
+	it('returns 404 for unknown path', async () => {
+		const { res } = await request('/not-found');
+		expect(res.status).toBe(404);
 	});
 });
