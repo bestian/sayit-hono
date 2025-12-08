@@ -49,7 +49,7 @@ async function prerender() {
 	const sharedStyles = mergeStyles(components.NavbarStyles, components.FooterStyles);
 
 	const speechIndexUrl =
-		process.env.SPEECH_INDEX_URL ?? 'https://sayit-backend.audreyt.workers.dev/api/speech_index.json';
+		process.env.SPEECH_INDEX_URL ?? 'https://sayit-hono.audreyt.workers.dev/api/speech_index.json';
 	let speechIndex: Array<{ filename: string; display_name: string }> = [];
 	let speechSource = speechIndexUrl;
 
