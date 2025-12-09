@@ -15,6 +15,18 @@ type PageSpec = {
 	props?: Record<string, unknown>;
 };
 
+type Section = {
+	filename: string;
+	section_id: number;
+	previous_section_id: number | null;
+	next_section_id: number | null;
+	section_speaker: string | null;
+	section_content: string;
+	display_name: string;
+	photoURL: string | null;
+	name: string | null;
+};
+
 function mergeStyles(...styles: Array<string | undefined>) {
 	return styles.filter(Boolean).join('\n');
 }
@@ -27,6 +39,81 @@ async function loadCompiledEntries() {
 	]);
 
 	return { views, components };
+}
+
+function checkMonotonic(sections: Section[]): boolean {
+	if (sections.length <= 1) return true;
+	for (let i = 1; i < sections.length; i++) {
+		const current = sections[i];
+		const previous = sections[i - 1];
+		if (current && previous && current.section_id <= previous.section_id) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function reorderSections(sections: Section[]): Section[] {
+	if (sections.length === 0) return [];
+
+	const newArray: Section[] = [];
+	const remaining = [...sections];
+
+	let minIndex = 0;
+	let minSectionId = remaining[0]?.section_id ?? 0;
+	for (let i = 1; i < remaining.length; i++) {
+		const current = remaining[i];
+		if (current && current.section_id < minSectionId) {
+			minSectionId = current.section_id;
+			minIndex = i;
+		}
+	}
+
+	const firstSection = remaining[minIndex];
+	if (firstSection) {
+		newArray.push(firstSection);
+		remaining.splice(minIndex, 1);
+	}
+
+	const arrayLength = sections.length;
+	for (let i = 0; i < arrayLength - 1; i++) {
+		const lastItem = newArray[newArray.length - 1];
+		if (!lastItem) break;
+
+		const lastSectionId = lastItem.section_id;
+		let found = false;
+
+		for (let j = 0; j < remaining.length; j++) {
+			const current = remaining[j];
+			if (current && current.previous_section_id === lastSectionId) {
+				newArray.push(current);
+				remaining.splice(j, 1);
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) break;
+	}
+
+	return newArray;
+}
+
+async function fetchSpeechSections(speechName: string) {
+	const apiBase =
+		process.env.SPEECH_API_BASE ?? 'https://sayit-hono.audreyt.workers.dev/api/speech/';
+	const target = `${apiBase}${encodeURIComponent(speechName)}`;
+
+	const res = await fetch(target);
+	if (!res.ok) {
+		throw new Error(`fetch speech ${speechName} failed: ${res.status}`);
+	}
+
+	return (await res.json()) as Section[];
+}
+
+function normalizeSections(rawData: Section[]): Section[] {
+	return checkMonotonic(rawData) ? rawData : reorderSections(rawData);
 }
 
 async function renderPage({ component, title, styles, filename, components, aliases, props }: PageSpec) {
@@ -84,6 +171,34 @@ async function prerender() {
 	];
 
 	await Promise.all(pages.map(renderPage));
+
+	const speechPages: PageSpec[] = [];
+	for (const speech of speechIndex) {
+		try {
+			const rawSections = await fetchSpeechSections(speech.filename);
+			const sections = normalizeSections(rawSections);
+
+			const decodedSlug = decodeURIComponent(speech.filename);
+			const filename = `${decodedSlug}.html`;
+			const aliases = [path.join(decodedSlug, 'index.html')];
+
+			speechPages.push({
+				filename,
+				title: speech.display_name,
+				styles: mergeStyles(views.SingleSpeechViewStyles, sharedStyles),
+				component: views.SingleSpeechView,
+				components: sharedComponents,
+				props: { sections, speechName: speech.filename, displayName: speech.display_name },
+				aliases
+			});
+		} catch (error) {
+			console.warn(`[prerender] 無法產生 ${speech.filename}：${String(error)}`);
+		}
+	}
+
+	for (const page of speechPages) {
+		await renderPage(page);
+	}
 
 	// 將 public 複製到 www，以支援預覽與部署靜態資源
 	const publicDir = path.resolve('public');
