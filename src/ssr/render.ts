@@ -6,7 +6,6 @@ const BASE_HEAD = `<meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta property="og:url" content="https://sayit.archive.tw">
   <meta property="og:site_name" content="SayIt">
-  <meta property="og:description" content="Transcripts for the modern internet">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://sayit.pdis.nat.gov.tw/static/speeches/img/apple-touch-icon-152x152.png">
   <meta property="og:image:type" content="image/png">

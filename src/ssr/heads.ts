@@ -10,8 +10,10 @@ export type HeadSpec = {
 };
 
 const baseOgTitle = 'SayIt';
+const baseOgDescription = 'Transcripts for the modern internet';
 
 const og = (content: string): MetaEntry => ({ property: 'og:title', content });
+const ogDescription = (content: string): MetaEntry => ({ property: 'og:description', content });
 
 function description(content: string): MetaEntry {
 	return { property: 'og:description', content };
@@ -22,22 +24,22 @@ function toPlainText(html: string): string {
 }
 
 export function headForHome(): HeadSpec {
-	return { title: ' Home :: SayIt ', meta: [og(baseOgTitle)] };
+	return { title: ' Home :: SayIt ', meta: [og(baseOgTitle), ogDescription(baseOgDescription)] };
 }
 
 export function headForSpeakers(): HeadSpec {
-	return { title: ' All Speakers :: SayIt ', meta: [og(baseOgTitle)] };
+	return { title: ' All Speakers :: SayIt ', meta: [og(baseOgTitle), ogDescription(baseOgDescription)] };
 }
 
 export function headForSpeeches(): HeadSpec {
-	return { title: ' Speeches :: Sayit ', meta: [og(baseOgTitle)] };
+	return { title: ' Speeches :: Sayit ', meta: [og(baseOgTitle), ogDescription(baseOgDescription)] };
 }
 
 export function headForSingleSpeech(displayName: string): HeadSpec {
 	const name = displayName ?? '';
 	return {
 		title: ` View Section: ${name} :: SayIt `,
-		meta: [og(`View Section: ${name} :: SayIt`)]
+		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription)]
 	};
 }
 
@@ -46,7 +48,7 @@ export function headForSpeaker(routePathname: string): HeadSpec {
 	const cleaned = decoded.replace(/-\d+$/, '');
 	return {
 		title: ` View Speaker: ${cleaned} :: SayIt `,
-		meta: [og(`View Speaker: ${cleaned} :: SayIt`)]
+		meta: [og(`View Speaker: ${cleaned} :: SayIt`), ogDescription(baseOgDescription)]
 	};
 }
 
