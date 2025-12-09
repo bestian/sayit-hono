@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compileScript, compileTemplate, parse } from '@vue/compiler-sfc';
+import { compileScript, compileStyle, compileTemplate, parse } from '@vue/compiler-sfc';
 
 const VIEWS_DIR = path.resolve('src/views');
 const COMPONENTS_DIR = path.resolve('src/components');
@@ -32,8 +32,29 @@ async function compileSfc(file: string, target: CompileTarget) {
 
 	const name = path.basename(file, '.vue');
 	const id = `${name}-ssr`;
+	const hasScoped = (descriptor.styles ?? []).some((style) => style.scoped);
 
-	const styles = (descriptor.styles ?? []).map((style) => style.content).join('\n');
+	const styles = (descriptor.styles ?? [])
+		.map((style, index) => {
+			const result = compileStyle({
+				filename: file,
+				id,
+				source: style.content,
+				scoped: style.scoped ?? false,
+				isProd: false
+			});
+
+			if (result.errors.length > 0) {
+				throw new Error(
+					`編譯樣式失敗（${file} 第 ${index + 1} 個 <style>）：${result.errors
+						.map((err) => String(err))
+						.join('; ')}`
+				);
+			}
+
+			return result.code;
+		})
+		.join('\n');
 	const hasScript = Boolean(descriptor.script || descriptor.scriptSetup);
 
 	let output: string;
@@ -42,7 +63,7 @@ async function compileSfc(file: string, target: CompileTarget) {
 		const compiledScript = compileScript(descriptor, {
 			id,
 			inlineTemplate: true,
-			templateOptions: { ssr: true }
+			templateOptions: { ssr: true, scoped: hasScoped }
 		});
 
 		output = `${header}${compiledScript.content}
@@ -54,7 +75,8 @@ export const styles = ${JSON.stringify(styles)};
 			source: descriptor.template.content,
 			filename: file,
 			id,
-			ssr: true
+			ssr: true,
+			scoped: hasScoped
 		});
 
 		output = `${header}import { defineComponent } from 'vue';
