@@ -90,6 +90,9 @@ export default _sfc_main;
 `;
 	}
 
+	// 將 `.vue` 匯入改為無副檔名，讓編譯後的 `.ts` component 可以被解析
+	output = output.replace(/from\\s+(['"])([^'"\\n]+)\\.vue\\1/g, 'from $1$2$1');
+
 	await writeFile(path.join(target.outDir, `${name}.ts`), output, 'utf8');
 	return `export { default as ${name}, styles as ${name}Styles } from './${name}.ts';`;
 }

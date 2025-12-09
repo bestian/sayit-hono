@@ -5,7 +5,6 @@ import type { HeadSpec } from './heads';
 const BASE_HEAD = `<meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta property="og:url" content="https://sayit.archive.tw">
-  <meta property="og:title" content="SayIt">
   <meta property="og:site_name" content="SayIt">
   <meta property="og:description" content="Transcripts for the modern internet">
   <meta property="og:type" content="website">
