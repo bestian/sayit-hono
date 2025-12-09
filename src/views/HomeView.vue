@@ -1,41 +1,39 @@
 <template>
 	<div class="page">
 		<Navbar />
-		<main class="page__content">
-			<h1>Home</h1>
-			<p>這是首頁，使用 Vue SSR 直接由 Worker 輸出。</p>
-			<a href="/about">Learn more</a>
-		</main>
+		<div class="full-page">
+			<div class="full-page__row">
+			<div class="full-page__unit">
+				<div class="page-content__row">
+					<div class="homepage-search">
+						<h2>Search speeches and statements</h2>
+						<form class="site-search site-search--homepage" action="/search/" method="get">
+						<div class="search-wrapper">
+							<input type="search" class="site-search__input" placeholder="Search" name="q" />
+							<input type="submit" class="icon-search icon-search" value="Search" />
+						</div>
+						</form>
+					</div>
+				</div>
+			</div>
+			</div>
+			<div class="homepage-stats">
+			<div class="full-page__row">
+				<div class="full-page__unit">
+				<a href="/speeches"><strong>400841</strong></a> speeches;
+				<a href="/speakers"><strong>8037</strong></a> speakers;
+				<a href="/speeches"><strong>2193</strong></a> sections
+				</div>
+			</div>
+			<div class="full-page__row">
+				<div class="full-page__unit"></div>
+			</div>
+			</div>
+		</div>
 		<Footer />
 	</div>
 </template>
 
-<style>
-.page {
-	min-height: 100vh;
-	margin: 0;
-	display: grid;
-	gap: 24px;
-	background: linear-gradient(135deg, #f5f7fa, #e0e7ff);
-	font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-	color: #1f2937;
-}
-
-.page__content {
-	padding: 64px 24px;
-	display: grid;
-	gap: 16px;
-}
-
-h1 {
-	margin: 0;
-	font-size: 2.25rem;
-}
-
-p {
-	margin: 0;
-	max-width: 540px;
-	line-height: 1.6;
-}
+<style scoped>
 </style>
 
