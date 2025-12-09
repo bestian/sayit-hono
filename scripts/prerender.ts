@@ -4,10 +4,12 @@ import { pathToFileURL } from 'node:url';
 import { renderHtml } from '../src/ssr/render';
 import type { Component } from 'vue';
 import { buildViews } from './build-views';
+import { headForHome, headForSingleSpeech, headForSpeeches } from '../src/ssr/heads';
 
 type PageSpec = {
 	filename: string;
-	title: string;
+	title?: string;
+	head?: import('../src/ssr/heads').HeadSpec;
 	styles?: string;
 	component: Component;
 	components: Record<string, Component>;
@@ -116,8 +118,8 @@ function normalizeSections(rawData: Section[]): Section[] {
 	return checkMonotonic(rawData) ? rawData : reorderSections(rawData);
 }
 
-async function renderPage({ component, title, styles, filename, components, aliases, props }: PageSpec) {
-	const html = await renderHtml(component, { title, styles, components, props });
+async function renderPage({ component, title, styles, filename, components, aliases, props, head }: PageSpec) {
+	const html = await renderHtml(component, { title, styles, components, props, head });
 
 	const outDir = path.resolve('www');
 	await mkdir(outDir, { recursive: true });
@@ -154,14 +156,14 @@ async function prerender() {
 	const pages: PageSpec[] = [
 		{
 			filename: 'index.html',
-			title: 'Home',
+			head: headForHome(),
 			styles: mergeStyles(views.HomeViewStyles, sharedStyles),
 			component: views.HomeView,
 			components: sharedComponents
 		},
 		{
 			filename: 'speeches.html',
-			title: 'Speeches',
+			head: headForSpeeches(),
 			styles: mergeStyles(views.SpeechesViewStyles, sharedStyles),
 			component: views.SpeechesView,
 			components: sharedComponents,
@@ -184,7 +186,7 @@ async function prerender() {
 
 			speechPages.push({
 				filename,
-				title: speech.display_name,
+				head: headForSingleSpeech(speech.display_name),
 				styles: mergeStyles(views.SingleSpeechViewStyles, sharedStyles),
 				component: views.SingleSpeechView,
 				components: sharedComponents,
