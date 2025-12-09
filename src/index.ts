@@ -52,6 +52,9 @@ app.get('/', (c) => serveAsset(c, '/index.html'));
 // Speeches 靜態頁
 app.get('/speeches', (c) => serveAsset(c, '/speeches.html'));
 app.get('/speeches/', (c) => serveAsset(c, '/speeches/index.html'));
+// Speakers 靜態頁
+app.get('/speakers', (c) => serveAsset(c, '/speakers.html'));
+app.get('/speakers/', (c) => serveAsset(c, '/speakers/index.html'));
 
 // API CORS preflight
 app.options('/api/*', (c) => handleOptions(c));

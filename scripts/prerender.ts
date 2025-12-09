@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { renderHtml } from '../src/ssr/render';
 import type { Component } from 'vue';
 import { buildViews } from './build-views';
-import { headForHome, headForSingleSpeech, headForSpeeches } from '../src/ssr/heads';
+import { headForHome, headForSingleSpeech, headForSpeeches, headForSpeakers } from '../src/ssr/heads';
 
 type PageSpec = {
 	filename: string;
@@ -139,8 +139,13 @@ async function prerender() {
 
 	const speechIndexUrl =
 		process.env.SPEECH_INDEX_URL ?? 'https://sayit-hono.audreyt.workers.dev/api/speech_index.json';
+	const speakersIndexUrl =
+		process.env.SPEAKERS_INDEX_URL ??
+		'https://sayit-hono.audreyt.workers.dev/api/speakers_index.json';
 	let speechIndex: Array<{ filename: string; display_name: string }> = [];
+	let speakersIndex: Array<{ id: number; route_pathname: string; name: string; photoURL: string | null }> = [];
 	let speechSource = speechIndexUrl;
+	let speakersSource = speakersIndexUrl;
 
 	try {
 		const res = await fetch(speechIndexUrl);
@@ -151,6 +156,17 @@ async function prerender() {
 	} catch (error) {
 		console.warn(`[prerender] 無法取得 speech index，將輸出空列表：${String(error)}`);
 		speechSource = `${speechIndexUrl} (fetch failed)`;
+	}
+
+	try {
+		const res = await fetch(speakersIndexUrl);
+		if (!res.ok) {
+			throw new Error(`Unexpected status ${res.status}`);
+		}
+		speakersIndex = await res.json();
+	} catch (error) {
+		console.warn(`[prerender] 無法取得 speakers index，將輸出空列表：${String(error)}`);
+		speakersSource = `${speakersIndexUrl} (fetch failed)`;
 	}
 
 	const pages: PageSpec[] = [
@@ -169,6 +185,15 @@ async function prerender() {
 			components: sharedComponents,
 			props: { speeches: speechIndex, source: speechSource },
 			aliases: ['speeches/index.html']
+		},
+		{
+			filename: 'speakers.html',
+			head: headForSpeakers(),
+			styles: mergeStyles(views.SpeakersViewStyles, sharedStyles),
+			component: views.SpeakersView,
+			components: sharedComponents,
+			props: { speakers: speakersIndex, source: speakersSource },
+			aliases: ['speakers/index.html']
 		}
 	];
 
