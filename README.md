@@ -3,7 +3,7 @@
 這個專案使用 Hono + Vue 3 在 Cloudflare Workers 上進行 SSR，沒有 App.vue、沒有 vue-router，每個頁面獨立維護於 `src/views`。
 
 ## 檔案結構
-- `src/views/*.vue`：頁面來源（目前有 `HomeView.vue`、`AboutView.vue`）。
+- `src/views/*.vue`：頁面來源。
 - `scripts/build-views.ts`：將 `.vue` 轉成 Worker 可用的 SSR 元件，輸出到 `src/.generated/views`。
 - `scripts/prerender.ts`：使用 SSR 輸出靜態 HTML 到 `www/`。
 - `src/index.ts`：Hono Worker，直接渲染各頁。
@@ -19,7 +19,7 @@ npm run dev
 ```bash
 npm run build:static
 ```
-會在 `www/` 產生 `index.html`、`about.html`。若要近端預覽靜態檔：
+會在 `www/` 產生 `index.html`等。若要近端預覽靜態檔：
 ```bash
 npm run preview:static
 ```

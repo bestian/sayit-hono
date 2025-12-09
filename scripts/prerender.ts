@@ -73,14 +73,6 @@ async function prerender() {
 			components: sharedComponents
 		},
 		{
-			filename: 'about.html',
-			title: 'About',
-			styles: mergeStyles(views.AboutViewStyles, sharedStyles),
-			component: views.AboutView,
-			components: sharedComponents,
-			aliases: ['about/index.html']
-		},
-		{
 			filename: 'speeches.html',
 			title: 'Speeches',
 			styles: mergeStyles(views.SpeechesViewStyles, sharedStyles),

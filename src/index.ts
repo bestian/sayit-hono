@@ -23,10 +23,6 @@ async function serveAsset(c: any, path?: string) {
 
 app.get('/', (c) => serveAsset(c, '/index.html'));
 
-// 僅支援 /about，不做 /about/ 的重新導向
-app.get('/about', (c) => serveAsset(c, '/about.html'));
-app.get('/about/', (c) => serveAsset(c, '/about/index.html'));
-
 // Speeches 靜態頁
 app.get('/speeches', (c) => serveAsset(c, '/speeches.html'));
 app.get('/speeches/', (c) => serveAsset(c, '/speeches/index.html'));
