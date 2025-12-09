@@ -9,32 +9,6 @@
 	</div>
 </template>
 
-<style>
-.page {
-	min-height: 100vh;
-	margin: 0;
-	display: grid;
-	gap: 24px;
-	background: radial-gradient(circle at 20% 20%, #fff7ed, #e0f2fe);
-	font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-	color: #111827;
-}
-
-.page__content {
-	padding: 64px 24px;
-	display: grid;
-	gap: 16px;
-}
-
-h1 {
-	margin: 0;
-	font-size: 2.25rem;
-}
-
-p {
-	margin: 0;
-	max-width: 540px;
-	line-height: 1.6;
-}
+<style scoped>
 </style>
 
