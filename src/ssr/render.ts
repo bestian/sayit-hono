@@ -1,5 +1,6 @@
 import { createSSRApp, type Component } from 'vue';
 import { renderToString } from '@vue/server-renderer';
+import type { HeadSpec } from './heads';
 
 const BASE_HEAD = `<meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,20 +21,40 @@ const BASE_HEAD = `<meta charset="utf-8">
   <script type="text/javascript" src="/static/speeches/js/select2-override.js" charset="utf-8"></script>`;
 
 type RenderOptions = {
-	title: string;
+	title?: string;
+	head?: HeadSpec;
 	styles?: string;
 	components?: Record<string, Component>;
 	props?: Record<string, unknown>;
 };
 
-function wrapHtml(appHtml: string, { title, styles }: RenderOptions) {
+function renderMeta(head?: HeadSpec) {
+	const entries = head?.meta ?? [];
+	return entries
+		.map((meta) => {
+			if (meta.property) {
+				return `<meta property="${meta.property}" content="${meta.content}">`;
+			}
+			if (meta.name) {
+				return `<meta name="${meta.name}" content="${meta.content}">`;
+			}
+			return '';
+		})
+		.filter(Boolean)
+		.join('\n  ');
+}
+
+function wrapHtml(appHtml: string, { title, styles, head }: RenderOptions) {
+	const headTitle = head?.title ?? (title ? `${title} :: SayIt` : 'SayIt');
 	const inlineStyles = styles?.trim() ? `<style>${styles}</style>` : '';
+	const metaTags = renderMeta(head);
 
 	return `<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   ${BASE_HEAD}
-  <title>${title} :: SayIt</title>
+  <title>${headTitle}</title>
+  ${metaTags}
   ${inlineStyles}
 </head>
 <body id="top">
@@ -42,7 +63,10 @@ function wrapHtml(appHtml: string, { title, styles }: RenderOptions) {
 </html>`;
 }
 
-export async function renderHtml(component: Component, { title, styles, components, props }: RenderOptions) {
+export async function renderHtml(
+	component: Component,
+	{ title, styles, components, props, head }: RenderOptions
+) {
 	const app = createSSRApp(component, props);
 
 	if (components) {
@@ -52,6 +76,6 @@ export async function renderHtml(component: Component, { title, styles, componen
 	}
 
 	const appHtml = await renderToString(app);
-	return wrapHtml(appHtml, { title, styles });
+	return wrapHtml(appHtml, { title, styles, head });
 }
 
