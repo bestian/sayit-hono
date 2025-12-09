@@ -8,10 +8,6 @@ function createEnv() {
 	const okPaths = new Set([
 		'/',
 		'/index.html',
-		'/about',
-		'/about.html',
-		'/about/',
-		'/about/index.html',
 		'/speeches',
 		'/speeches.html',
 		'/speeches/',
