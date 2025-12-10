@@ -4,7 +4,13 @@ import { pathToFileURL } from 'node:url';
 import { renderHtml } from '../src/ssr/render';
 import type { Component } from 'vue';
 import { buildViews } from './build-views';
-import { headForHome, headForSingleSpeech, headForSpeeches, headForSpeakers } from '../src/ssr/heads';
+import {
+	headForHome,
+	headForSingleSpeech,
+	headForSpeeches,
+	headForSpeakers,
+	headForSpeaker
+} from '../src/ssr/heads';
 
 type PageSpec = {
 	filename: string;
@@ -27,6 +33,22 @@ type Section = {
 	display_name: string;
 	photoURL: string | null;
 	name: string | null;
+};
+
+type SpeakerDetail = {
+	id: number;
+	route_pathname: string;
+	name: string;
+	photoURL: string | null;
+	appearances_count: number;
+	sections_count: number;
+	sections: Section[];
+	longest_section: {
+		section_id: number;
+		section_content: string;
+		section_filename: string;
+		section_display_name: string;
+	} | null;
 };
 
 function mergeStyles(...styles: Array<string | undefined>) {
@@ -112,6 +134,26 @@ async function fetchSpeechSections(speechName: string) {
 	}
 
 	return (await res.json()) as Section[];
+}
+
+async function fetchSpeakerDetail(routePathname: string) {
+	const apiBase =
+		process.env.SPEAKER_DETAIL_BASE ?? 'https://sayit-hono.audreyt.workers.dev/api/speaker_detail/';
+	const normalizedPathname = routePathname.endsWith('.json') ? routePathname : `${routePathname}.json`;
+	const target = `${apiBase}${normalizedPathname}`;
+
+	const res = await fetch(target);
+	if (!res.ok) {
+		throw new Error(`fetch speaker detail ${routePathname} failed: ${res.status}`);
+	}
+
+	const data = (await res.json()) as SpeakerDetail;
+	const normalizedSections = normalizeSections(data.sections ?? []).map((section) => ({
+		...section,
+		photoURL: section.photoURL ?? null,
+		name: section.name ?? null
+	}));
+	return { ...data, sections: normalizedSections };
 }
 
 function normalizeSections(rawData: Section[]): Section[] {
@@ -224,6 +266,33 @@ async function prerender() {
 	}
 
 	for (const page of speechPages) {
+		await renderPage(page);
+	}
+
+	const speakerPages: PageSpec[] = [];
+	for (const speaker of speakersIndex) {
+		try {
+			const detail = await fetchSpeakerDetail(speaker.route_pathname);
+
+			const decodedSlug = decodeURIComponent(speaker.route_pathname);
+			const filename = path.join('speaker', `${decodedSlug}.html`);
+			const aliases = [path.join('speaker', decodedSlug, 'index.html')];
+
+			speakerPages.push({
+				filename,
+				head: headForSpeaker(speaker.route_pathname),
+				styles: mergeStyles(views.SingleSpeakerViewStyles, sharedStyles),
+				component: views.SingleSpeakerView,
+				components: sharedComponents,
+				props: { initialSpeaker: detail, routePathname: speaker.route_pathname },
+				aliases
+			});
+		} catch (error) {
+			console.warn(`[prerender] 無法產生 speaker ${speaker.route_pathname}：${String(error)}`);
+		}
+	}
+
+	for (const page of speakerPages) {
 		await renderPage(page);
 	}
 
