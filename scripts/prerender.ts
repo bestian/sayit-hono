@@ -21,6 +21,7 @@ type PageSpec = {
 	components: Record<string, Component>;
 	aliases?: string[];
 	props?: Record<string, unknown>;
+	scripts?: string;
 };
 
 type Section = {
@@ -160,8 +161,18 @@ function normalizeSections(rawData: Section[]): Section[] {
 	return checkMonotonic(rawData) ? rawData : reorderSections(rawData);
 }
 
-async function renderPage({ component, title, styles, filename, components, aliases, props, head }: PageSpec) {
-	const html = await renderHtml(component, { title, styles, components, props, head });
+async function renderPage({
+	component,
+	title,
+	styles,
+	filename,
+	components,
+	aliases,
+	props,
+	head,
+	scripts
+}: PageSpec) {
+	const html = await renderHtml(component, { title, styles, components, props, head, scripts });
 
 	const outDir = path.resolve('www');
 	await mkdir(outDir, { recursive: true });
@@ -285,6 +296,7 @@ async function prerender() {
 				component: views.SingleSpeakerView,
 				components: sharedComponents,
 				props: { initialSpeaker: detail, routePathname: speaker.route_pathname },
+				scripts: '<script src="/static/speeches/js/masonry.pkgd.min.js"></script>',
 				aliases
 			});
 		} catch (error) {

@@ -24,6 +24,7 @@ type RenderOptions = {
 	styles?: string;
 	components?: Record<string, Component>;
 	props?: Record<string, unknown>;
+	scripts?: string;
 };
 
 function renderMeta(head?: HeadSpec) {
@@ -42,10 +43,11 @@ function renderMeta(head?: HeadSpec) {
 		.join('\n  ');
 }
 
-function wrapHtml(appHtml: string, { title, styles, head }: RenderOptions) {
+function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptions) {
 	const headTitle = head?.title ?? (title ? `${title} :: SayIt` : 'SayIt');
 	const inlineStyles = styles?.trim() ? `<style>${styles}</style>` : '';
 	const metaTags = renderMeta(head);
+	const extraScripts = scripts?.trim() ? `  ${scripts}` : '';
 
 	return `<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -57,13 +59,14 @@ function wrapHtml(appHtml: string, { title, styles, head }: RenderOptions) {
 </head>
 <body id="top">
   <div id="app">${appHtml}</div>
+${extraScripts}
 </body>
 </html>`;
 }
 
 export async function renderHtml(
 	component: Component,
-	{ title, styles, components, props, head }: RenderOptions
+	{ title, styles, components, props, head, scripts }: RenderOptions
 ) {
 	const app = createSSRApp(component, props);
 
@@ -74,6 +77,6 @@ export async function renderHtml(
 	}
 
 	const appHtml = await renderToString(app);
-	return wrapHtml(appHtml, { title, styles, head });
+	return wrapHtml(appHtml, { title, styles, head, scripts });
 }
 
