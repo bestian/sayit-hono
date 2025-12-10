@@ -55,6 +55,13 @@ app.get('/speeches/', (c) => serveAsset(c, '/speeches/index.html'));
 // Speakers 靜態頁
 app.get('/speakers', (c) => serveAsset(c, '/speakers.html'));
 app.get('/speakers/', (c) => serveAsset(c, '/speakers/index.html'));
+// Speaker 詳細靜態頁
+app.get('/speaker/:route_pathname', (c) =>
+	serveAsset(c, `/speaker/${c.req.param('route_pathname')}.html`)
+);
+app.get('/speaker/:route_pathname/', (c) =>
+	serveAsset(c, `/speaker/${c.req.param('route_pathname')}/index.html`)
+);
 
 // API CORS preflight
 app.options('/api/*', (c) => handleOptions(c));

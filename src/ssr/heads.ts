@@ -45,7 +45,7 @@ export function headForSingleSpeech(displayName: string): HeadSpec {
 
 export function headForSpeaker(routePathname: string): HeadSpec {
 	const decoded = decodeURIComponent(routePathname ?? '');
-	const cleaned = decoded.replace(/-\d+$/, '');
+	const cleaned = decoded.replace(/-\d+$/, '').replace(/\s+/g, ' ').trim();
 	return {
 		title: ` View Speaker: ${cleaned} :: SayIt `,
 		meta: [og(`View Speaker: ${cleaned} :: SayIt`), ogDescription(baseOgDescription)]
