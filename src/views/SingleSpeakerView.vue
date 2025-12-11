@@ -112,6 +112,12 @@ const normalizeSpeaker = (raw: SpeakerApiResponse | Speaker | null): Speaker | n
 
 speaker.value = normalizeSpeaker(props.initialSpeaker)
 
+const hasSections = computed(() => (speaker.value?.sections?.length ?? 0) > 0)
+const displayName = computed(() => speaker.value?.name || 'This speaker')
+const portraitUrl = computed(
+  () => speaker.value?.photoURL ? 'https://sayit.archive.tw' + speaker.value?.photoURL : '/static/speeches/i/a.png'
+)
+
 // 生成演講連結（包含 hash，用於 router-link）
 const getSpeechUrl = (filename: string, sectionId: number) => {
   return `/${encodeURIComponent(filename)}#s${sectionId}`
@@ -148,14 +154,14 @@ const formatLongestSectionSummary = (summary: string) => {
 					<div class="page-header page-header--with-portrait">
 						<div class="page-header__row">
 							<div class="speaker-page__details">
-								<img :src="speaker.photoURL" style="border-color: #4d89d2; background-color: #4d89d2;"
+								<img :src="portraitUrl" style="border-color: #319393; background-color: #319393;"
 									class="speaker-portrait speaker-portrait--left speaker-portrait--large round-image"
-									:alt="`Headshot of ${speaker.name}`">
+									:alt="`Headshot of ${displayName}`">
 								<div class="speaker-information">
-									<h1>{{ speaker.name }}</h1>
+									<h1>{{ displayName }}</h1>
 								</div>
 								<div class="speaker-page__stats">
-									<div class="stat">
+									<div class="stat" v-if="hasSections">
 										<div class="stat__figure">
 											{{ speaker.appearances_count }}
 										</div>
@@ -165,7 +171,7 @@ const formatLongestSectionSummary = (summary: string) => {
 									</div>
 									<div class="stat">
 										<div class="stat__figure">
-											{{ speaker.sections_count }}
+											{{ hasSections ? speaker.sections_count : 0 }}
 										</div>
 										<div class="stat__descriptor">
 											Speeches
@@ -216,6 +222,9 @@ const formatLongestSectionSummary = (summary: string) => {
 						<ul class="unstyled js-masonry"
 							data-masonry-options='{"columnWidth":".speech","itemSelector":".speech","gutter":".gutter-sizer"}'>
 							<li class="gutter-sizer"></li>
+							<li v-if="!hasSections" class="speech">
+								{{ displayName }} has no recorded speeches yet.
+							</li>
 							<li v-for="section in speaker.sections" :key="section.section_id" :id="`s${section.section_id}`"
 								class="speech speech--speech speech--border" style="border-left-color: rgb(77, 137, 210);">
 								<div class="speech-wrapper">
