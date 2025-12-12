@@ -259,8 +259,9 @@ async function prerender() {
 	// 將 public 複製到 www，以支援預覽與部署靜態資源
 	const publicDir = path.resolve('public');
 	const outDir = path.resolve('www');
-	// 保留與 public 相同的目錄結構（含根層 favicon/robots 與 static 目錄）
-	await cp(publicDir, outDir, { recursive: true });
+	// 保留與 public 相同的目錄結構（含根層 favicon/robots、static 目錄與 media 目錄）
+	await cp(publicDir, outDir, { recursive: true, force: true });
+	console.log(`[prerender] 已複製 public/ 到 www/（包含 media/ 目錄）`);
 }
 
 prerender().catch((err) => {
