@@ -7,10 +7,12 @@ import { speechContent } from './api/speech';
 import { sectionDetail } from './api/section';
 import { speechAn } from './api/an';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
+import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
+import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generated/views/SingleSpeakerView';
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
 import { renderHtml } from './ssr/render';
-import { headForSpeechContent } from './ssr/heads';
+import { headForSpeechContent, headForSingleSpeech, headForSpeaker } from './ssr/heads';
 
 type WorkerEnv = {
 	ASSETS: Fetcher;
@@ -47,6 +49,80 @@ async function loadSection(c: any, sectionId: number) {
 	return result.results[0] as any;
 }
 
+type Section = {
+	filename: string;
+	section_id: number;
+	previous_section_id: number | null;
+	next_section_id: number | null;
+	section_speaker: string | null;
+	section_content: string;
+	display_name: string;
+	photoURL: string | null;
+	name: string | null;
+};
+
+function checkMonotonic(sections: Section[]): boolean {
+	if (sections.length <= 1) return true;
+	for (let i = 1; i < sections.length; i++) {
+		const current = sections[i];
+		const previous = sections[i - 1];
+		if (current && previous && current.section_id <= previous.section_id) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function reorderSections(sections: Section[]): Section[] {
+	if (sections.length === 0) return [];
+
+	const newArray: Section[] = [];
+	const remaining = [...sections];
+
+	let minIndex = 0;
+	let minSectionId = remaining[0]?.section_id ?? 0;
+	for (let i = 1; i < remaining.length; i++) {
+		const current = remaining[i];
+		if (current && current.section_id < minSectionId) {
+			minSectionId = current.section_id;
+			minIndex = i;
+		}
+	}
+
+	const firstSection = remaining[minIndex];
+	if (firstSection) {
+		newArray.push(firstSection);
+		remaining.splice(minIndex, 1);
+	}
+
+	const arrayLength = sections.length;
+	for (let i = 0; i < arrayLength - 1; i++) {
+		const lastItem = newArray[newArray.length - 1];
+		if (!lastItem) break;
+
+		const lastSectionId = lastItem.section_id;
+		let found = false;
+
+		for (let j = 0; j < remaining.length; j++) {
+			const current = remaining[j];
+			if (current && current.previous_section_id === lastSectionId) {
+				newArray.push(current);
+				remaining.splice(j, 1);
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) break;
+	}
+
+	return newArray;
+}
+
+function normalizeSections(rawData: Section[]): Section[] {
+	return checkMonotonic(rawData) ? rawData : reorderSections(rawData);
+}
+
 app.get('/', (c) => serveAsset(c, '/index.html'));
 
 // Speeches 靜態頁
@@ -55,13 +131,6 @@ app.get('/speeches/', (c) => serveAsset(c, '/speeches/index.html'));
 // Speakers 靜態頁
 app.get('/speakers', (c) => serveAsset(c, '/speakers.html'));
 app.get('/speakers/', (c) => serveAsset(c, '/speakers/index.html'));
-// Speaker 詳細靜態頁
-app.get('/speaker/:route_pathname', (c) =>
-	serveAsset(c, `/speaker/${c.req.param('route_pathname')}.html`)
-);
-app.get('/speaker/:route_pathname/', (c) =>
-	serveAsset(c, `/speaker/${c.req.param('route_pathname')}/index.html`)
-);
 
 // API CORS preflight
 app.options('/api/*', (c) => handleOptions(c));
@@ -112,9 +181,189 @@ app.get('/speech/:section_id', async (c) => {
 	return c.html(html);
 });
 
+// SSR 講者頁
+app.get('/speaker/:route_pathname', async (c) => {
+	const routePathname = encodeURIComponent(c.req.param('route_pathname'));
+	console.log(routePathname);
+	if (!routePathname) {
+		return c.text('Bad Request', 400);
+	}
+
+	let speaker: any;
+	let sections: Section[];
+	try {
+		// 取得講者基本資料
+		const speakerRow = await c.env.DB.prepare('SELECT * FROM speakers_view WHERE route_pathname = ?')
+			.bind(routePathname)
+			.first();
+
+		if (!speakerRow) {
+			return c.text('Not Found', 404);
+		}
+
+		// 取得講者的所有段落
+		const sectionsResult = await c.env.DB.prepare(
+			`SELECT
+				sc.filename,
+				sc.section_id,
+				sc.previous_section_id,
+				sc.next_section_id,
+				sc.section_speaker,
+				sc.section_content,
+				si.display_name
+			FROM speech_content sc
+			LEFT JOIN speech_index si ON sc.filename = si.filename
+			WHERE sc.section_speaker = ?
+			ORDER BY sc.section_id ASC`
+		)
+			.bind(routePathname)
+			.all();
+
+		if (!sectionsResult.success) {
+			throw new Error('Database query failed');
+		}
+
+		sections = normalizeSections(
+			sectionsResult.results.map((row: any) => ({
+				filename: row.filename,
+				display_name: row.display_name,
+				section_id: row.section_id,
+				previous_section_id: row.previous_section_id,
+				next_section_id: row.next_section_id,
+				section_speaker: row.section_speaker,
+				section_content: row.section_content,
+				photoURL: null,
+				name: null
+			}))
+		);
+
+		const longestSection = speakerRow.longest_section_id
+			? {
+					section_id: speakerRow.longest_section_id,
+					section_content: speakerRow.longest_section_content || '',
+					section_filename: speakerRow.longest_section_filename || '',
+					section_display_name: speakerRow.longest_section_displayname || ''
+			  }
+			: null;
+
+		speaker = {
+			id: speakerRow.id,
+			route_pathname: speakerRow.route_pathname,
+			name: speakerRow.name,
+			photoURL: speakerRow.photoURL,
+			appearances_count: speakerRow.appearances_count ?? 0,
+			sections_count: (typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length,
+			sections,
+			longest_section: longestSection
+		};
+	} catch (err) {
+		console.error('[speaker SSR] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	const styles = [SingleSpeakerViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForSpeaker(speaker.route_pathname);
+
+	const html = await renderHtml(SingleSpeakerView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: { initialSpeaker: speaker, routePathname: speaker.route_pathname },
+		scripts: '<script src="/static/speeches/js/masonry.pkgd.min.js"></script>'
+	});
+
+	return c.html(html);
+});
+
+
 // 直接映射根層靜態檔案
 app.get('/favicon.ico', (c) => serveAsset(c, '/favicon.ico'));
 app.get('/robots.txt', (c) => serveAsset(c, '/robots.txt'));
+
+// SSR 演講頁（單一演講，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
+app.get('/:filename', async (c) => {
+	console.log('SSR Single Speech filename', c.req.param('filename'));
+	const encodedFilename = c.req.param('filename');
+	if (!encodedFilename) {
+		return c.text('Not Found', 404);
+	}
+
+	// 排除已知路由與靜態檔案路徑
+	const excludedPaths = [
+		'api',
+		'speeches',
+		'speakers',
+		'speaker',
+		'speech',
+		'favicon.ico',
+		'robots.txt',
+		'static',
+		'index.html'
+	];
+	if (excludedPaths.includes(encodedFilename.toLowerCase())) {
+		return c.text('Not Found', 404);
+	}
+
+	// 純數字留給 /speech/:section_id
+	if (/^\d+$/.test(encodedFilename)) {
+		return c.text('Not Found', 404);
+	}
+
+	let filename: string;
+	try {
+		filename = decodeURIComponent(encodedFilename);
+	} catch {
+		return c.text('Not Found', 404);
+	}
+
+	let sections: Section[];
+	try {
+		const result = await c.env.DB.prepare(
+			'SELECT filename, section_id, previous_section_id, next_section_id, section_speaker, section_content, display_name, photoURL, name FROM sections WHERE filename = ? ORDER BY section_id ASC'
+		)
+			.bind(filename)
+			.all();
+
+		if (!result.success) {
+			throw new Error('Database query failed');
+		}
+
+		const rawSections = result.results.map((row: any) => ({
+			filename: row.filename,
+			section_id: row.section_id,
+			previous_section_id: row.previous_section_id,
+			next_section_id: row.next_section_id,
+			section_speaker: row.section_speaker,
+			section_content: row.section_content,
+			display_name: row.display_name,
+			photoURL: row.photoURL,
+			name: row.name
+		}));
+
+		if (rawSections.length === 0) {
+			return c.text('Not Found', 404);
+		}
+
+		sections = normalizeSections(rawSections);
+	} catch (err) {
+		console.error('[speech SSR] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	const displayName = sections[0]?.display_name ?? filename;
+	const styles = [SingleSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForSingleSpeech(displayName);
+
+	const html = await renderHtml(SingleSpeechView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: { sections, speechName: filename, displayName }
+	});
+
+	return c.html(html);
+});
+
 
 // 其餘請求交給靜態資源或返回 404
 app.get('*', async (c) => {

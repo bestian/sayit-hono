@@ -252,61 +252,9 @@ async function prerender() {
 
 	await Promise.all(pages.map(renderPage));
 
-	const speechPages: PageSpec[] = [];
-	for (const speech of speechIndex.slice(0, 10)) {
-		try {
-			const rawSections = await fetchSpeechSections(speech.filename);
-			const sections = normalizeSections(rawSections);
-
-			const decodedSlug = decodeURIComponent(speech.filename);
-			const filename = `${decodedSlug}.html`;
-			const aliases = [path.join(decodedSlug, 'index.html')];
-
-			speechPages.push({
-				filename,
-				head: headForSingleSpeech(speech.display_name),
-				styles: mergeStyles(views.SingleSpeechViewStyles, sharedStyles),
-				component: views.SingleSpeechView,
-				components: sharedComponents,
-				props: { sections, speechName: speech.filename, displayName: speech.display_name },
-				aliases
-			});
-		} catch (error) {
-			console.warn(`[prerender] 無法產生 ${speech.filename}：${String(error)}`);
-		}
-	}
-
-	for (const page of speechPages) {
-		await renderPage(page);
-	}
-
-	const speakerPages: PageSpec[] = [];
-	for (const speaker of speakersIndex.slice(0, 10)) {
-		try {
-			const detail = await fetchSpeakerDetail(speaker.route_pathname);
-
-			const decodedSlug = decodeURIComponent(speaker.route_pathname);
-			const filename = path.join('speaker', `${decodedSlug}.html`);
-			const aliases = [path.join('speaker', decodedSlug, 'index.html')];
-
-			speakerPages.push({
-				filename,
-				head: headForSpeaker(speaker.route_pathname),
-				styles: mergeStyles(views.SingleSpeakerViewStyles, sharedStyles),
-				component: views.SingleSpeakerView,
-				components: sharedComponents,
-				props: { initialSpeaker: detail, routePathname: speaker.route_pathname },
-				scripts: '<script src="/static/speeches/js/masonry.pkgd.min.js"></script>',
-				aliases
-			});
-		} catch (error) {
-			console.warn(`[prerender] 無法產生 speaker ${speaker.route_pathname}：${String(error)}`);
-		}
-	}
-
-	for (const page of speakerPages) {
-		await renderPage(page);
-	}
+	// 注意：演講詳細頁和講者詳細頁已改為 SSR，不再在此 prerender
+	// 詳細頁面會在 Cloudflare Workers 中按需動態渲染，直接從 D1 資料庫讀取資料
+	// 這樣可以大幅減少 prerender 時間，並確保資料即時性
 
 	// 將 public 複製到 www，以支援預覽與部署靜態資源
 	const publicDir = path.resolve('public');
