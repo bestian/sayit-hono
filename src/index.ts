@@ -280,6 +280,12 @@ app.get('/speaker/:route_pathname', async (c) => {
 app.get('/favicon.ico', (c) => serveAsset(c, '/favicon.ico'));
 app.get('/robots.txt', (c) => serveAsset(c, '/robots.txt'));
 
+// 媒體資源（圖檔等）
+app.get('/media/*', (c) => serveAsset(c));
+
+// 靜態檔案
+app.get('/static/*', (c) => serveAsset(c));
+
 // SSR 演講頁（單一演講，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
 app.get('/:filename', async (c) => {
 	console.log('SSR Single Speech filename', c.req.param('filename'));
