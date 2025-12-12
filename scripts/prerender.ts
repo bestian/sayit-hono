@@ -253,7 +253,7 @@ async function prerender() {
 	await Promise.all(pages.map(renderPage));
 
 	const speechPages: PageSpec[] = [];
-	for (const speech of speechIndex) {
+	for (const speech of speechIndex.slice(0, 10)) {
 		try {
 			const rawSections = await fetchSpeechSections(speech.filename);
 			const sections = normalizeSections(rawSections);
@@ -281,7 +281,7 @@ async function prerender() {
 	}
 
 	const speakerPages: PageSpec[] = [];
-	for (const speaker of speakersIndex) {
+	for (const speaker of speakersIndex.slice(0, 10)) {
 		try {
 			const detail = await fetchSpeakerDetail(speaker.route_pathname);
 
