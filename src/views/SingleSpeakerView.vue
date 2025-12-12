@@ -115,7 +115,7 @@ speaker.value = normalizeSpeaker(props.initialSpeaker)
 const hasSections = computed(() => (speaker.value?.sections?.length ?? 0) > 0)
 const displayName = computed(() => speaker.value?.name || 'This speaker')
 const portraitUrl = computed(
-  () => speaker.value?.photoURL ? 'https://sayit.archive.tw' + speaker.value?.photoURL : '/static/speeches/i/a.png'
+  () => speaker.value?.photoURL || '/static/speeches/i/a.png'
 )
 
 // 生成演講連結（包含 hash，用於 router-link）
