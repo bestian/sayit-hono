@@ -59,7 +59,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 									:href="getSpeakerUrl(section.section_speaker)"
 								>
 									<img
-										:src="section.photoURL"
+										:src="'https://sayit.archive.tw' + section.photoURL"
 										:style="`border-color: #4d89d2; background-color: #4d89d2;`"
 										:alt="section.name || ''"
 										class="speaker-portrait speaker-portrait--left round-image speaker-portrait--large"
