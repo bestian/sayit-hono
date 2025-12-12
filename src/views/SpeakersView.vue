@@ -27,7 +27,7 @@ const speakers = computed<Speaker[]>(() => props.speakers ?? [])
 						<li v-for="speaker in speakers" :key="speaker.id">
 							<a :href="'/speaker/' + speaker.route_pathname">
 								<div class="speaker-card">
-									<img :src="speaker.photoURL ? 'https://sayit.archive.tw' + speaker.photoURL : '/static/speeches/i/a.png'"
+									<img :src="speaker.photoURL || '/static/speeches/i/a.png'"
 										style="border-color: #9c4f2d; background-color: #9c4f2d;" :alt="speaker.name || 'Speaker Photo'"
 										class="speaker-card__portrait speaker-portrait round-image speaker-portrait--small">
 									<span class="speaker-card__name"> {{ speaker.name || 'Speaker' }}</span>
