@@ -30,7 +30,15 @@ function stripHtmlTags(html: string): string {
 	return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-const parsedContent = parseContent(props.section?.section_content);
+function sanitizeHtmlContent(html: string): string {
+	// Remove script tags with various formats and replace with warning comment
+	return html
+		.replace(/<script[\s\S]*?<\/script>/gi, '<!-- Warning: there\'s an unexpected Script -->')
+		.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '<!-- Warning: there\'s an unexpected Script -->')
+		.replace(/<script[^>]*\/>/gi, '<!-- Warning: there\'s an unexpected Script -->');
+}
+
+const parsedContent = sanitizeHtmlContent(parseContent(props.section?.section_content));
 const previousTextPreview = props.section?.previous_content
 	? stripHtmlTags(parseContent(props.section.previous_content)).slice(0, 30)
 	: '';
