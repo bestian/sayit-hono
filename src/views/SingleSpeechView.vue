@@ -43,6 +43,14 @@ const getSpeakerUrl = (sectionSpeaker: string) => `/speaker/${sectionSpeaker}`
 
 const getSpeakerColor = (): string => '#4d89d2'
 
+const sanitizeHtmlContent = (html: string): string => {
+	// Remove script tags with various formats and replace with warning comment
+	return html
+		.replace(/<script[\s\S]*?<\/script>/gi, '<!-- Warning: there\'s an unexpected Script -->')
+		.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '<!-- Warning: there\'s an unexpected Script -->')
+		.replace(/<script[^>]*\/>/gi, '<!-- Warning: there\'s an unexpected Script -->');
+}
+
 const loading = false
 </script>
 
@@ -82,7 +90,7 @@ const loading = false
 												</a>
 											</span>
 										</div>
-										<div class="speech__content" v-html="section.section_content">
+										<div class="speech__content" v-html="sanitizeHtmlContent(section.section_content)">
 										</div>
 										<div class="speech__links">
 											<a :href="getLinkInContextUrl(section)" title="Link in context">
