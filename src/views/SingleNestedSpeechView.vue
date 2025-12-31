@@ -1,5 +1,5 @@
 <script setup lang="ts">
-	import { computed, onBeforeUnmount, onMounted } from 'vue';
+	import { computed } from 'vue';
 
 	interface Section {
 		filename: string;
@@ -81,32 +81,6 @@
 	const getNestUrl = (nestFilename: string) =>
 		`/${encodeURIComponent(props.speechName)}/${encodeURIComponent(nestFilename)}`;
 
-	const isEditableElement = (el: Element | null) => {
-		if (!el) return false;
-		const tag = el.tagName.toLowerCase();
-		return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable;
-	};
-
-	const handleKeyNavigation = (event: KeyboardEvent) => {
-		if (event.metaKey || event.ctrlKey || event.altKey) return;
-		if (isEditableElement(document.activeElement)) return;
-
-		if (event.key === 'j' && previousSibling.value) {
-			window.location.href = getNestUrl(previousSibling.value.nest_filename);
-		}
-		if (event.key === 'k' && nextSibling.value) {
-			window.location.href = getNestUrl(nextSibling.value.nest_filename);
-		}
-	};
-
-	onMounted(() => {
-		window.addEventListener('keydown', handleKeyNavigation);
-	});
-
-	onBeforeUnmount(() => {
-		window.removeEventListener('keydown', handleKeyNavigation);
-	});
-
 	const sanitizeHtmlContent = (html: string): string => {
 		// Remove script tags with various formats and replace with warning comment
 		return html
@@ -184,6 +158,7 @@
 										v-if="previousSibling"
 										class="button speech-navigation__button"
 										:href="getNestUrl(previousSibling.nest_filename)"
+										data-prev-btn
 									>
 									   ← {{ formattedPreviousSiblingTitle }}
 									</a>
@@ -191,6 +166,7 @@
 										v-if="nextSibling"
 										class="button speech-navigation__button"
 										:href="getNestUrl(nextSibling.nest_filename)"
+										data-next-btn
 									>
 									{{ formattedNextSiblingTitle }} →
 									</a>
