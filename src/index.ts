@@ -8,6 +8,8 @@ import { sectionDetail } from './api/section';
 import { speechAn } from './api/an';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
 import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
+import NestedSpeechView, { styles as NestedSpeechViewStyles } from './.generated/views/NestedSpeechView';
+import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from './.generated/views/SingleNestedSpeechView';
 import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generated/views/SingleSpeakerView';
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
@@ -51,6 +53,8 @@ async function loadSection(c: any, sectionId: number) {
 
 type Section = {
 	filename: string;
+	nest_filename?: string | null;
+	nest_display_name?: string | null;
 	section_id: number;
 	previous_section_id: number | null;
 	next_section_id: number | null;
@@ -60,6 +64,25 @@ type Section = {
 	photoURL: string | null;
 	name: string | null;
 };
+
+type SpeechIndexRow = {
+	filename: string;
+	display_name: string;
+	isNested: number | boolean;
+	nest_filenames?: string | null;
+	nest_display_names?: string | null;
+};
+
+async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow | null> {
+	const result = await c.env.DB.prepare(
+		`SELECT filename, display_name, isNested, nest_filenames, nest_display_names
+		 FROM speech_index WHERE filename = ?`
+	)
+		.bind(filename)
+		.first<SpeechIndexRow>();
+
+	return result ?? null;
+}
 
 function checkMonotonic(sections: Section[]): boolean {
 	if (sections.length <= 1) return true;
@@ -286,7 +309,120 @@ app.get('/media/*', (c) => serveAsset(c));
 // 靜態檔案
 app.get('/static/*', (c) => serveAsset(c));
 
-// SSR 演講頁（單一演講，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
+const excludedPaths = [
+	'api',
+	'speeches',
+	'speakers',
+	'speaker',
+	'speech',
+	'favicon.ico',
+	'robots.txt',
+	'static',
+	'index.html'
+];
+
+function isExcludedPath(segment: string) {
+	return excludedPaths.includes(segment.toLowerCase());
+}
+
+// SSR 巢狀演講內容頁（巢狀子項）
+app.get('/:filename/:nest_filename', async (c) => {
+	const encodedFilename = c.req.param('filename');
+	const encodedNestFilename = c.req.param('nest_filename');
+
+	if (!encodedFilename || !encodedNestFilename || isExcludedPath(encodedFilename)) {
+		return c.text('Not Found', 404);
+	}
+
+	let filename: string;
+	let nestFilename: string;
+	try {
+		filename = decodeURIComponent(encodedFilename);
+		nestFilename = decodeURIComponent(encodedNestFilename);
+	} catch {
+		return c.text('Not Found', 404);
+	}
+
+	let speechMeta: SpeechIndexRow | null;
+	try {
+		speechMeta = await loadSpeechMeta(c, filename);
+	} catch (err) {
+		console.error('[nested speech meta] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	if (!speechMeta || !speechMeta.isNested) {
+		return c.text('Not Found', 404);
+	}
+
+	let sections: Section[];
+	try {
+		const result = await c.env.DB.prepare(
+			`SELECT
+				sc.filename,
+				sc.nest_filename,
+				sc.nest_display_name,
+				sc.section_id,
+				sc.previous_section_id,
+				sc.next_section_id,
+				sc.section_speaker,
+				sc.section_content,
+				si.display_name,
+				sp.photoURL,
+				sp.name
+			FROM speech_content sc
+			LEFT JOIN speech_index si ON sc.filename = si.filename
+			LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+			WHERE sc.filename = ? AND sc.nest_filename = ?
+			ORDER BY sc.section_id ASC`
+		)
+			.bind(filename, nestFilename)
+			.all();
+
+		if (!result.success) {
+			throw new Error('Database query failed');
+		}
+
+		const rawSections = result.results.map((row: any) => ({
+			filename: row.filename,
+			nest_filename: row.nest_filename ?? null,
+			nest_display_name: row.nest_display_name ?? row.nest_filename ?? null,
+			section_id: row.section_id,
+			previous_section_id: row.previous_section_id,
+			next_section_id: row.next_section_id,
+			section_speaker: row.section_speaker,
+			section_content: row.section_content,
+			display_name: row.display_name,
+			photoURL: row.photoURL,
+			name: row.name
+		}));
+
+		if (rawSections.length === 0) {
+			return c.text('Not Found', 404);
+		}
+
+		sections = normalizeSections(rawSections);
+	} catch (err) {
+		console.error('[nested speech detail] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	const nestDisplayName = sections[0]?.nest_display_name ?? nestFilename;
+	const speechDisplayName = speechMeta.display_name ?? filename;
+	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForSingleSpeech(nestDisplayName);
+
+	const html = await renderHtml(SingleNestedSpeechView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: { sections, speechName: filename, nestFilename, displayName: nestDisplayName, speechDisplayName }
+	});
+
+	return c.html(html);
+});
+
+// SSR 演講頁（單一演講或巢狀清單，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
 app.get('/:filename', async (c) => {
 	console.log('SSR Single Speech filename', c.req.param('filename'));
 	const encodedFilename = c.req.param('filename');
@@ -294,19 +430,7 @@ app.get('/:filename', async (c) => {
 		return c.text('Not Found', 404);
 	}
 
-	// 排除已知路由與靜態檔案路徑
-	const excludedPaths = [
-		'api',
-		'speeches',
-		'speakers',
-		'speaker',
-		'speech',
-		'favicon.ico',
-		'robots.txt',
-		'static',
-		'index.html'
-	];
-	if (excludedPaths.includes(encodedFilename.toLowerCase())) {
+	if (isExcludedPath(encodedFilename)) {
 		return c.text('Not Found', 404);
 	}
 
@@ -320,6 +444,98 @@ app.get('/:filename', async (c) => {
 		filename = decodeURIComponent(encodedFilename);
 	} catch {
 		return c.text('Not Found', 404);
+	}
+
+	let speechMeta: SpeechIndexRow | null;
+	try {
+		speechMeta = await loadSpeechMeta(c, filename);
+	} catch (err) {
+		console.error('[speech meta] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	if (!speechMeta) {
+		return c.text('Not Found', 404);
+	}
+
+	if (speechMeta.isNested) {
+		let nests: Array<{ nest_filename: string; nest_display_name: string; section_count: number; preview?: string }> =
+			[];
+
+		try {
+			const result = await c.env.DB.prepare(
+				`SELECT
+					nest_filename,
+					nest_display_name,
+					section_id,
+					section_content
+				FROM speech_content
+				WHERE filename = ?
+				ORDER BY section_id ASC`
+			)
+				.bind(filename)
+				.all();
+
+			if (!result.success) {
+				throw new Error('Database query failed');
+			}
+
+			const map = new Map<
+				string,
+				{ nest_filename: string; nest_display_name: string; section_count: number; preview?: string }
+			>();
+
+			for (const row of result.results as any[]) {
+				const nestKey = row.nest_filename;
+				if (!nestKey) continue;
+
+				const existing = map.get(nestKey) ?? {
+					nest_filename: nestKey,
+					nest_display_name: row.nest_display_name ?? nestKey,
+					section_count: 0,
+					preview: undefined
+				};
+
+				const currentCount = existing.section_count + 1;
+				let preview = existing.preview;
+				if (!preview) {
+					const parsedContent = parseContent(row.section_content ?? '');
+					const plain = toPlainText(parsedContent);
+					preview = plain ? `${plain.slice(0, 80)}${plain.length > 80 ? '...' : ''}` : undefined;
+				}
+
+				map.set(nestKey, {
+					...existing,
+					section_count: currentCount,
+					preview
+				});
+			}
+
+			nests = Array.from(map.values());
+		} catch (err) {
+			console.error('[nested speech list] DB error', err);
+			return c.text('Internal Server Error', 500);
+		}
+
+		if (nests.length === 0) {
+			return c.text('Not Found', 404);
+		}
+
+		const styles = [NestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+		const head = headForSingleSpeech(speechMeta.display_name ?? filename);
+
+		const html = await renderHtml(NestedSpeechView, {
+			head,
+			styles,
+			components: { Navbar, Footer },
+			props: {
+				nests,
+				speechName: filename,
+				displayName: speechMeta.display_name ?? filename
+			}
+		});
+
+		return c.html(html);
 	}
 
 	let sections: Section[];
@@ -356,7 +572,7 @@ app.get('/:filename', async (c) => {
 		return c.text('Internal Server Error', 500);
 	}
 
-	const displayName = sections[0]?.display_name ?? filename;
+	const displayName = sections[0]?.display_name ?? speechMeta.display_name ?? filename;
 	const styles = [SingleSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSingleSpeech(displayName);
 
