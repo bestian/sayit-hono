@@ -92,10 +92,11 @@ async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow 
 		 FROM speech_index WHERE filename = ?`
 	)
 		.bind(filename)
-		.first<SpeechIndexRow>();
+		.first();
 
-	return result ?? null;
+	return result as SpeechIndexRow ?? null;
 }
+
 
 function checkMonotonic(sections: Section[]): boolean {
 	if (sections.length <= 1) return true;
