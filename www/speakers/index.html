@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html class="no-touch" lang="zh-Hant">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +16,14 @@
   <link href="/static/speeches/css/speeches.css" rel="stylesheet" type="text/css">
   <script type="text/javascript" src="/static/speeches/js/jquery.js" charset="utf-8"></script>
   <script type="text/javascript" src="/static/speeches/js/select2-override.js" charset="utf-8"></script>
+  <script>
+    (function() {
+      var root = document.documentElement;
+      var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      root.classList.remove('no-touch');
+      root.classList.add(hasTouch ? 'touch' : 'no-touch');
+    })();
+  </script>
   <title> All Speakers :: SayIt </title>
   <meta property="og:title" content="SayIt">
   <meta property="og:description" content="Transcripts for the modern internet">
