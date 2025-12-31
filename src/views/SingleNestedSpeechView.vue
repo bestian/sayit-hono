@@ -1,5 +1,5 @@
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, onBeforeUnmount, onMounted } from 'vue';
 
 	interface Section {
 		filename: string;
@@ -15,12 +15,18 @@
 		name: string | null;
 	}
 
+	type SiblingNest = {
+		nest_filename: string;
+		nest_display_name?: string | null;
+	};
+
 	const props = defineProps<{
 		sections: Section[];
 		speechName: string;
 		nestFilename: string;
 		displayName?: string;
 		speechDisplayName?: string;
+		siblings?: SiblingNest[];
 	}>();
 
 	const displaySections = computed(() => props.sections ?? []);
@@ -39,6 +45,15 @@
 		return props.speechName;
 	});
 
+	const formattedPreviousSiblingTitle = computed(() => {
+		if (previousSibling.value?.nest_display_name) return previousSibling.value.nest_display_name;
+		return previousSibling.value?.nest_filename;
+	});
+	const formattedNextSiblingTitle = computed(() => {
+		if (nextSibling.value?.nest_display_name) return nextSibling.value.nest_display_name;
+		return nextSibling.value?.nest_filename;
+	});
+
 	const getLinkInContextUrl = (section: Section) =>
 		`/${encodeURIComponent(section.filename)}/${encodeURIComponent(props.nestFilename)}#s${section.section_id}`;
 
@@ -48,7 +63,49 @@
 
 	const getNestListUrl = () => `/${encodeURIComponent(props.speechName)}`;
 
-const getSpeakerColor = (): string => '#4d89d2';
+	const getSpeakerColor = (): string => '#4d89d2';
+
+	const siblingList = computed(() => props.siblings ?? []);
+	const currentSiblingIndex = computed(() =>
+		siblingList.value.findIndex((item) => item.nest_filename === props.nestFilename)
+	);
+	const previousSibling = computed(() =>
+		currentSiblingIndex.value > 0 ? siblingList.value[currentSiblingIndex.value - 1] : null
+	);
+	const nextSibling = computed(() =>
+		currentSiblingIndex.value >= 0 && currentSiblingIndex.value < siblingList.value.length - 1
+			? siblingList.value[currentSiblingIndex.value + 1]
+			: null
+	);
+
+	const getNestUrl = (nestFilename: string) =>
+		`/${encodeURIComponent(props.speechName)}/${encodeURIComponent(nestFilename)}`;
+
+	const isEditableElement = (el: Element | null) => {
+		if (!el) return false;
+		const tag = el.tagName.toLowerCase();
+		return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable;
+	};
+
+	const handleKeyNavigation = (event: KeyboardEvent) => {
+		if (event.metaKey || event.ctrlKey || event.altKey) return;
+		if (isEditableElement(document.activeElement)) return;
+
+		if (event.key === 'j' && previousSibling.value) {
+			window.location.href = getNestUrl(previousSibling.value.nest_filename);
+		}
+		if (event.key === 'k' && nextSibling.value) {
+			window.location.href = getNestUrl(nextSibling.value.nest_filename);
+		}
+	};
+
+	onMounted(() => {
+		window.addEventListener('keydown', handleKeyNavigation);
+	});
+
+	onBeforeUnmount(() => {
+		window.removeEventListener('keydown', handleKeyNavigation);
+	});
 
 	const sanitizeHtmlContent = (html: string): string => {
 		// Remove script tags with various formats and replace with warning comment
@@ -120,7 +177,32 @@ const getSpeakerColor = (): string => '#4d89d2';
 									</li>
 								</ul>
 							</div>
-							<div class="sidebar__unit section-detail-sidebar"></div>
+							<!-- close primary-content__unit -->
+							<div class="sidebar__unit section-detail-sidebar">
+								<div class="section-navigation">
+									<a
+										v-if="previousSibling"
+										class="button speech-navigation__button"
+										:href="getNestUrl(previousSibling.nest_filename)"
+									>
+									   ← {{ formattedPreviousSiblingTitle }}
+									</a>
+									<a
+										v-if="nextSibling"
+										class="button speech-navigation__button"
+										:href="getNestUrl(nextSibling.nest_filename)"
+									>
+									{{ formattedNextSiblingTitle }} →
+									</a>
+								</div>
+								<div class="ui-instructions cleared">
+									<h2>Keyboard shortcuts</h2>
+									<p>
+										<span class="key-descriptor">j</span> previous section
+										<span class="key-descriptor">k</span> next section
+									</p>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>

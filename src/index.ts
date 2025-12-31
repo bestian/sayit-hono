@@ -44,6 +44,19 @@ function toPlainText(html: string) {
 	return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function parseToArray(raw?: string | null): string[] {
+	if (!raw) return [];
+	const parsed = parseContent(raw);
+	if (Array.isArray(parsed)) return parsed.map((v) => `${v}`.trim()).filter(Boolean);
+	if (typeof parsed === 'string') {
+		return parsed
+			.split(',')
+			.map((v) => v.trim())
+			.filter(Boolean);
+	}
+	return [];
+}
+
 async function loadSection(c: any, sectionId: number) {
 	const result = await c.env.DB.prepare('SELECT * FROM sections WHERE section_id = ?').bind(sectionId).all();
 	if (!result.success) throw new Error('Database query failed');
@@ -409,6 +422,12 @@ app.get('/:filename/:nest_filename', async (c) => {
 
 	const nestDisplayName = sections[0]?.nest_display_name ?? nestFilename;
 	const speechDisplayName = speechMeta.display_name ?? filename;
+	const nestFilenames = parseToArray(speechMeta.nest_filenames);
+	const nestDisplayNames = parseToArray(speechMeta.nest_display_names);
+	const siblings = nestFilenames.map((nest, idx) => ({
+		nest_filename: nest,
+		nest_display_name: nestDisplayNames[idx] ?? nest
+	}));
 	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSingleSpeech(nestDisplayName);
 
@@ -416,7 +435,14 @@ app.get('/:filename/:nest_filename', async (c) => {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: { sections, speechName: filename, nestFilename, displayName: nestDisplayName, speechDisplayName }
+		props: {
+			sections,
+			speechName: filename,
+			nestFilename,
+			displayName: nestDisplayName,
+			speechDisplayName,
+			siblings
+		}
 	});
 
 	return c.html(html);
