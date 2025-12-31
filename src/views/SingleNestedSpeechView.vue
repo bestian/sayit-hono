@@ -42,14 +42,11 @@ const formattedParentTitle = computed(() => {
 const getLinkInContextUrl = (section: Section) =>
 	`/${encodeURIComponent(section.filename)}/${encodeURIComponent(props.nestFilename)}#s${section.section_id}`;
 
-const getSpeechPageUrl = (sectionId: number) =>
-	`/${encodeURIComponent(props.speechName)}/${encodeURIComponent(props.nestFilename)}#s${sectionId}`;
+const getSpeechPageUrl = (sectionId: number) => `/speech/${sectionId}`;
 
 const getSpeakerUrl = (sectionSpeaker: string) => `/speaker/${sectionSpeaker}`;
 
 const getNestListUrl = () => `/${encodeURIComponent(props.speechName)}`;
-
-const getSpeakerColor = (): string => '#4d89d2';
 
 const sanitizeHtmlContent = (html: string): string => {
 	// Remove script tags with various formats and replace with warning comment
@@ -89,19 +86,17 @@ const loading = false;
 										'speech--border',
 										section.section_speaker ? 'speech--with-portrait' : ''
 									]"
-									:style="section.section_speaker ? { borderLeftColor: getSpeakerColor() } : {}"
 								>
 									<div class="speaker-portrait-wrapper" v-if="section.section_speaker && section.photoURL">
 										<img
 											:src="section.photoURL"
-											:style="`border-color: ${getSpeakerColor()}; background-color: ${getSpeakerColor()};`"
 											:alt="section.name || ''"
 											class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium"
 										/>
 									</div>
 									<div class="speech-wrapper">
-										<div class="speech__meta-data" v-if="section.section_speaker && section.name">
-											<span class="speech__meta-data__speaker-name">
+										<div class="speech__meta-data">
+											<span class="speech__meta-data__speaker-name" v-if="section.section_speaker && section.name">
 												<a :href="getSpeakerUrl(section.section_speaker)">
 													{{ section.name }}
 												</a>
