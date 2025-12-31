@@ -64,3 +64,19 @@ export function headForSpeechContent(titleText: string, sectionHtml?: string): H
 		meta
 	};
 }
+
+export function headForNestedSpeech(displayName: string): HeadSpec {
+	const name = displayName ?? '';
+	return {
+		title: ` View Section: ${name} :: SayIt `,
+		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription)]
+	};
+}
+
+export function headForNestedSpeechDetail(nestDisplayName: string): HeadSpec {
+	const name = nestDisplayName ?? '';
+	return {
+		title: ` View Section: ${name} :: SayIt `,
+		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription)]
+	};
+}
