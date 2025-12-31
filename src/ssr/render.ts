@@ -50,9 +50,17 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
 	const extraScripts = scripts?.trim() ? `  ${scripts}` : '';
 
 	return `<!DOCTYPE html>
-<html lang="zh-Hant">
+<html class="no-touch" lang="zh-Hant">
 <head>
   ${BASE_HEAD}
+  <script>
+    (function() {
+      var root = document.documentElement;
+      var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      root.classList.remove('no-touch');
+      root.classList.add(hasTouch ? 'touch' : 'no-touch');
+    })();
+  </script>
   <title>${headTitle}</title>
   ${metaTags}
   ${inlineStyles}
