@@ -432,6 +432,11 @@ app.get('/:filename/:nest_filename', async (c) => {
 	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForNestedSpeechDetail(nestDisplayName);
 
+	const hasSiblingNav = siblings.length > 0;
+	const navigationScript = hasSiblingNav
+		? `<script>(function(){var prev=document.querySelector('[data-prev-btn]');var next=document.querySelector('[data-next-btn]');function isEditable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(isEditable(document.activeElement))return;if(e.key==='j'&&prev&&prev.getAttribute('href')){window.location.href=prev.getAttribute('href');}if(e.key==='k'&&next&&next.getAttribute('href')){window.location.href=next.getAttribute('href');}});})();</script>`
+		: undefined;
+
 	const html = await renderHtml(SingleNestedSpeechView, {
 		head,
 		styles,
@@ -443,7 +448,8 @@ app.get('/:filename/:nest_filename', async (c) => {
 			displayName: nestDisplayName,
 			speechDisplayName,
 			siblings
-		}
+		},
+		scripts: navigationScript
 	});
 
 	return c.html(html);
