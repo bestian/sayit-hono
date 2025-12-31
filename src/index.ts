@@ -14,7 +14,7 @@ import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generat
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
 import { renderHtml } from './ssr/render';
-import { headForSpeechContent, headForSingleSpeech, headForSpeaker } from './ssr/heads';
+import { headForSpeechContent, headForSingleSpeech, headForSpeaker, headForNestedSpeech, headForNestedSpeechDetail } from './ssr/heads';
 
 type WorkerEnv = {
 	ASSETS: Fetcher;
@@ -429,7 +429,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 		nest_display_name: nestDisplayNames[idx] ?? nest
 	}));
 	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const head = headForSingleSpeech(nestDisplayName);
+	const head = headForNestedSpeechDetail(nestDisplayName);
 
 	const html = await renderHtml(SingleNestedSpeechView, {
 		head,
@@ -548,7 +548,7 @@ app.get('/:filename', async (c) => {
 		}
 
 		const styles = [NestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-		const head = headForSingleSpeech(speechMeta.display_name ?? filename);
+		const head = headForNestedSpeech(speechMeta.display_name ?? filename);
 
 		const html = await renderHtml(NestedSpeechView, {
 			head,
