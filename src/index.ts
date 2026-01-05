@@ -251,7 +251,9 @@ app.get('/speaker/:route_pathname', async (c) => {
 			FROM speech_content sc
 			LEFT JOIN speech_index si ON sc.filename = si.filename
 			WHERE sc.section_speaker = ?
-			ORDER BY sc.section_id ASC`
+			ORDER BY sc.section_id ASC
+			LIMIT 50`
+			// limit to 50 sections for preview，未來以query string切割 HTML 的方式來處理
 		)
 			.bind(routePathname)
 			.all();
