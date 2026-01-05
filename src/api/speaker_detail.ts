@@ -33,6 +33,8 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 		const sectionsResult = await c.env.DB.prepare(
 			`SELECT
 				sc.filename,
+				sc.nest_filename,
+				sc.nest_display_name,
 				sc.section_id,
 				sc.previous_section_id,
 				sc.next_section_id,
@@ -53,6 +55,8 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 
 		const sections = sectionsResult.results.map((row: any) => ({
 			filename: row.filename,
+			nest_filename: row.nest_filename ?? null,
+			nest_display_name: row.nest_display_name ?? null,
 			display_name: row.display_name,
 			section_id: row.section_id,
 			previous_section_id: row.previous_section_id,
@@ -66,6 +70,8 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 					section_id: speakerRow.longest_section_id,
 					section_content: speakerRow.longest_section_content || '',
 					section_filename: speakerRow.longest_section_filename || '',
+					section_nest_filename: speakerRow.longest_section_nest_filename ?? null,
+					section_nest_display_name: speakerRow.longest_section_nest_display_name ?? null,
 					section_display_name: speakerRow.longest_section_displayname || '',
 			  }
 			: null;
