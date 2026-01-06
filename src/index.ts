@@ -157,7 +157,10 @@ function reorderSections(sections: Section[]): Section[] {
 	return newArray;
 }
 
-function normalizeSections(rawData: Section[]): Section[] {
+function normalizeSections(rawData: Section[], allowReorder = true): Section[] {
+	// 在分頁情境下（只拿到部分資料），不要依照 previous_section_id 重新串接，
+	// 否則會因為缺少第一頁資料而中途提前停止，導致頁面只剩少量項目。
+	if (!allowReorder) return rawData;
 	return checkMonotonic(rawData) ? rawData : reorderSections(rawData);
 }
 
@@ -280,7 +283,8 @@ app.get('/speaker/:route_pathname', async (c) => {
 				section_content: row.section_content,
 				photoURL: null,
 				name: null
-			}))
+			})),
+			false // 分頁結果，不做重新串接
 		);
 
 		const longestSection = speakerRow.longest_section_id
