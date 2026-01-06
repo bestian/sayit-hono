@@ -6,6 +6,7 @@ import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
 import { sectionDetail } from './api/section';
 import { speechAn } from './api/an';
+import type { ApiEnv } from './api/types';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
 import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
 import NestedSpeechView, { styles as NestedSpeechViewStyles } from './.generated/views/NestedSpeechView';
@@ -17,13 +18,98 @@ import { renderHtml } from './ssr/render';
 import { headForSpeechContent, headForSingleSpeech, headForSpeaker, headForNestedSpeech, headForNestedSpeechDetail } from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
 
-type WorkerEnv = {
-	ASSETS: Fetcher;
-	DB: D1Database;
-	SPEECH_AN: R2Bucket;
-};
+type WorkerEnv = ApiEnv['Bindings'];
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
+
+const EDGE_TTL_SECONDS = 60;
+const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=${EDGE_TTL_SECONDS}, s-maxage=${EDGE_TTL_SECONDS}`;
+
+function buildCacheKey(url: string): string {
+	try {
+		const u = new URL(url);
+		return `${u.host}${u.pathname}${u.search}`;
+	} catch {
+		// fallback: strip protocol manually
+		return url.replace(/^https?:\/\//, '');
+	}
+}
+
+async function readEdgeCache(cacheKey: string): Promise<Response | null> {
+	try {
+		const cached = await caches.default.match(cacheKey);
+		return cached ?? null;
+	} catch (err) {
+		console.error('[edge cache] read error', err);
+		return null;
+	}
+}
+
+async function writeEdgeCache(cacheKey: string, response: Response) {
+	try {
+		console.log('writing to edge cache', cacheKey);
+		const res = new Response(response.body, response);
+		res.headers.set('Cache-Control', response.headers.get('Cache-Control') ?? DEFAULT_HTML_CACHE_CONTROL);
+		await caches.default.put(cacheKey, res);
+	} catch (err) {
+		console.error('[edge cache] write error', err);
+	}
+}
+
+async function readR2Cache(bucket: R2Bucket, cacheKey: string): Promise<Response | null> {
+	try {
+		console.log('reading from r2 cache', cacheKey);
+		const object = await bucket.get(cacheKey);
+		if (!object) return null;
+
+		const body = await object.text();
+		const headers = new Headers();
+		const cacheControl = object.httpMetadata?.cacheControl ?? DEFAULT_HTML_CACHE_CONTROL;
+		const contentType = object.httpMetadata?.contentType ?? 'text/html; charset=utf-8';
+
+		headers.set('Cache-Control', cacheControl);
+		headers.set('Content-Type', contentType);
+
+		if (typeof object.size === 'number') {
+			headers.set('Content-Length', object.size.toString());
+		}
+		if (object.httpEtag) {
+			headers.set('ETag', object.httpEtag);
+		}
+
+		return new Response(body, { status: 200, headers });
+	} catch (err) {
+		console.error('[r2 cache] read error', err);
+		return null;
+	}
+}
+
+async function writeR2Cache(bucket: R2Bucket, cacheKey: string, response: Response) {
+	try {
+		const cloned = response.clone();
+		const body = await cloned.text();
+		const cacheControl = cloned.headers.get('Cache-Control') ?? DEFAULT_HTML_CACHE_CONTROL;
+		const contentType = cloned.headers.get('Content-Type') ?? 'text/html; charset=utf-8';
+
+		await bucket.put(cacheKey, body, {
+			httpMetadata: {
+				cacheControl,
+				contentType
+			}
+		});
+	} catch (err) {
+		console.error('[r2 cache] write error', err);
+	}
+}
+
+function withCacheHeaders(response: Response): Response {
+	const res = new Response(response.body, response);
+	res.headers.set('Cache-Control', DEFAULT_HTML_CACHE_CONTROL);
+	if (!res.headers.has('Content-Type')) {
+		res.headers.set('Content-Type', 'text/html; charset=utf-8');
+	}
+	return res;
+}
 
 async function serveAsset(c: any, path?: string) {
 	const url = new URL(c.req.url);
@@ -224,6 +310,17 @@ app.get('/speech/:section_id', async (c) => {
 
 // SSR 講者頁
 app.get('/speaker/:route_pathname', async (c) => {
+	const cacheKey = buildCacheKey(c.req.url);
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) {
+		console.log('writing to edge cache', cacheKey);
+		await writeEdgeCache(cacheKey, r2Cached.clone());
+		return r2Cached;
+	}
+
 	const routePathname = encodeURIComponent(c.req.param('route_pathname'));
 	console.log(routePathname);
 	if (!routePathname) {
@@ -331,7 +428,16 @@ app.get('/speaker/:route_pathname', async (c) => {
 		scripts: '<script src="/static/speeches/js/masonry.pkgd.min.js"></script>'
 	});
 
-	return c.html(html);
+	let response = c.html(html);
+	response = withCacheHeaders(response);
+
+	if (response.ok && response.status < 400) {
+		console.log('writing to R2 cache', cacheKey);
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone());
+	}
+
+	return response;
 });
 
 
@@ -363,6 +469,16 @@ function isExcludedPath(segment: string) {
 
 // SSR 巢狀演講內容頁（巢狀子項）
 app.get('/:filename/:nest_filename', async (c) => {
+	const cacheKey = buildCacheKey(c.req.url);
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) {
+		await writeEdgeCache(cacheKey, r2Cached.clone());
+		return r2Cached;
+	}
+
 	const encodedFilename = c.req.param('filename');
 	const encodedNestFilename = c.req.param('nest_filename');
 
@@ -474,11 +590,29 @@ app.get('/:filename/:nest_filename', async (c) => {
 		scripts: navigationScript
 	});
 
-	return c.html(html);
+	let response = c.html(html);
+	response = withCacheHeaders(response);
+
+	if (response.ok && response.status < 400) {
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone());
+	}
+
+	return response;
 });
 
 // SSR 演講頁（單一演講或巢狀清單，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
 app.get('/:filename', async (c) => {
+	const cacheKey = buildCacheKey(c.req.url);
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) {
+		await writeEdgeCache(cacheKey, r2Cached.clone());
+		return r2Cached;
+	}
+
 	console.log('SSR Single Speech filename', c.req.param('filename'));
 	const encodedFilename = c.req.param('filename');
 	if (!encodedFilename) {
@@ -638,7 +772,15 @@ app.get('/:filename', async (c) => {
 		props: { sections, speechName: filename, displayName }
 	});
 
-	return c.html(html);
+	let response = c.html(html);
+	response = withCacheHeaders(response);
+
+	if (response.ok && response.status < 400) {
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone());
+	}
+
+	return response;
 });
 
 
