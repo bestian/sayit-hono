@@ -6,6 +6,7 @@ import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
 import { sectionDetail } from './api/section';
 import { speechAn } from './api/an';
+import { searchHomepage } from './api/search_homepage';
 import type { ApiEnv } from './api/types';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
 import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
@@ -269,6 +270,7 @@ app.get('/api/speaker_detail/:route_pathname_with_json', (c) => speakerDetail(c)
 app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
 app.on(['GET', 'HEAD'], '/api/an/*', (c) => speechAn(c));
+app.get('/api/search_homepage.json', (c) => searchHomepage(c));
 
 // 動態段落頁（不預先產生）
 app.get('/speech/:section_id', async (c) => {
