@@ -76,8 +76,8 @@ const loading = false
 									'speech--border',
 									section.section_speaker ? 'speech--with-portrait' : ''
 								]" :style="section.section_speaker ? { borderLeftColor: getSpeakerColor() } : {}">
-									<div class="speaker-portrait-wrapper" v-if="section.section_speaker && section.photoURL">
-										<img :src="section.photoURL"
+									<div class="speaker-portrait-wrapper" v-if="section.section_speaker">
+										<img :src="section.photoURL || '/static/speeches/i/a.png'"
 											:style="`border-color: ${getSpeakerColor()}; background-color: ${getSpeakerColor()};`"
 											:alt="section.name || ''"
 											class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
