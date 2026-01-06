@@ -46,6 +46,41 @@ function normalizeLimit(raw: number | undefined, fallback: number, max: number) 
 	return fallback;
 }
 
+function tokenize(raw: string): string[] {
+	return (raw ?? '')
+		.trim()
+		.split(/\s+/)
+		.map((t) => t.trim())
+		.filter(Boolean);
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeHtml(value: string): string {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
+function highlightTerm(value: string, query: string): string {
+	if (!value || !query) return value;
+	const tokens = tokenize(query);
+	if (tokens.length === 0) return escapeHtml(value);
+	const encodedTokens = tokens.map((t) => encodeURIComponent(t));
+
+	let highlighted = escapeHtml(value);
+	for (const token of [...tokens, ...encodedTokens]) {
+		const re = new RegExp(escapeRegExp(token), 'gi');
+		highlighted = highlighted.replace(re, (match) => `<mark>${match}</mark>`);
+	}
+	return highlighted;
+}
+
 function buildFtsQuery(raw: string): string {
 	return raw
 		.trim()
@@ -118,7 +153,13 @@ export async function runSearchHomepage(
 		route_pathname: row.route_pathname,
 		name: row.name,
 		photoURL: row.photoURL ?? null,
-		snippet: row.snippet ?? row.name ?? ''
+		snippet:
+			row.snippet ??
+			highlightTerm(row.name ?? '', query) ??
+			highlightTerm(row.route_pathname ?? '', query) ??
+			row.name ??
+			row.route_pathname ??
+			''
 	}));
 
 	const sections: SearchSectionResult[] = (sectionResult.results ?? []).map((row: any) => ({
