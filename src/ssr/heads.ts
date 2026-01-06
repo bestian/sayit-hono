@@ -80,3 +80,12 @@ export function headForNestedSpeechDetail(nestDisplayName: string): HeadSpec {
 		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription)]
 	};
 }
+
+export function headForSearch(query: string): HeadSpec {
+	const text = (query ?? '').trim();
+	const title = text ? ` Search: ${text} :: SayIt ` : ' Search :: SayIt ';
+	return {
+		title,
+		meta: [og(title.trim()), ogDescription(baseOgDescription)]
+	};
+}
