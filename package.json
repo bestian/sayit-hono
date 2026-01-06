@@ -5,7 +5,6 @@
 	"scripts": {
 		"deploy": "npm run build:views && wrangler deploy",
 		"dev": "npm run build:views && wrangler dev --remote",
-		"dev:debug": "npm run build:views && wrangler dev --remote --inspector-port=9229",
 		"start": "npm run dev",
 		"build:views": "tsx --tsconfig scripts/tsconfig.json scripts/build-views.ts",
 		"build:static": "npm run build:views && tsx --tsconfig scripts/tsconfig.json scripts/prerender.ts",
