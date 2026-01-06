@@ -167,3 +167,7 @@ dist
 .env*
 !.env.example
 .wrangler/
+
+# Cursor debug mode
+.cursor/
+*.cursor-debug
