@@ -6,17 +6,25 @@ import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
 import { sectionDetail } from './api/section';
 import { speechAn } from './api/an';
-import { searchHomepage } from './api/search_homepage';
+import { runSearchHomepage, searchHomepage } from './api/search_homepage';
 import type { ApiEnv } from './api/types';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
 import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
 import NestedSpeechView, { styles as NestedSpeechViewStyles } from './.generated/views/NestedSpeechView';
 import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from './.generated/views/SingleNestedSpeechView';
 import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generated/views/SingleSpeakerView';
+import SearchResultView, { styles as SearchResultViewStyles } from './.generated/views/SearchResultView';
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
 import { renderHtml } from './ssr/render';
-import { headForSpeechContent, headForSingleSpeech, headForSpeaker, headForNestedSpeech, headForNestedSpeechDetail } from './ssr/heads';
+import {
+	headForSpeechContent,
+	headForSingleSpeech,
+	headForSpeaker,
+	headForNestedSpeech,
+	headForNestedSpeechDetail,
+	headForSearch
+} from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
 
 type WorkerEnv = ApiEnv['Bindings'];
@@ -271,6 +279,45 @@ app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
 app.on(['GET', 'HEAD'], '/api/an/*', (c) => speechAn(c));
 app.get('/api/search_homepage.json', (c) => searchHomepage(c));
+
+// SSR 搜尋結果頁
+async function renderSearchPage(c: any) {
+	const url = new URL(c.req.url);
+	const query = url.searchParams.get('q') ?? '';
+
+	let result: Awaited<ReturnType<typeof runSearchHomepage>>;
+	try {
+		result = await runSearchHomepage(c.env, query);
+	} catch (err) {
+		console.error('[search SSR] query failed', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	const styles = [SearchResultViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForSearch(result.query);
+	const scripts = [
+		'<script type="text/javascript" src="/static/speeches/js/foundation/foundation.js" charset="utf-8"></script>',
+		'<script type="text/javascript" src="/static/speeches/js/foundation/foundation.dropdown.js" charset="utf-8"></script>',
+		'<script type="text/javascript" src="/static/speeches/js/speeches.js" charset="utf-8"></script>'
+	].join('\n');
+
+	const html = await renderHtml(SearchResultView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: {
+			query: result.query,
+			speakers: result.speakers,
+			sections: result.sections
+		},
+		scripts
+	});
+
+	return withCacheHeaders(c.html(html));
+}
+
+app.get('/search', (c) => renderSearchPage(c));
+app.get('/search/', (c) => renderSearchPage(c));
 
 // 動態段落頁（不預先產生）
 app.get('/speech/:section_id', async (c) => {
