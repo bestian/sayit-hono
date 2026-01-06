@@ -113,14 +113,12 @@ const normalizeSpeaker = (raw: SpeakerApiResponse | Speaker | null): Speaker | n
       }
     : null
 
+  // 直接展開所有屬性，包括 page, page_size, total_pages
   return {
-    ...(raw as Speaker),
+    ...raw,
     sections: normalizedSections,
     longest_section: normalizedLongestSection,
-    page: (raw as SpeakerApiResponse).page ?? (raw as Speaker).page,
-    page_size: (raw as SpeakerApiResponse).page_size ?? (raw as Speaker).page_size,
-    total_pages: (raw as SpeakerApiResponse).total_pages ?? (raw as Speaker).total_pages,
-  }
+  } as Speaker
 }
 
 speaker.value = normalizeSpeaker(props.initialSpeaker)
@@ -159,13 +157,58 @@ const getPageUrl = (targetPage: number) => {
 const hasPrev = computed(() => page.value > 1)
 const hasNext = computed(() => page.value < totalPages.value)
 
+// 生成分頁頁碼陣列
+const paginationPages = computed(() => {
+  if (props.initialSpeaker && Array.isArray((props.initialSpeaker as any).pagination_pages)) {
+    return (props.initialSpeaker as any).pagination_pages as Array<number | 'ellipsis'>
+  }
+
+  const current = page.value
+  const total = totalPages.value
+  const pages: Array<number | 'ellipsis'> = []
+  const addedPages = new Set<number>()
+
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i)
+  } else {
+    pages.push(1)
+    addedPages.add(1)
+
+    const nearStart = Math.max(2, current - 1)
+    const nearEnd = Math.min(total - 2, current + 1)
+
+    if (nearStart > 2) pages.push('ellipsis')
+
+    for (let i = nearStart; i <= nearEnd; i++) {
+      if (!addedPages.has(i)) {
+        pages.push(i)
+        addedPages.add(i)
+      }
+    }
+
+    const lastTwoStart = total - 1
+    if (nearEnd < lastTwoStart - 1) pages.push('ellipsis')
+
+    if (!addedPages.has(lastTwoStart)) {
+      pages.push(lastTwoStart)
+      addedPages.add(lastTwoStart)
+    }
+    if (!addedPages.has(total)) {
+      pages.push(total)
+      addedPages.add(total)
+    }
+  }
+
+  return pages
+})
+
 // 格式化 longest_section 的摘要：截取前30個字符，加上前後引號和省略號
 const formatLongestSectionSummary = (summary: string) => {
   if (!summary) {
     return ''
   }
   const truncated = summary.length > 30 ? summary.substring(0, 30) + '...' : summary
-  return `“${truncated}”`
+  return `"${truncated}"`
 }
 
 </script>
@@ -296,8 +339,21 @@ const formatLongestSectionSummary = (summary: string) => {
 								</template>
 								<template v-else>← Previous</template>
 							</span>
-							<span class="pagination__page-number current">{{ page }}</span>
-							<span class="pagination__page-number">/ {{ totalPages }}</span>
+							<template v-for="pageNum in paginationPages" :key="pageNum === 'ellipsis' ? 'ellipsis' : pageNum">
+								<span
+									v-if="pageNum === 'ellipsis'"
+									class="pagination__no__border"
+								>...</span>
+								<a
+									v-else-if="pageNum !== page"
+									:href="getPageUrl(pageNum as number)"
+									class="button pagination__page-number"
+								>{{ pageNum }}</a>
+								<span
+									v-else
+									class="pagination__page-number current"
+								>{{ pageNum }}</span>
+							</template>
 							<span
 								:class="['button search-pagination-button', hasNext ? '' : 'button--disabled']"
 								:aria-disabled="!hasNext"
