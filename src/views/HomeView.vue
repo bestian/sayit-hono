@@ -35,5 +35,8 @@
 </template>
 
 <style scoped>
+a {
+	cursor: pointer !important;
+}
 </style>
 
