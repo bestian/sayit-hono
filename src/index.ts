@@ -238,7 +238,14 @@ app.get('/speaker/:route_pathname', async (c) => {
 			return c.text('Not Found', 404);
 		}
 
-		// 取得講者的所有段落
+		const pageSize = 50;
+		const urlObj = new URL(c.req.url);
+		const pageParam = urlObj.searchParams.get('page') ?? '';
+		const pageNumber = Number(pageParam);
+		const page = Number.isFinite(pageNumber) && pageNumber >= 1 ? Math.floor(pageNumber) : 1;
+		const offset = (page - 1) * pageSize;
+
+		// 取得講者的所有段落（分頁）
 		const sectionsResult = await c.env.DB.prepare(
 			`SELECT
 				sc.filename,
@@ -252,10 +259,9 @@ app.get('/speaker/:route_pathname', async (c) => {
 			LEFT JOIN speech_index si ON sc.filename = si.filename
 			WHERE sc.section_speaker = ?
 			ORDER BY sc.filename DESC, sc.section_id ASC
-			LIMIT 50`
-			// limit to 50 sections for preview，未來以query string切割 HTML 的方式來處理
+			LIMIT ? OFFSET ?`
 		)
-			.bind(routePathname)
+			.bind(routePathname, pageSize, offset)
 			.all();
 
 		if (!sectionsResult.success) {
@@ -285,13 +291,20 @@ app.get('/speaker/:route_pathname', async (c) => {
 			  }
 			: null;
 
+		const totalSections =
+			(typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length;
+		const totalPages = Math.max(1, Math.ceil(totalSections / pageSize));
+
 		speaker = {
 			id: speakerRow.id,
 			route_pathname: speakerRow.route_pathname,
 			name: speakerRow.name,
 			photoURL: speakerRow.photoURL,
 			appearances_count: speakerRow.appearances_count ?? 0,
-			sections_count: (typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length,
+			sections_count: totalSections,
+			page,
+			page_size: pageSize,
+			total_pages: totalPages,
 			sections,
 			longest_section: longestSection
 		};

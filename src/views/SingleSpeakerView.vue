@@ -35,6 +35,9 @@ interface SpeakerApiResponse {
   sections_count: number
   sections: ApiSection[]
   longest_section: ApiLongestSection | null
+  page?: number
+  page_size?: number
+  total_pages?: number
 }
 
 interface Speaker {
@@ -46,6 +49,9 @@ interface Speaker {
   sections_count: number
   sections: Section[]
   longest_section: LongestSection | null
+  page?: number
+  page_size?: number
+  total_pages?: number
 }
 
 const props = withDefaults(
@@ -60,6 +66,10 @@ const props = withDefaults(
 )
 
 const speaker = ref<Speaker | null>(null)
+const pageSize = computed(() => speaker.value?.page_size || 50)
+const page = computed(() => speaker.value?.page || 1)
+const totalPages = computed(() => speaker.value?.total_pages || 1)
+const totalSections = computed(() => speaker.value?.sections_count || 0)
 
 const resolvedRoutePathname = computed(() => {
   if (props.routePathname) return props.routePathname
@@ -107,6 +117,9 @@ const normalizeSpeaker = (raw: SpeakerApiResponse | Speaker | null): Speaker | n
     ...(raw as Speaker),
     sections: normalizedSections,
     longest_section: normalizedLongestSection,
+    page: (raw as SpeakerApiResponse).page ?? (raw as Speaker).page,
+    page_size: (raw as SpeakerApiResponse).page_size ?? (raw as Speaker).page_size,
+    total_pages: (raw as SpeakerApiResponse).total_pages ?? (raw as Speaker).total_pages,
   }
 }
 
@@ -132,6 +145,19 @@ const getSpeechPageUrl = (sectionId: number) => {
 const getSpeechNameUrl = (filename: string) => {
   return `/${encodeURIComponent(filename)}`
 }
+
+const resolvedRouteForLinks = computed(() => {
+  const slug = props.routePathname || resolvedRoutePathname.value
+  return slug || ''
+})
+
+const getPageUrl = (targetPage: number) => {
+  const safePage = Math.max(1, Math.min(totalPages.value, targetPage))
+  return `/speaker/${resolvedRouteForLinks.value}?page=${safePage}`
+}
+
+const hasPrev = computed(() => page.value > 1)
+const hasNext = computed(() => page.value < totalPages.value)
 
 // 格式化 longest_section 的摘要：截取前30個字符，加上前後引號和省略號
 const formatLongestSectionSummary = (summary: string) => {
@@ -261,14 +287,26 @@ const formatLongestSectionSummary = (summary: string) => {
 							</li>
 						</ul>
 						<div class="pagination">
-							<span class="button--disabled button search-pagination-button">← Previous</span>
-							<span class="button current pagination__page-number">1</span>
-							<a href="?page=2" class="button pagination__page-number">2</a>
-							<a href="?page=3" class="button pagination__page-number">3</a>
-							...
-							<a href="?page=1911" class="button pagination__page-number">1911</a>
-							<a href="?page=1912" class="button pagination__page-number">1912</a>
-							<a href="?page=2" class="button search-pagination-button">Next →</a>
+							<span
+								:class="['button search-pagination-button', hasPrev ? '' : 'button--disabled']"
+								:aria-disabled="!hasPrev"
+							>
+								<template v-if="hasPrev">
+									<a :href="getPageUrl(page - 1)">← Previous</a>
+								</template>
+								<template v-else>← Previous</template>
+							</span>
+							<span class="pagination__page-number current">{{ page }}</span>
+							<span class="pagination__page-number">/ {{ totalPages }}</span>
+							<span
+								:class="['button search-pagination-button', hasNext ? '' : 'button--disabled']"
+								:aria-disabled="!hasNext"
+							>
+								<template v-if="hasNext">
+									<a :href="getPageUrl(page + 1)">Next →</a>
+								</template>
+								<template v-else>Next →</template>
+							</span>
 						</div>
 					</div>
 				</div>
