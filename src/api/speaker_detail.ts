@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
 import type { ApiEnv } from './types';
+import { buildPaginationPages } from '../utils/pagination';
 
 export async function speakerDetail(c: Context<ApiEnv>) {
 	const origin = c.req.header('Origin') ?? null;
@@ -87,6 +88,7 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 		const totalSections =
 			(typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length;
 		const totalPages = Math.max(1, Math.ceil(totalSections / pageSize));
+		const paginationPages = buildPaginationPages(page, totalPages);
 
 		const speaker = {
 			id: speakerRow.id,
@@ -100,6 +102,7 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			page,
 			page_size: pageSize,
 			total_pages: totalPages,
+			pagination_pages: paginationPages
 		};
 
 		return c.json(speaker, 200, corsHeaders);

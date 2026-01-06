@@ -15,6 +15,7 @@ import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
 import { renderHtml } from './ssr/render';
 import { headForSpeechContent, headForSingleSpeech, headForSpeaker, headForNestedSpeech, headForNestedSpeechDetail } from './ssr/heads';
+import { buildPaginationPages } from './utils/pagination';
 
 type WorkerEnv = {
 	ASSETS: Fetcher;
@@ -294,6 +295,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 		const totalSections =
 			(typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length;
 		const totalPages = Math.max(1, Math.ceil(totalSections / pageSize));
+		const paginationPages = buildPaginationPages(page, totalPages);
 
 		speaker = {
 			id: speakerRow.id,
@@ -305,6 +307,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 			page,
 			page_size: pageSize,
 			total_pages: totalPages,
+			pagination_pages: paginationPages,
 			sections,
 			longest_section: longestSection
 		};
