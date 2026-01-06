@@ -30,6 +30,13 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			return c.json({ error: 'Speaker not found' }, 404, corsHeaders);
 		}
 
+		const pageSize = 50;
+		const urlObj = new URL(c.req.url);
+		const pageParam = urlObj.searchParams.get('page') ?? '';
+		const pageNumber = Number(pageParam);
+		const page = Number.isFinite(pageNumber) && pageNumber >= 1 ? Math.floor(pageNumber) : 1;
+		const offset = (page - 1) * pageSize;
+
 		const sectionsResult = await c.env.DB.prepare(
 			`SELECT
 				sc.filename,
@@ -44,9 +51,10 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			FROM speech_content sc
 			LEFT JOIN speech_index si ON sc.filename = si.filename
 			WHERE sc.section_speaker = ?
-			ORDER BY sc.section_id ASC`
+			ORDER BY sc.filename DESC, sc.section_id ASC
+			LIMIT ? OFFSET ?`
 		)
-			.bind(routePathname)
+			.bind(routePathname, pageSize, offset)
 			.all();
 
 		if (!sectionsResult.success) {
@@ -76,15 +84,22 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			  }
 			: null;
 
+		const totalSections =
+			(typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length;
+		const totalPages = Math.max(1, Math.ceil(totalSections / pageSize));
+
 		const speaker = {
 			id: speakerRow.id,
 			route_pathname: speakerRow.route_pathname,
 			name: speakerRow.name,
 			photoURL: speakerRow.photoURL,
 			appearances_count: speakerRow.appearances_count ?? 0,
-			sections_count: (typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length,
+			sections_count: totalSections,
 			sections,
 			longest_section: longestSection,
+			page,
+			page_size: pageSize,
+			total_pages: totalPages,
 		};
 
 		return c.json(speaker, 200, corsHeaders);
