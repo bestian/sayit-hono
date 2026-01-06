@@ -1,652 +1,142 @@
 <template>
-	<div class="full-page">
-		<div class="full-page__row">
-		<div class="full-page__unit">
-			<h1 class="search-title-with-result">搜尋 / <strong>唐鳳</strong></h1>
-			<form class="site-search site-search--on-results-page" action="/search/" method="get" >
-				<div class="search-wrapper">
-					<input type="search" class="site-search__input" placeholder="搜尋" name="q" value="唐鳳"/>
-					<input type="submit" class="icon-search" value="搜尋"/>
-				</div>
-			</form>
-			<div class="page-content__row ">
+	<div class="page">
+		<Navbar />
+		<div class="full-page">
+			<div class="full-page__row">
 				<div class="full-page__unit">
-					<h2>Speakers</h2>
-					<ul class="unstyled-list search-results-speakers">
-					<li class="search"><a href="/speaker/%E5%94%90%E9%B3%B3-4">
-						<em>唐</em><em>鳳</em>
-						</a>
-					</li>
-					<li class="search"><a href="/speaker/%E5%94%90%E9%B3%B3-5">
-						<em>唐</em><em>鳳</em>
-						</a>
-					</li>
-					<li class="search"><a href="/speaker/%E5%94%90%E9%B3%B3-3">
-						<em>唐</em><em>鳳</em>
-						</a>
-					</li>
-					<li class="search"><a href="/speaker/%E5%94%90%E9%B3%B3">
-						<em>唐</em><em>鳳</em>
-						</a>
-					</li>
-					<li class="search"><a href="/speaker/%E5%94%90%E9%B3%B3-2">
-						<em>唐</em><em>鳳</em>
-						</a>
-					</li>
-					<li class="search"><a href="/speaker/%E5%94%90%E9%B3%B3%E5%8F%AC%E9%9B%86%E4%BA%BA">
-						<em>唐</em><em>鳳</em>召集人
-						</a>
-					</li>
-					<li class="search"><a href="/speaker/%E5%94%90%E9%B3%B3%E5%85%B1%E5%90%8C%E5%8F%AC%E9%9B%86%E4%BA%BA">
-						<em>唐</em><em>鳳</em>共同召集人
-						</a>
-					</li>
-					<li class="search"><a href="/speaker/%E8%A1%8C%E6%94%BF%E9%99%A2%E5%94%90%E9%B3%B3%E6%94%BF%E5%A7%94">
-						行政院<em>唐</em><em>鳳</em>政委
-						</a>
-					</li>
-					<li class="search"><a href="/speaker/%E5%94%90%E9%B3%B3%E6%94%BF%E5%A7%94%E8%BE%A6%E5%85%AC%E5%AE%A4%E4%BB%A3%E8%A1%A8">
-						<em>唐</em><em>鳳</em>政委辦公室代表
-						</a>
-					</li>
-					</ul>
-					<h2>Mentions of <strong>&ldquo;唐鳳&rdquo;</strong> in speeches</h2>
-					<ul class="unstyled-list search-results-list">
-					<li id="s254119" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #b17656;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #b17656; background-color: #b17656;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
+					<h1 class="search-title-with-result">搜尋 / <strong>{{ query }}</strong></h1>
+					<form class="site-search site-search--on-results-page" action="/search/" method="get">
+						<div class="search-wrapper">
+							<input type="search" class="site-search__input" placeholder="搜尋" name="q" :value="query" />
+							<input type="submit" class="icon-search" value="搜尋" />
 						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2018-12-18-%E7%A4%BE%E6%9C%83%E5%89%B5%E6%96%B0%E7%AC%AC%E4%BA%94%E6%AC%A1%E8%A1%8C%E5%8B%95%E5%B7%A1%E8%BF%B4%E5%BA%A7%E8%AB%87%E5%8F%B0%E5%8D%97">2018-12-18 社會創新第五次行動巡迴座談（台南）</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E7%9B%A7%E9%BE%8D%E5%90%9B">
-								盧龍君
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2018-12-18-%E7%A4%BE%E6%9C%83%E5%89%B5%E6%96%B0%E7%AC%AC%E4%BA%94%E6%AC%A1%E8%A1%8C%E5%8B%95%E5%B7%A1%E8%BF%B4%E5%BA%A7%E8%AB%87%E5%8F%B0%E5%8D%97#s254119">
-								## <em>唐</em><em>鳳</em>：
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s170438" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #c17660;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #c17660; background-color: #c17660;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2018-05-08-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C-po-%E7%AC%AC%E5%8D%81%E4%BA%94%E6%AC%A1%E6%9C%88%E6%9C%83">2018-05-08 開放政府 PO 第十五次月會</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E9%AB%98%E6%85%88%E8%94%9A">
-								高慈蔚
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2018-05-08-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C-po-%E7%AC%AC%E5%8D%81%E4%BA%94%E6%AC%A1%E6%9C%88%E6%9C%83#s170438">
-								<em>唐</em><em>鳳</em>：
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s9816" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #f5b68d;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #f5b68d; background-color: #f5b68d;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87">2016-09-10 公視VR對談</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%BB%96%E5%AE%B8%E8%82%B2">
-								廖宸育
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87#s9816">
-								<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s40174" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #4d89d2;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/pic_AudreyTang-small.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #4d89d2; background-color: #4d89d2;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2017-02-22-%E5%9B%9E%E6%87%89%E9%85%8D%E5%90%88%E5%8B%9E%E5%9F%BA%E6%B3%95%E4%BF%AE%E6%AD%A3%E6%94%BF%E5%BA%9C%E6%87%89%E5%8F%96%E6%B6%88%E5%9C%8B%E6%97%85%E5%8D%A1%E6%81%A2%E5%BE%A9%E4%B8%8D%E4%BC%91%E5%81%87%E7%8D%8E%E9%87%91po%E5%B7%A5%E4%BD%9C%E5%9D%8A">2017-02-22 回應「配合勞基法修正，政府應取消國旅卡，恢復不休假獎金」PO工作坊</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%94%90%E9%B3%B3-3">
-								唐鳳
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2017-02-22-%E5%9B%9E%E6%87%89%E9%85%8D%E5%90%88%E5%8B%9E%E5%9F%BA%E6%B3%95%E4%BF%AE%E6%AD%A3%E6%94%BF%E5%BA%9C%E6%87%89%E5%8F%96%E6%B6%88%E5%9C%8B%E6%97%85%E5%8D%A1%E6%81%A2%E5%BE%A9%E4%B8%8D%E4%BC%91%E5%81%87%E7%8D%8E%E9%87%91po%E5%B7%A5%E4%BD%9C%E5%9D%8A#s40174">
-								我是<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s268156" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #4d89d2;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/pic_AudreyTang-small.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #4d89d2; background-color: #4d89d2;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2019-02-12-pop-radio-%E8%94%A1%E8%A9%A9%E8%90%8D%E4%BE%86%E8%A8%AA">2019-02-12 POP Radio 蔡詩萍來訪</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%94%90%E9%B3%B3-3">
-								唐鳳
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2019-02-12-pop-radio-%E8%94%A1%E8%A9%A9%E8%90%8D%E4%BE%86%E8%A8%AA#s268156">
-								Hello，我是<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s296137" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #4d89d2;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/pic_AudreyTang-small.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #4d89d2; background-color: #4d89d2;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2019-05-17-%E7%B8%BD%E7%B5%B1%E7%9B%83%E9%BB%91%E5%AE%A2%E6%9D%BE%E5%AA%92%E5%90%88%E6%9C%83%E8%AD%B0">2019-05-17 總統盃黑客松媒合會議</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%94%90%E9%B3%B3-3">
-								唐鳳
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2019-05-17-%E7%B8%BD%E7%B5%B1%E7%9B%83%E9%BB%91%E5%AE%A2%E6%9D%BE%E5%AA%92%E5%90%88%E6%9C%83%E8%AD%B0#s296137">
-								我是<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s370629" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #9c245d;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/Brian_Tzeng.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #9c245d; background-color: #9c245d;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2020-01-18-%E8%88%87%E6%9B%BE%E5%8D%9A%E6%81%A9%E5%B0%8D%E8%AB%87-2">2020-01-18 與曾博恩對談
+					</form>
+					<div class="page-content__row ">
+						<div class="full-page__unit">
+							<h2>Speakers</h2>
+							<ul class="unstyled-list search-results-speakers">
+								<li v-for="speaker in speakers" :key="speaker.route_pathname" class="search">
+									<a :href="`/speaker/${speaker.route_pathname}`">
+										<span v-html="speaker.snippet || speaker.name"></span>
 									</a>
 								</li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%8D%9A%E6%81%A9">
-								博恩
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2020-01-18-%E8%88%87%E6%9B%BE%E5%8D%9A%E6%81%A9%E5%B0%8D%E8%AB%87-2#s370629">
-								噢，被<em>唐</em><em>鳳</em>了。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s160108" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #6229d3;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/%E8%B3%B4%E8%87%B4%E7%BF%94_bC96amn.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #6229d3; background-color: #6229d3;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2018-04-12-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C107%E5%B9%B4%E7%AC%AC1%E5%AD%A3%E6%9C%83%E8%AD%B0">2018-04-12 開放政府107年第1季會議</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E8%B3%B4%E8%87%B4%E7%BF%94">
-								賴致翔
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2018-04-12-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C107%E5%B9%B4%E7%AC%AC1%E5%AD%A3%E6%9C%83%E8%AD%B0#s160108">
-								謝謝<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s324975" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #15895c;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #15895c; background-color: #15895c;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2019-09-11-%E8%A1%8C%E6%94%BF%E9%99%A2%E9%9D%92%E5%B9%B4%E8%AB%AE%E8%A9%A2%E5%A7%94%E5%93%A1%E6%9C%83%E7%AC%AC2%E5%B1%86%E7%AC%AC5%E5%A0%B4%E5%B7%A1%E8%BF%B4%E5%BA%A7%E8%AB%87">2019-09-11 行政院青年諮詢委員會第2屆第5場巡迴座談
-									</a>
+								<li v-if="speakers.length === 0" class="search">沒有相關講者</li>
+							</ul>
+							<h2>Mentions of <strong>&ldquo;{{ query }}&rdquo;</strong> in speeches</h2>
+							<ul class="unstyled-list search-results-list">
+								<li
+									v-for="section in sections"
+									:key="section.section_id"
+									class="speech speech--search-result speech--with-portrait speech--speech speech--border"
+									:style="sectionBorderStyle(section)"
+								>
+									<div class="speaker-portrait-wrapper">
+										<img
+											:src="section.photoURL || '/static/speeches/i/a.png'"
+											:alt="section.speaker_name || ''"
+											class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium"
+										>
+									</div>
+									<div class="speech-wrapper">
+										<div class="speech__breadcrumb">
+											<ul class="breadcrumbs">
+												<li>
+													<a :href="sectionLink(section)">{{ section.display_name }}</a>
+												</li>
+											</ul>
+										</div>
+										<div class="speech__meta-data">
+											<span v-if="section.speaker_name" class="speech__meta-data__speaker-name">
+												<a :href="section.section_speaker ? `/speaker/${section.section_speaker}` : undefined">
+													{{ section.speaker_name }}
+												</a>
+											</span>
+										</div>
+										<div class="speech__content">
+											<p class="search">
+												<a title="Link in context" :href="sectionLink(section)" v-html="section.snippet"></a>
+											</p>
+										</div>
+									</div>
 								</li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E6%9E%97%E7%AD%B1%E8%8F%81">
-								林筱菁
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2019-09-11-%E8%A1%8C%E6%94%BF%E9%99%A2%E9%9D%92%E5%B9%B4%E8%AB%AE%E8%A9%A2%E5%A7%94%E5%93%A1%E6%9C%83%E7%AC%AC2%E5%B1%86%E7%AC%AC5%E5%A0%B4%E5%B7%A1%E8%BF%B4%E5%BA%A7%E8%AB%87#s324975">
-								謝謝<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s9885" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #8a279e;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #8a279e; background-color: #8a279e;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87">2016-09-10 公視VR對談</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E8%94%A1%E4%BC%83%E5%A9%B7">
-								蔡伃婷
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87#s9885">
-								謝謝<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s155606" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #01055f;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/15747809_10212020087996415_2966752978680824305_n.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #01055f; background-color: #01055f;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2018-03-31-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C%E8%81%AF%E7%B5%A1%E4%BA%BA%E7%AC%AC%E4%BA%8C%E5%8D%81%E4%B9%9D%E6%AC%A1%E5%8D%94%E4%BD%9C%E6%9C%83%E8%AD%B0">2018-03-31 開放政府聯絡人第二十九次協作會議</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%BC%B5%E8%8A%B3%E7%9D%BF">
-								張芳睿
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2018-03-31-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C%E8%81%AF%E7%B5%A1%E4%BA%BA%E7%AC%AC%E4%BA%8C%E5%8D%81%E4%B9%9D%E6%AC%A1%E5%8D%94%E4%BD%9C%E6%9C%83%E8%AD%B0#s155606">
-								謝謝<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s360435" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #9c245d;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/Brian_Tzeng.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #9c245d; background-color: #9c245d;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2020-01-18-%E8%88%87%E6%9B%BE%E5%8D%9A%E6%81%A9%E5%B0%8D%E8%AB%87">2020-01-18 與曾博恩對談</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%8D%9A%E6%81%A9">
-								博恩
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2020-01-18-%E8%88%87%E6%9B%BE%E5%8D%9A%E6%81%A9%E5%B0%8D%E8%AB%87#s360435">
-								噢，被<em>唐</em><em>鳳</em>了。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s9743" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #8a279e;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #8a279e; background-color: #8a279e;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87">2016-09-10 公視VR對談</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E8%94%A1%E4%BC%83%E5%A9%B7">
-								蔡伃婷
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87#s9743">
-								<em>唐</em><em>鳳</em>你好。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s9871" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #8a279e;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #8a279e; background-color: #8a279e;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87">2016-09-10 公視VR對談</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E8%94%A1%E4%BC%83%E5%A9%B7">
-								蔡伃婷
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87#s9871">
-								謝謝<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s212820" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #6229d3;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/%E8%B3%B4%E8%87%B4%E7%BF%94_bC96amn.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #6229d3; background-color: #6229d3;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2018-09-03-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C-po-%E7%AC%AC%E5%8D%81%E4%B9%9D%E6%AC%A1%E6%9C%88%E6%9C%83">2018-09-03 開放政府 PO 第十九次月會</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E8%B3%B4%E8%87%B4%E7%BF%94">
-								賴致翔
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2018-09-03-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C-po-%E7%AC%AC%E5%8D%81%E4%B9%9D%E6%AC%A1%E6%9C%88%E6%9C%83#s212820">
-								謝謝<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s382944" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #1e27b1;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #1e27b1; background-color: #1e27b1;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2020-03-05-%E6%96%B0%E9%BB%9E%E5%AD%90%E5%AF%A6%E9%A9%97%E5%A0%B4%E4%BE%86%E8%A8%AA">2020-03-05 新點子實驗場來訪
-									</a>
+								<li v-if="sections.length === 0" class="speech speech--search-result speech--with-portrait speech--speech speech--border">
+									<div class="speech-wrapper">
+										<div class="speech__content">沒有找到相關段落</div>
+									</div>
 								</li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E9%BB%83%E9%8A%98%E5%BD%B0">
-								黃銘彰
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2020-03-05-%E6%96%B0%E9%BB%9E%E5%AD%90%E5%AF%A6%E9%A9%97%E5%A0%B4%E4%BE%86%E8%A8%AA#s382944">
-								那<em>唐</em><em>鳳</em>呢？
-								</a>
-								</p>
+							</ul>
+							<div class="pagination">
+								<span class="button--disabled button search-pagination-button">&larr; Previous</span>
+								<span class="button current pagination__page-number">1</span>
+								<a :href="pageHref(2)" class="button pagination__page-number">2</a>
+								<a :href="pageHref(3)" class="button pagination__page-number">3</a>
+								...
+								<a :href="pageHref(91)" class="button pagination__page-number">91</a>
+								<a :href="pageHref(92)" class="button pagination__page-number">92</a>
+								<a :href="pageHref(2)" class="button search-pagination-button">Next &rarr;</a>
 							</div>
 						</div>
-					</li>
-					<li id="s163969" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #01055f;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/15747809_10212020087996415_2966752978680824305_n.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #01055f; background-color: #01055f;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2018-04-20-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C%E8%81%AF%E7%B5%A1%E4%BA%BA%E7%AC%AC%E4%B8%89%E5%8D%81%E4%B8%80%E6%AC%A1%E5%8D%94%E4%BD%9C%E6%9C%83%E8%AD%B0">2018-04-20 開放政府聯絡人第三十一次協作會議</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%BC%B5%E8%8A%B3%E7%9D%BF">
-								張芳睿
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2018-04-20-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C%E8%81%AF%E7%B5%A1%E4%BA%BA%E7%AC%AC%E4%B8%89%E5%8D%81%E4%B8%80%E6%AC%A1%E5%8D%94%E4%BD%9C%E6%9C%83%E8%AD%B0#s163969">
-								謝謝<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s9896" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #8a279e;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #8a279e; background-color: #8a279e;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87">2016-09-10 公視VR對談</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E8%94%A1%E4%BC%83%E5%A9%B7">
-								蔡伃婷
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87#s9896">
-								謝謝你，謝謝<em>唐</em><em>鳳</em>，跟<em>唐</em><em>鳳</em>掰掰。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s162876" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #4d89d2;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/media/speakers/default/pic_AudreyTang-small.jpg.96x96_q85_crop-smart_face_upscale.jpg"
-								style="border-color: #4d89d2; background-color: #4d89d2;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2018-04-16-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C%E8%81%AF%E7%B5%A1%E4%BA%BA%E7%AC%AC%E4%B8%89%E5%8D%81%E4%B8%80%E6%AC%A1%E5%8D%94%E4%BD%9C%E6%9C%83%E8%AD%B0%E6%9C%83%E5%89%8D%E6%9C%83">2018-04-16 開放政府聯絡人第三十一次協作會議會前會</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%94%90%E9%B3%B3-3">
-								唐鳳
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2018-04-16-%E9%96%8B%E6%94%BE%E6%94%BF%E5%BA%9C%E8%81%AF%E7%B5%A1%E4%BA%BA%E7%AC%AC%E4%B8%89%E5%8D%81%E4%B8%80%E6%AC%A1%E5%8D%94%E4%BD%9C%E6%9C%83%E8%AD%B0%E6%9C%83%E5%89%8D%E6%9C%83#s162876">
-								我叫<em>唐</em><em>鳳</em>，叫我<em>唐</em><em>鳳</em>就可以了。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					<li id="s9822" class="speech speech--search-result speech--with-portrait speech--speech speech--border"
-						style="border-left-color: #f5b68d;">
-						<div class="speaker-portrait-wrapper">
-							<img src="/static/speeches/i/a.png"
-								style="border-color: #f5b68d; background-color: #f5b68d;" alt=""  class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
-						</div>
-						<div class="speech-wrapper">
-							<div class="speech__breadcrumb">
-								<ul class="breadcrumbs">
-								<li><a href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87">2016-09-10 公視VR對談</a></li>
-								</ul>
-							</div>
-							<div class="speech__meta-data">
-								<span class="speech__meta-data__speaker-name">
-								<a href="/speaker/%E5%BB%96%E5%AE%B8%E8%82%B2">
-								廖宸育
-								</a>
-								</span>
-							</div>
-							<div class="speech__content">
-								<p class="search">
-								<a title="Link in context" href="/2016-09-10-%E5%85%AC%E8%A6%96vr%E5%B0%8D%E8%AB%87#s9822">
-								好，謝謝，謝謝<em>唐</em><em>鳳</em>。
-								</a>
-								</p>
-							</div>
-						</div>
-					</li>
-					</ul>
-					<div class="pagination">
-					<span class="button--disabled button search-pagination-button">&larr; Previous</span>
-					<span class="button current pagination__page-number">1</span>
-					<a href="?page=2&amp;q=%E5%94%90%E9%B3%B3" class="button pagination__page-number">2</a>
-					<a href="?page=3&amp;q=%E5%94%90%E9%B3%B3" class="button pagination__page-number">3</a>
-					...
-					<a href="?page=91&amp;q=%E5%94%90%E9%B3%B3" class="button pagination__page-number">91</a>
-					<a href="?page=92&amp;q=%E5%94%90%E9%B3%B3" class="button pagination__page-number">92</a>
-					<a href="?page=2&amp;q=%E5%94%90%E9%B3%B3" class="button search-pagination-button">Next &rarr;</a>
 					</div>
 				</div>
 			</div>
 		</div>
-		</div>
+		<Footer />
 	</div>
-	<footer class="full-page__row">
-		<div class="full-page__unit" style="display: flex">
-		<div class="row">
-			<div class="columns small-12 large-9" style="padding: 0">
-				<p style="font-size: 1em;font-weight: bold;display: flex;margin-inline-end: auto;" id="cc"></p>
-			</div>
-			<div class="columns small-12 large-3" style="padding: 0">
-				<p style="font-size: 1em;font-weight: bold;display: flex; justify-content: end;">
-					<a id="tos"></a>
-					<a id="privacy" style="margin-left: 1rem;"></a>
-				</p>
-			</div>
-		</div>
-		</div>
-	</footer>
 </template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+
+type SpeakerResult = {
+	route_pathname: string;
+	name: string;
+	photoURL: string | null;
+	snippet: string;
+};
+
+type SectionResult = {
+	section_id: number;
+	filename: string;
+	nest_filename: string | null;
+	section_speaker: string | null;
+	speaker_name: string | null;
+	display_name: string;
+	photoURL: string | null;
+	snippet: string;
+};
+
+const props = defineProps<{
+	query: string;
+	speakers: SpeakerResult[];
+	sections: SectionResult[];
+}>();
+
+const encodedQuery = computed(() => encodeURIComponent(props.query ?? ''));
+const borderPalette = ['#4d89d2', '#b17656', '#c17660', '#f5b68d', '#9c245d', '#6229d3', '#01055f', '#15895c', '#8a279e', '#1e27b1'];
+
+function hashString(value: string): number {
+	let hash = 0;
+	for (let i = 0; i < value.length; i++) {
+		hash = (hash << 5) - hash + value.charCodeAt(i);
+		hash |= 0;
+	}
+	return Math.abs(hash);
+}
+
+function sectionBorderStyle(section: SectionResult) {
+	const key = section.section_speaker || section.filename || '';
+	const index = key ? hashString(key) % borderPalette.length : 0;
+	return { borderLeftColor: borderPalette[index] };
+}
+
+function sectionLink(section: SectionResult) {
+	const encodedFilename = encodeURIComponent(section.filename);
+	const encodedNest = section.nest_filename ? `/${encodeURIComponent(section.nest_filename)}` : '';
+	return `/${encodedFilename}${encodedNest}#s${section.section_id}`;
+}
+
+function pageHref(page: number) {
+	const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+	return `/search/?page=${safePage}&q=${encodedQuery.value}`;
+}
+</script>
