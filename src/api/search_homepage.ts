@@ -149,18 +149,47 @@ export async function runSearchHomepage(
 		throw new Error('Database query failed');
 	}
 
-	const speakers: SearchSpeakerResult[] = (speakerResult.results ?? []).map((row: any) => ({
+	let speakers: SearchSpeakerResult[] = (speakerResult.results ?? []).map((row: any) => ({
 		route_pathname: row.route_pathname,
 		name: row.name,
 		photoURL: row.photoURL ?? null,
-		snippet:
-			row.snippet ??
-			highlightTerm(row.name ?? '', query) ??
-			highlightTerm(row.route_pathname ?? '', query) ??
-			row.name ??
-			row.route_pathname ??
-			''
+		snippet: row.snippet ?? ''
 	}));
+
+
+	// for each speaker, find the duplicate speakera by name using D1 and push to speakers
+	const additionalSpeakers: SearchSpeakerResult[] = [];
+	const seenRoutes = new Set<string>(speakers.map((s) => s.route_pathname));
+
+	for (const speaker of speakers) {
+		const speakerDB = await env.DB.prepare(
+			'SELECT name, route_pathname, photoURL FROM speakers WHERE name LIKE ?'
+		)
+			.bind(`%${speaker.name}%`)
+			.all();
+
+		if (!speakerDB.success) continue;
+
+		const rows = (speakerDB.results ?? []) as Array<{
+			route_pathname?: string;
+			name?: string;
+			photoURL?: string | null;
+		}>;
+
+		for (const row1 of rows) {
+			const route = row1.route_pathname ?? '';
+			if (!route || seenRoutes.has(route)) continue;
+			seenRoutes.add(route);
+			additionalSpeakers.push({
+				route_pathname: route,
+				name: row1.name ?? route,
+				photoURL: row1.photoURL ?? speaker.photoURL ?? null,
+				snippet: speaker.snippet ?? ''
+			});
+		}
+	}
+	speakers = [...additionalSpeakers, ...speakers];
+
 
 	const sections: SearchSectionResult[] = (sectionResult.results ?? []).map((row: any) => ({
 		section_id: row.section_id,
