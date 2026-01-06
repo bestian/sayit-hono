@@ -371,3 +371,9 @@ const formatLongestSectionSummary = (summary: string) => {
 		<Footer />
 	</div>
 </template>
+
+<style scoped>
+	.button.pagination__page-number {
+		margin: auto .2rem;
+	}
+</style>
