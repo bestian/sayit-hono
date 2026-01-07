@@ -8,7 +8,6 @@
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">
 							<input type="search" class="site-search__input" placeholder="Search" name="q" :value="query" />
-							<input v-if="currentSpeakerId" type="hidden" name="p" :value="currentSpeakerId" />
 							<input type="submit" class="icon-search" value="Search" />
 						</div>
 					</form>
@@ -17,7 +16,7 @@
 							<!-- 當有講者篩選時，顯示 checkbox -->
 							<template v-if="filteredSpeakerId && filteredSpeakerName">
 								<label>
-									<input type="checkbox" name="p" :value="filteredSpeakerId" checked @change="handleSpeakerFilterChange">
+									<input type="checkbox" name="p" :value="filteredSpeakerId" checked>
 									Search only speeches by {{ filteredSpeakerName }}
 								</label>
 							</template>
@@ -187,16 +186,8 @@ const resolvedPaginationPages = computed<PaginationPage[]>(() => {
 const hasPrev = computed(() => safePage.value > 1);
 const hasNext = computed(() => safePage.value < totalPages.value);
 
-// 從 props 或當前 URL 取得講者 ID (p 參數)
-const currentSpeakerId = computed(() => {
-	if (props.filteredSpeakerId) {
-		return props.filteredSpeakerId.toString();
-	}
-	if (typeof window === 'undefined') return null;
-	const urlParams = new URLSearchParams(window.location.search);
-	const p = urlParams.get('p');
-	return p || null;
-});
+// 供 SSR 使用：有講者篩選時帶入分頁與連結
+const speakerIdForFilter = computed(() => (props.filteredSpeakerId ? props.filteredSpeakerId.toString() : null));
 
 const borderPalette = ['#4d89d2', '#b17656', '#c17660', '#f5b68d', '#9c245d', '#6229d3', '#01055f', '#15895c', '#8a279e', '#1e27b1'];
 
@@ -232,27 +223,11 @@ function pageHref(page: number) {
 
 	// 從 props 或當前 URL 取得 p 參數（講者 ID）
 	let speakerIdParam = '';
-	if (props.filteredSpeakerId) {
-		speakerIdParam = `&p=${props.filteredSpeakerId}`;
-	} else if (typeof window !== 'undefined') {
-		const urlParams = new URLSearchParams(window.location.search);
-		const p = urlParams.get('p');
-		if (p) {
-			speakerIdParam = `&p=${encodeURIComponent(p)}`;
-		}
+	const speakerId = speakerIdForFilter.value;
+	if (speakerId) {
+		speakerIdParam = `&p=${encodeURIComponent(speakerId)}`;
 	}
 
 	return `/search/?page=${safe}&q=${encodedQuery.value}${speakerIdParam}`;
-}
-
-function handleSpeakerFilterChange(event: Event) {
-	const checkbox = event.target as HTMLInputElement;
-	if (!checkbox.checked) {
-		// 取消勾選時，移除 p 參數並重新導向
-		const url = new URL(window.location.href);
-		url.searchParams.delete('p');
-		url.searchParams.set('page', '1'); // 重置到第一頁
-		window.location.href = url.toString();
-	}
 }
 </script>
