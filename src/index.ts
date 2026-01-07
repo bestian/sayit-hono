@@ -284,10 +284,13 @@ app.get('/api/search_homepage.json', (c) => searchHomepage(c));
 async function renderSearchPage(c: any) {
 	const url = new URL(c.req.url);
 	const query = url.searchParams.get('q') ?? '';
+	const pageParam = url.searchParams.get('page');
+	const pageNumber = Number(pageParam);
+	const page = Number.isFinite(pageNumber) && pageNumber > 0 ? Math.floor(pageNumber) : 1;
 
 	let result: Awaited<ReturnType<typeof runSearchHomepage>>;
 	try {
-		result = await runSearchHomepage(c.env, query);
+		result = await runSearchHomepage(c.env, query, { page });
 	} catch (err) {
 		console.error('[search SSR] query failed', err);
 		return c.text('Internal Server Error', 500);
@@ -308,7 +311,12 @@ async function renderSearchPage(c: any) {
 		props: {
 			query: result.query,
 			speakers: result.speakers,
-			sections: result.sections
+			sections: result.sections,
+			page: result.page,
+			page_size: result.page_size,
+			total_pages: result.total_pages,
+			total_sections: result.total_sections,
+			pagination_pages: result.pagination_pages
 		},
 		scripts
 	});

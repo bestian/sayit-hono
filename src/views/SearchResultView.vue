@@ -67,14 +67,39 @@
 								</li>
 							</ul>
 							<div class="pagination">
-								<span class="button--disabled button search-pagination-button">&larr; Previous</span>
-								<span class="button current pagination__page-number">1</span>
-								<a :href="pageHref(2)" class="button pagination__page-number">2</a>
-								<a :href="pageHref(3)" class="button pagination__page-number">3</a>
-								...
-								<a :href="pageHref(91)" class="button pagination__page-number">91</a>
-								<a :href="pageHref(92)" class="button pagination__page-number">92</a>
-								<a :href="pageHref(2)" class="button search-pagination-button">Next &rarr;</a>
+								<span
+									:class="['button search-pagination-button', hasPrev ? '' : 'button--disabled']"
+									:aria-disabled="!hasPrev"
+								>
+									<template v-if="hasPrev">
+										<a :href="pageHref(safePage - 1)">&larr; Previous</a>
+									</template>
+									<template v-else>&larr; Previous</template>
+								</span>
+								<template v-for="pageNum in resolvedPaginationPages" :key="pageNum === 'ellipsis' ? 'ellipsis' : pageNum">
+									<span
+										v-if="pageNum === 'ellipsis'"
+										class="pagination__no__border"
+									>...</span>
+									<a
+										v-else-if="pageNum !== safePage"
+										:href="pageHref(pageNum as number)"
+										class="button pagination__page-number"
+									>{{ pageNum }}</a>
+									<span
+										v-else
+										class="button current pagination__page-number"
+									>{{ pageNum }}</span>
+								</template>
+								<span
+									:class="['button search-pagination-button', hasNext ? '' : 'button--disabled']"
+									:aria-disabled="!hasNext"
+								>
+									<template v-if="hasNext">
+										<a :href="pageHref(safePage + 1)">Next &rarr;</a>
+									</template>
+									<template v-else>Next &rarr;</template>
+								</span>
 							</div>
 						</div>
 					</div>
@@ -106,13 +131,48 @@ type SectionResult = {
 	snippet: string;
 };
 
+type PaginationPage = number | 'ellipsis';
+
 const props = defineProps<{
 	query: string;
 	speakers: SpeakerResult[];
 	sections: SectionResult[];
+	page?: number;
+	page_size?: number;
+	total_pages?: number;
+	total_sections?: number;
+	pagination_pages?: PaginationPage[];
 }>();
 
 const encodedQuery = computed(() => encodeURIComponent(props.query ?? ''));
+const pageSize = computed(() => {
+	const num = Number(props.page_size);
+	if (Number.isFinite(num) && num > 0) return Math.floor(num);
+	return 20;
+});
+const safePage = computed(() => {
+	const num = Number(props.page);
+	return Number.isFinite(num) && num > 0 ? Math.floor(num) : 1;
+});
+const totalSections = computed(() => {
+	const num = Number(props.total_sections);
+	if (Number.isFinite(num) && num >= 0) return Math.floor(num);
+	return props.sections?.length ?? 0;
+});
+const totalPages = computed(() => {
+	const num = Number(props.total_pages);
+	if (Number.isFinite(num) && num > 0) return Math.floor(num);
+	const sectionsCount = totalSections.value;
+	return sectionsCount > 0 ? Math.ceil(sectionsCount / pageSize.value) : 1;
+});
+const resolvedPaginationPages = computed<PaginationPage[]>(() => {
+	if (Array.isArray(props.pagination_pages) && props.pagination_pages.length > 0) {
+		return props.pagination_pages;
+	}
+	return [safePage.value];
+});
+const hasPrev = computed(() => safePage.value > 1);
+const hasNext = computed(() => safePage.value < totalPages.value);
 const borderPalette = ['#4d89d2', '#b17656', '#c17660', '#f5b68d', '#9c245d', '#6229d3', '#01055f', '#15895c', '#8a279e', '#1e27b1'];
 
 function hashString(value: string): number {
@@ -143,7 +203,7 @@ function sectionLink(section: SectionResult) {
 }
 
 function pageHref(page: number) {
-	const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
-	return `/search/?page=${safePage}&q=${encodedQuery.value}`;
+	const safe = Number.isFinite(page) ? Math.max(1, Math.min(totalPages.value, Math.floor(page))) : 1;
+	return `/search/?page=${safe}&q=${encodedQuery.value}`;
 }
 </script>
