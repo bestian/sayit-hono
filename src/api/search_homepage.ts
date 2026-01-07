@@ -164,12 +164,24 @@ function buildFtsQuery(raw: string): string {
 export async function runSearchHomepage(
 	env: ApiEnv['Bindings'],
 	queryRaw: string,
-	limits?: { speakerLimit?: number; sectionLimit?: number; page?: number }
+	limits?: { speakerLimit?: number; sectionLimit?: number; page?: number; speakerId?: number }
 ): Promise<SearchHomepageResult> {
 	const query = (queryRaw ?? '').trim();
 	const speakerLimit = normalizeLimit(limits?.speakerLimit, DEFAULT_SPEAKER_LIMIT, MAX_SPEAKER_LIMIT);
 	const sectionLimit = normalizeLimit(limits?.sectionLimit, DEFAULT_SECTION_LIMIT, MAX_SECTION_LIMIT);
 	const requestedPage = normalizePage(limits?.page);
+	const speakerId = limits?.speakerId;
+
+	// 如果有講者 ID，查詢對應的 route_pathname
+	let speakerRoutePathname: string | null = null;
+	if (speakerId && Number.isFinite(speakerId) && speakerId > 0) {
+		const speakerRow = await env.DB.prepare('SELECT route_pathname FROM speakers WHERE id = ?')
+			.bind(speakerId)
+			.first();
+		if (speakerRow && (speakerRow as any).route_pathname) {
+			speakerRoutePathname = (speakerRow as any).route_pathname;
+		}
+	}
 
 	if (!query) {
 		return {
@@ -213,12 +225,16 @@ export async function runSearchHomepage(
 		.bind(ftsQuery, speakerLimit)
 		.all();
 
+	// 建立講者篩選條件
+	const speakerFilter = speakerRoutePathname ? 'AND route_pathname = ?' : '';
+	const totalSectionsBindings = speakerRoutePathname ? [ftsQuery, speakerRoutePathname] : [ftsQuery];
+
 	const totalSectionsPromise = env.DB.prepare(
 		`SELECT COUNT(*) AS total
 			FROM homepage_search
-			WHERE doc_type = 'section' AND homepage_search MATCH ?`
+			WHERE doc_type = 'section' AND homepage_search MATCH ? ${speakerFilter}`
 	)
-		.bind(ftsQuery)
+		.bind(...totalSectionsBindings)
 		.first();
 
 	const [speakerResult, totalSectionsRow] = await Promise.all([speakerPromise, totalSectionsPromise]);
@@ -232,6 +248,10 @@ export async function runSearchHomepage(
 	const page = Math.min(Math.max(DEFAULT_PAGE, requestedPage), totalPages);
 	const offset = (page - 1) * sectionLimit;
 
+	const sectionBindings = speakerRoutePathname
+		? [ftsQuery, speakerRoutePathname, sectionLimit, offset]
+		: [ftsQuery, sectionLimit, offset];
+
 	const sectionResult = await env.DB.prepare(
 		`SELECT
 				route_pathname AS section_speaker,
@@ -244,11 +264,11 @@ export async function runSearchHomepage(
 				snippet(homepage_search, 3, '<em>', '</em>', '…', 96) AS snippet,
 				bm25(homepage_search) AS score
 			FROM homepage_search
-			WHERE doc_type = 'section' AND homepage_search MATCH ?
+			WHERE doc_type = 'section' AND homepage_search MATCH ? ${speakerFilter}
 			ORDER BY score, filename DESC, section_id DESC
 			LIMIT ? OFFSET ?`
 	)
-		.bind(ftsQuery, sectionLimit, offset)
+		.bind(...sectionBindings)
 		.all();
 
 	if (!sectionResult.success) {
@@ -332,6 +352,12 @@ export async function searchHomepage(c: Context<ApiEnv>) {
 	const speakerLimit = parseLimit(url.searchParams.get('speakerLimit'), DEFAULT_SPEAKER_LIMIT, MAX_SPEAKER_LIMIT);
 	const sectionLimit = parseLimit(url.searchParams.get('sectionLimit'), DEFAULT_SECTION_LIMIT, MAX_SECTION_LIMIT);
 
+	// 解析講者 ID 參數 (p)
+	const speakerIdParam = url.searchParams.get('p');
+	const speakerId = speakerIdParam && Number.isFinite(Number(speakerIdParam)) && Number(speakerIdParam) > 0
+		? Math.floor(Number(speakerIdParam))
+		: undefined;
+
 	if (!query) {
 		return c.json(
 			{
@@ -350,7 +376,7 @@ export async function searchHomepage(c: Context<ApiEnv>) {
 	}
 
 	try {
-		const result = await runSearchHomepage(c.env, query, { speakerLimit, sectionLimit, page });
+		const result = await runSearchHomepage(c.env, query, { speakerLimit, sectionLimit, page, speakerId });
 		return c.json(result, 200, corsHeaders);
 	} catch (error) {
 		console.error('[search_homepage] query failed', error);
