@@ -74,6 +74,62 @@ function escapeHtml(value: string): string {
 		.replace(/'/g, '&#39;');
 }
 
+// 簡易補齊未關閉標籤，避免截斷時產生不成對的 HTML
+function ensureBalancedHtml(html: string): string {
+	const selfClosing = new Set([
+		'br',
+		'img',
+		'hr',
+		'meta',
+		'link',
+		'input',
+		'area',
+		'base',
+		'col',
+		'command',
+		'embed',
+		'keygen',
+		'param',
+		'source',
+		'track',
+		'wbr'
+	]);
+
+	const stack: string[] = [];
+	const tagRe = /<\s*\/?\s*([a-zA-Z0-9]+)[^>]*>/g;
+	let match: RegExpExecArray | null;
+
+	while ((match = tagRe.exec(html))) {
+		const rawTag = match[0];
+		const name = match[1].toLowerCase();
+		const isClosing = rawTag.startsWith('</');
+
+		if (selfClosing.has(name)) {
+			continue;
+		}
+
+		if (!isClosing) {
+			stack.push(name);
+		} else {
+			// 尋找最近的同名開標籤並關閉之，避免深層錯位
+			const idx = stack.lastIndexOf(name);
+			if (idx >= 0) {
+				stack.splice(idx, 1);
+			}
+		}
+	}
+
+	if (stack.length === 0) return html;
+
+	return `${html}${stack.reverse().map((n) => `</${n}>`).join('')}`;
+}
+
+function toPlainText(html: string): string {
+	// 如果前端 html 不成對，先嘗試補齊，再轉為純文字
+	const balanced = ensureBalancedHtml(html);
+	return balanced.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function normalizePage(raw?: number | null): number {
 	if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
 		return Math.floor(raw);
@@ -203,7 +259,7 @@ export async function runSearchHomepage(
 		route_pathname: row.route_pathname,
 		name: row.name,
 		photoURL: row.photoURL ?? null,
-		snippet: row.snippet ?? ''
+		snippet: highlightTerm(toPlainText(row.snippet ?? ''), query)
 	}));
 
 
@@ -249,7 +305,7 @@ export async function runSearchHomepage(
 		speaker_name: row.speaker_name ?? null,
 		display_name: row.display_name ?? row.filename ?? '',
 		photoURL: row.photoURL ?? null,
-		snippet: row.snippet ?? ''
+		snippet: highlightTerm(toPlainText(row.snippet ?? ''), query)
 	}));
 
 	return {
