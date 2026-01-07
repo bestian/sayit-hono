@@ -76,7 +76,7 @@ function highlightTerm(value: string, query: string): string {
 	let highlighted = escapeHtml(value);
 	for (const token of [...tokens, ...encodedTokens]) {
 		const re = new RegExp(escapeRegExp(token), 'gi');
-		highlighted = highlighted.replace(re, (match) => `<mark>${match}</mark>`);
+		highlighted = highlighted.replace(re, (match) => `<em>${match}</em>`);
 	}
 	return highlighted;
 }
@@ -114,7 +114,7 @@ export async function runSearchHomepage(
 				route_pathname,
 				name,
 				photoURL,
-				snippet(homepage_search, 2, '<mark>', '</mark>', '…', 48) AS snippet,
+				snippet(homepage_search, 2, '<em>', '</em>', '…', 48) AS snippet,
 				bm25(homepage_search) AS score
 			FROM homepage_search
 			WHERE doc_type = 'speaker' AND homepage_search MATCH ?
@@ -133,7 +133,7 @@ export async function runSearchHomepage(
 				section_id,
 				display_name,
 				photoURL,
-				snippet(homepage_search, 3, '<mark>', '</mark>', '…', 96) AS snippet,
+				snippet(homepage_search, 3, '<em>', '</em>', '…', 96) AS snippet,
 				bm25(homepage_search) AS score
 			FROM homepage_search
 			WHERE doc_type = 'section' AND homepage_search MATCH ?
