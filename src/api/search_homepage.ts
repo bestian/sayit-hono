@@ -1,9 +1,11 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
 import type { ApiEnv } from './types';
+import { buildPaginationPages } from '../utils/pagination';
 
 const DEFAULT_SPEAKER_LIMIT = 5;
 const DEFAULT_SECTION_LIMIT = 20;
+const DEFAULT_PAGE = 1;
 const MAX_SPEAKER_LIMIT = 10;
 const MAX_SECTION_LIMIT = 50;
 
@@ -29,6 +31,11 @@ export type SearchHomepageResult = {
 	query: string;
 	speakers: SearchSpeakerResult[];
 	sections: SearchSectionResult[];
+	page: number;
+	page_size: number;
+	total_pages: number;
+	total_sections: number;
+	pagination_pages: Array<number | 'ellipsis'>;
 };
 
 function parseLimit(raw: string | null, fallback: number, max: number) {
@@ -67,6 +74,13 @@ function escapeHtml(value: string): string {
 		.replace(/'/g, '&#39;');
 }
 
+function normalizePage(raw?: number | null): number {
+	if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+		return Math.floor(raw);
+	}
+	return DEFAULT_PAGE;
+}
+
 function highlightTerm(value: string, query: string): string {
 	if (!value || !query) return value;
 	const tokens = tokenize(query);
@@ -94,19 +108,38 @@ function buildFtsQuery(raw: string): string {
 export async function runSearchHomepage(
 	env: ApiEnv['Bindings'],
 	queryRaw: string,
-	limits?: { speakerLimit?: number; sectionLimit?: number }
+	limits?: { speakerLimit?: number; sectionLimit?: number; page?: number }
 ): Promise<SearchHomepageResult> {
 	const query = (queryRaw ?? '').trim();
 	const speakerLimit = normalizeLimit(limits?.speakerLimit, DEFAULT_SPEAKER_LIMIT, MAX_SPEAKER_LIMIT);
 	const sectionLimit = normalizeLimit(limits?.sectionLimit, DEFAULT_SECTION_LIMIT, MAX_SECTION_LIMIT);
+	const requestedPage = normalizePage(limits?.page);
 
 	if (!query) {
-		return { query: '', speakers: [], sections: [] };
+		return {
+			query: '',
+			speakers: [],
+			sections: [],
+			page: DEFAULT_PAGE,
+			page_size: sectionLimit,
+			total_pages: DEFAULT_PAGE,
+			total_sections: 0,
+			pagination_pages: [DEFAULT_PAGE]
+		};
 	}
 
 	const ftsQuery = buildFtsQuery(query);
 	if (!ftsQuery) {
-		return { query, speakers: [], sections: [] };
+		return {
+			query,
+			speakers: [],
+			sections: [],
+			page: DEFAULT_PAGE,
+			page_size: sectionLimit,
+			total_pages: DEFAULT_PAGE,
+			total_sections: 0,
+			pagination_pages: [DEFAULT_PAGE]
+		};
 	}
 
 	const speakerPromise = env.DB.prepare(
@@ -124,7 +157,26 @@ export async function runSearchHomepage(
 		.bind(ftsQuery, speakerLimit)
 		.all();
 
-	const sectionPromise = env.DB.prepare(
+	const totalSectionsPromise = env.DB.prepare(
+		`SELECT COUNT(*) AS total
+			FROM homepage_search
+			WHERE doc_type = 'section' AND homepage_search MATCH ?`
+	)
+		.bind(ftsQuery)
+		.first();
+
+	const [speakerResult, totalSectionsRow] = await Promise.all([speakerPromise, totalSectionsPromise]);
+
+	if (!speakerResult.success) {
+		throw new Error('Database query failed');
+	}
+
+	const totalSections = typeof (totalSectionsRow as any)?.total === 'number' ? (totalSectionsRow as any).total : 0;
+	const totalPages = Math.max(1, Math.ceil(totalSections / sectionLimit));
+	const page = Math.min(Math.max(DEFAULT_PAGE, requestedPage), totalPages);
+	const offset = (page - 1) * sectionLimit;
+
+	const sectionResult = await env.DB.prepare(
 		`SELECT
 				route_pathname AS section_speaker,
 				name AS speaker_name,
@@ -138,14 +190,12 @@ export async function runSearchHomepage(
 			FROM homepage_search
 			WHERE doc_type = 'section' AND homepage_search MATCH ?
 			ORDER BY score, filename, section_id
-			LIMIT ?`
+			LIMIT ? OFFSET ?`
 	)
-		.bind(ftsQuery, sectionLimit)
+		.bind(ftsQuery, sectionLimit, offset)
 		.all();
 
-	const [speakerResult, sectionResult] = await Promise.all([speakerPromise, sectionPromise]);
-
-	if (!speakerResult.success || !sectionResult.success) {
+	if (!sectionResult.success) {
 		throw new Error('Database query failed');
 	}
 
@@ -202,7 +252,16 @@ export async function runSearchHomepage(
 		snippet: row.snippet ?? ''
 	}));
 
-	return { query, speakers, sections };
+	return {
+		query,
+		speakers,
+		sections,
+		page,
+		page_size: sectionLimit,
+		total_pages: totalPages,
+		total_sections: totalSections,
+		pagination_pages: buildPaginationPages(page, totalPages)
+	};
 }
 
 export async function searchHomepage(c: Context<ApiEnv>) {
@@ -210,16 +269,32 @@ export async function searchHomepage(c: Context<ApiEnv>) {
 	const corsHeaders = getCorsHeaders(origin);
 	const url = new URL(c.req.url);
 	const query = (url.searchParams.get('q') ?? '').trim();
+	const pageParamRaw = url.searchParams.get('page');
+	const pageParamNum = Number(pageParamRaw);
+	const page = Number.isFinite(pageParamNum) && pageParamNum > 0 ? Math.floor(pageParamNum) : DEFAULT_PAGE;
 
 	const speakerLimit = parseLimit(url.searchParams.get('speakerLimit'), DEFAULT_SPEAKER_LIMIT, MAX_SPEAKER_LIMIT);
 	const sectionLimit = parseLimit(url.searchParams.get('sectionLimit'), DEFAULT_SECTION_LIMIT, MAX_SECTION_LIMIT);
 
 	if (!query) {
-		return c.json({ query: '', speakers: [], sections: [] }, 200, corsHeaders);
+		return c.json(
+			{
+				query: '',
+				speakers: [],
+				sections: [],
+				page: DEFAULT_PAGE,
+				page_size: sectionLimit,
+				total_pages: DEFAULT_PAGE,
+				total_sections: 0,
+				pagination_pages: [DEFAULT_PAGE]
+			},
+			200,
+			corsHeaders
+		);
 	}
 
 	try {
-		const result = await runSearchHomepage(c.env, query, { speakerLimit, sectionLimit });
+		const result = await runSearchHomepage(c.env, query, { speakerLimit, sectionLimit, page });
 		return c.json(result, 200, corsHeaders);
 	} catch (error) {
 		console.error('[search_homepage] query failed', error);
