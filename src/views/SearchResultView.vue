@@ -34,6 +34,7 @@
 										<img
 											:src="section.photoURL || '/static/speeches/i/a.png'"
 											:alt="section.speaker_name || ''"
+											:style="avatarStyle(section)"
 											class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium"
 										>
 									</div>
@@ -126,7 +127,13 @@ function hashString(value: string): number {
 function sectionBorderStyle(section: SectionResult) {
 	const key = section.section_speaker || section.filename || '';
 	const index = key ? hashString(key) % borderPalette.length : 0;
-	return { borderLeftColor: borderPalette[index] };
+	return { borderColor: borderPalette[index] };
+}
+
+function avatarStyle(section: SectionResult) {
+	const key = section.section_speaker || section.filename || '';
+	const index = key ? hashString(key) % borderPalette.length : 0;
+	return { borderColor: borderPalette[index], backgroundColor: borderPalette[index] };
 }
 
 function sectionLink(section: SectionResult) {
