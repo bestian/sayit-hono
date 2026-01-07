@@ -245,7 +245,7 @@ export async function runSearchHomepage(
 				bm25(homepage_search) AS score
 			FROM homepage_search
 			WHERE doc_type = 'section' AND homepage_search MATCH ?
-			ORDER BY score, filename, section_id
+			ORDER BY score, filename DESC, section_id DESC
 			LIMIT ? OFFSET ?`
 	)
 		.bind(ftsQuery, sectionLimit, offset)
