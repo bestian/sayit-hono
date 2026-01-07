@@ -4,24 +4,35 @@
 		<div class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit">
-					<h1 class="search-title-with-result">搜尋 / <strong>{{ query }}</strong></h1>
+					<h1 class="search-title-with-result">Search / <strong>{{ query }}</strong></h1>
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">
-							<input type="search" class="site-search__input" placeholder="搜尋" name="q" :value="query" />
-							<input type="submit" class="icon-search" value="搜尋" />
+							<input type="search" class="site-search__input" placeholder="Search" name="q" :value="query" />
+							<input v-if="currentSpeakerId" type="hidden" name="p" :value="currentSpeakerId" />
+							<input type="submit" class="icon-search" value="Search" />
 						</div>
 					</form>
 					<div class="page-content__row ">
 						<div class="full-page__unit">
-							<h2>Speakers</h2>
-							<ul class="unstyled-list search-results-speakers">
-								<li v-for="speaker in speakers" :key="speaker.route_pathname" class="search">
-									<a :href="`/speaker/${speaker.route_pathname}`">
-										<span v-html="speaker.snippet || speaker.name"></span>
-									</a>
-								</li>
-								<li v-if="speakers.length === 0" class="search">沒有相關講者</li>
-							</ul>
+							<!-- 當有講者篩選時，顯示 checkbox -->
+							<template v-if="filteredSpeakerId && filteredSpeakerName">
+								<label>
+									<input type="checkbox" name="p" :value="filteredSpeakerId" checked @change="handleSpeakerFilterChange">
+									Search only speeches by {{ filteredSpeakerName }}
+								</label>
+							</template>
+							<!-- 沒有講者篩選時，顯示原本的 Speakers 區塊 -->
+							<template v-else>
+								<h2>Speakers</h2>
+								<ul class="unstyled-list search-results-speakers">
+									<li v-for="speaker in speakers" :key="speaker.route_pathname" class="search">
+										<a :href="`/speaker/${speaker.route_pathname}`">
+											<span v-html="speaker.snippet || speaker.name"></span>
+										</a>
+									</li>
+									<li v-if="speakers.length === 0" class="search">There are no speakers that match your search.</li>
+								</ul>
+							</template>
 							<h2>Mentions of <strong>&ldquo;{{ query }}&rdquo;</strong> in speeches</h2>
 							<ul class="unstyled-list search-results-list">
 								<li
@@ -142,6 +153,8 @@ const props = defineProps<{
 	total_pages?: number;
 	total_sections?: number;
 	pagination_pages?: PaginationPage[];
+	filteredSpeakerId?: number;
+	filteredSpeakerName?: string | null;
 }>();
 
 const encodedQuery = computed(() => encodeURIComponent(props.query ?? ''));
@@ -173,6 +186,18 @@ const resolvedPaginationPages = computed<PaginationPage[]>(() => {
 });
 const hasPrev = computed(() => safePage.value > 1);
 const hasNext = computed(() => safePage.value < totalPages.value);
+
+// 從 props 或當前 URL 取得講者 ID (p 參數)
+const currentSpeakerId = computed(() => {
+	if (props.filteredSpeakerId) {
+		return props.filteredSpeakerId.toString();
+	}
+	if (typeof window === 'undefined') return null;
+	const urlParams = new URLSearchParams(window.location.search);
+	const p = urlParams.get('p');
+	return p || null;
+});
+
 const borderPalette = ['#4d89d2', '#b17656', '#c17660', '#f5b68d', '#9c245d', '#6229d3', '#01055f', '#15895c', '#8a279e', '#1e27b1'];
 
 function hashString(value: string): number {
@@ -204,6 +229,30 @@ function sectionLink(section: SectionResult) {
 
 function pageHref(page: number) {
 	const safe = Number.isFinite(page) ? Math.max(1, Math.min(totalPages.value, Math.floor(page))) : 1;
-	return `/search/?page=${safe}&q=${encodedQuery.value}`;
+
+	// 從 props 或當前 URL 取得 p 參數（講者 ID）
+	let speakerIdParam = '';
+	if (props.filteredSpeakerId) {
+		speakerIdParam = `&p=${props.filteredSpeakerId}`;
+	} else if (typeof window !== 'undefined') {
+		const urlParams = new URLSearchParams(window.location.search);
+		const p = urlParams.get('p');
+		if (p) {
+			speakerIdParam = `&p=${encodeURIComponent(p)}`;
+		}
+	}
+
+	return `/search/?page=${safe}&q=${encodedQuery.value}${speakerIdParam}`;
+}
+
+function handleSpeakerFilterChange(event: Event) {
+	const checkbox = event.target as HTMLInputElement;
+	if (!checkbox.checked) {
+		// 取消勾選時，移除 p 參數並重新導向
+		const url = new URL(window.location.href);
+		url.searchParams.delete('p');
+		url.searchParams.set('page', '1'); // 重置到第一頁
+		window.location.href = url.toString();
+	}
 }
 </script>

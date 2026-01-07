@@ -288,9 +288,30 @@ async function renderSearchPage(c: any) {
 	const pageNumber = Number(pageParam);
 	const page = Number.isFinite(pageNumber) && pageNumber > 0 ? Math.floor(pageNumber) : 1;
 
+	// 解析講者 ID 參數 (p)
+	const speakerIdParam = url.searchParams.get('p');
+	const speakerId = speakerIdParam && Number.isFinite(Number(speakerIdParam)) && Number(speakerIdParam) > 0
+		? Math.floor(Number(speakerIdParam))
+		: undefined;
+
+	// 如果有講者 ID，查詢講者名稱
+	let filteredSpeakerName: string | null = null;
+	if (speakerId) {
+		try {
+			const speakerRow = await c.env.DB.prepare('SELECT name FROM speakers WHERE id = ?')
+				.bind(speakerId)
+				.first();
+			if (speakerRow && (speakerRow as any).name) {
+				filteredSpeakerName = (speakerRow as any).name;
+			}
+		} catch (err) {
+			console.error('[search SSR] failed to get speaker name', err);
+		}
+	}
+
 	let result: Awaited<ReturnType<typeof runSearchHomepage>>;
 	try {
-		result = await runSearchHomepage(c.env, query, { page });
+		result = await runSearchHomepage(c.env, query, { page, speakerId });
 	} catch (err) {
 		console.error('[search SSR] query failed', err);
 		return c.text('Internal Server Error', 500);
@@ -316,7 +337,9 @@ async function renderSearchPage(c: any) {
 			page_size: result.page_size,
 			total_pages: result.total_pages,
 			total_sections: result.total_sections,
-			pagination_pages: result.pagination_pages
+			pagination_pages: result.pagination_pages,
+			filteredSpeakerId: speakerId,
+			filteredSpeakerName: filteredSpeakerName
 		},
 		scripts
 	});
