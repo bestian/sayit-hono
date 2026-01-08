@@ -7,11 +7,19 @@ const BASE_HEAD = `<meta charset="utf-8">
   <meta property="og:url" content="https://sayit.archive.tw">
   <meta property="og:site_name" content="SayIt">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="https://sayit-hono.audreyt.workers.dev/static/speeches/img/apple-touch-icon-152x152.png">
+  <meta property="og:image" content="https://sayit-hono.audreyt.workers.dev/android-chrome-512x512.png">
   <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="152">
-  <meta property="og:image:height" content="152">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
   <meta name="google-site-verification" content="DiXRH7TWCHjMPvi1kvFkDgwpHBGkbFkR2Rxki-iGh2o">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0f172a">
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@100;300;400;500;700&display=swap" rel="stylesheet">
   <link href="/static/speeches/css/speeches.css" rel="stylesheet" type="text/css">
