@@ -124,7 +124,12 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 									</a>
 								</div>
 								<div class="speech-navigation__column speech-navigation__column--two">
-									<div class="ui-instructions">
+									<div
+										class="ui-instructions"
+										id="keyboard-shortcuts"
+										:data-prev-url="section.previous_section_id ? getParagraphUrl(section.previous_section_id) : ''"
+										:data-next-url="section.next_section_id ? getParagraphUrl(section.next_section_id) : ''"
+									>
 										<h2>Keyboard shortcuts</h2>
 										<p>
 											<span class="key-descriptor">j</span> previous speech

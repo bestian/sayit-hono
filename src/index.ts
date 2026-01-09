@@ -376,13 +376,15 @@ app.get('/speech/:section_id', async (c) => {
 	const snippet = plain ? `${plain.slice(0, 80)}${plain.length > 80 ? '...' : ''}` : section.display_name ?? '';
 	const titleText = snippet ? `“${snippet}”` : 'View Section';
 	const styles = [SingleParagraphViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const navigationScript = `<script>(function(){var box=document.getElementById('keyboard-shortcuts');if(!box)return;var prev=box.getAttribute('data-prev-url')||'';var next=box.getAttribute('data-next-url')||'';function editable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||tag==='select'||tag==='option'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(editable(document.activeElement))return;if(e.key==='j'){if(prev){window.location.href=prev;}}else if(e.key==='k'){if(next){window.location.href=next;}}});})();</script>`;
 
 	const head = headForSpeechContent(titleText, sectionHtml);
 	const html = await renderHtml(SingleParagraphView, {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: { section }
+		props: { section },
+		scripts: navigationScript
 	});
 
 	return c.html(html);
