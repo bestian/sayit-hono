@@ -91,7 +91,10 @@ export default _sfc_main;
 	}
 
 	// 將 `.vue` 匯入改為無副檔名，讓編譯後的 `.ts` component 可以被解析
-	output = output.replace(/from\\s+(['"])([^'"\\n]+)\\.vue\\1/g, 'from $1$2$1');
+	output = output.replace(/from\s+(['"])([^'"\n]+)\.vue\1/g, 'from $1$2$1');
+
+	// 修正 utils 相對路徑：生成檔位於 src/.generated/views/，需回到 src/utils/
+	output = output.replace(/from\s+(['"])..\/utils\//g, 'from $1../../utils/');
 
 	await writeFile(path.join(target.outDir, `${name}.ts`), output, 'utf8');
 	return `export { default as ${name}, styles as ${name}Styles } from './${name}.ts';`;

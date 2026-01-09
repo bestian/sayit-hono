@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed,  ref } from 'vue'
+import { getSpeakerColor } from '../utils/speakerColor'
 
 interface ApiSection {
   filename: string
@@ -129,6 +130,16 @@ const portraitUrl = computed(
   () => speaker.value?.photoURL || '/static/speeches/i/a.png'
 )
 
+const speakerColor = computed(() =>
+  getSpeakerColor(
+    speaker.value?.route_pathname ||
+      props.routePathname ||
+      resolvedRoutePathname.value ||
+      speaker.value?.name ||
+      ''
+  )
+)
+
 // 生成演講連結（包含 hash，用於 router-link）
 const getSpeechUrl = (filename: string, sectionId: number) => {
   return `/${encodeURIComponent(filename)}#s${sectionId}`
@@ -223,7 +234,7 @@ const formatLongestSectionSummary = (summary: string) => {
 					<div class="page-header page-header--with-portrait">
 						<div class="page-header__row">
 							<div class="speaker-page__details">
-								<img :src="portraitUrl" style="border-color: #319393; background-color: #319393;"
+								<img :src="portraitUrl" :style="`border-color: ${speakerColor}; background-color: ${speakerColor};`"
 									class="speaker-portrait speaker-portrait--left speaker-portrait--large round-image"
 									:alt="`Headshot of ${displayName}`">
 								<div class="speaker-information">
@@ -295,7 +306,7 @@ const formatLongestSectionSummary = (summary: string) => {
 								{{ displayName }} has no recorded speeches yet.
 							</li>
 							<li v-for="section in speaker.sections" :key="section.section_id" :id="`s${section.section_id}`"
-								class="speech speech--speech speech--border" style="border-left-color: rgb(77, 137, 210);">
+								class="speech speech--speech speech--border" :style="{ borderLeftColor: speakerColor }">
 								<div class="speech-wrapper">
 									<div class="speech__breadcrumb">
 										<ul class="breadcrumbs">
