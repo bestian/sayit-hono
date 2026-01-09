@@ -1,5 +1,6 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
+	import { getSpeakerColor } from '../utils/speakerColor';
 
 	interface Section {
 		filename: string;
@@ -63,7 +64,22 @@
 
 	const getNestListUrl = () => `/${encodeURIComponent(props.speechName)}`;
 
-	const getSpeakerColor = (): string => '#4d89d2';
+	const colorForSpeaker = (section: Section): string => {
+		const key =
+			section.section_speaker ||
+			section.name ||
+			section.filename ||
+			(section.display_name ?? '')
+		return getSpeakerColor(key);
+	};
+
+	const borderStyle = (section: Section) =>
+		section.section_speaker ? { borderLeftColor: colorForSpeaker(section) } : {};
+
+	const avatarStyle = (section: Section) => {
+		const color = colorForSpeaker(section);
+		return { borderColor: color, backgroundColor: color };
+	};
 
 	const siblingList = computed(() => props.siblings ?? []);
 	const currentSiblingIndex = computed(() =>
@@ -119,13 +135,13 @@
 											'speech--border',
 											section.section_speaker ? 'speech--with-portrait' : ''
 										]"
-										:style="section.section_speaker ? { borderLeftColor: getSpeakerColor() } : {}"
+										:style="borderStyle(section)"
 									>
 										<div class="speaker-portrait-wrapper" v-if="section.section_speaker">
 											<img
 												:src="section.photoURL || '/static/speeches/i/a.png'"
 												:alt="section.name || ''"
-												:style="`border-color: ${getSpeakerColor()}; background-color: ${getSpeakerColor()};`"
+												:style="avatarStyle(section)"
 												class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium"
 											/>
 										</div>
