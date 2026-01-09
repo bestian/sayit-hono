@@ -15,6 +15,17 @@ npm run dev
 ```
 `npm run dev` 會先把 `.vue` 編譯到 `src/.generated/views`，再啟動 `wrangler dev`。修改 `.vue` 後需重跑一次 `npm run dev` 或單獨執行 `npm run build:views` 讓編譯檔更新。
 
+## 清理快取(暫時)
+
+1. 到dashboard。
+2. 手動清理。
+
+### 清理快取(未來)
+
+1. 用TOKEN證明下指令者是管理員
+2. 用API清理
+
+
 ## 靜態預先輸出
 ```bash
 npm run build:static
