@@ -42,6 +42,11 @@ function normalizeContent(raw?: string | null): string {
 	}
 }
 
+function sanitizeHtmlForXml(html: string): string {
+	// XML 不支援 &nbsp;，轉成數值實體；保留其他標籤與已合法的實體
+	return html.replace(/&(nbsp|#160);/gi, '&#160;');
+}
+
 function safeDecode(value: string): string {
 	try {
 		return decodeURIComponent(value);
@@ -161,17 +166,18 @@ export async function speechAn(c: Context<ApiEnv>) {
 
 	const speeches = rows.map((row) => {
 		const by = row.section_speaker ? safeDecode(row.section_speaker) : '';
-		const content = normalizeContent(row.section_content ?? '');
+		const content = sanitizeHtmlForXml(normalizeContent(row.section_content ?? ''));
 		return { by, content };
 	});
 
 	const personsInOrder = personOrder.map((id) => personMap.get(id)!).filter(Boolean);
 	const xml = buildAkomaNtosoXml(heading, personsInOrder, speeches);
 
+	const contentLength = new TextEncoder().encode(xml).length;
+
 	const headers = new Headers(corsHeaders);
 	headers.set('Content-Type', 'text/xml; charset=utf-8');
 	headers.set('Cache-Control', DEFAULT_CACHE_CONTROL);
-	const contentLength = new TextEncoder().encode(xml).length;
 	headers.set('Content-Length', contentLength.toString());
 
 	if (c.req.method === 'HEAD') {
