@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { getSpeakerColor } from '../utils/speakerColor'
 
 interface Section {
   filename: string
@@ -41,7 +42,22 @@ const getSpeechPageUrl = (sectionId: number) => `/speech/${sectionId}`
 
 const getSpeakerUrl = (sectionSpeaker: string) => `/speaker/${sectionSpeaker}`
 
-const getSpeakerColor = (): string => '#4d89d2'
+const colorForSpeaker = (section: Section): string => {
+	const key =
+		section.section_speaker ||
+		section.name ||
+		section.filename ||
+		(section.display_name ?? '')
+	return getSpeakerColor(key)
+}
+
+const borderStyle = (section: Section) =>
+	section.section_speaker ? { borderLeftColor: colorForSpeaker(section) } : {}
+
+const avatarStyle = (section: Section) => {
+	const color = colorForSpeaker(section)
+	return { borderColor: color, backgroundColor: color }
+}
 
 const sanitizeHtmlContent = (html: string): string => {
 	// Remove script tags with various formats and replace with warning comment
@@ -75,10 +91,10 @@ const loading = false
 									'speech--',
 									'speech--border',
 									section.section_speaker ? 'speech--with-portrait' : ''
-								]" :style="section.section_speaker ? { borderLeftColor: getSpeakerColor() } : {}">
+								]" :style="borderStyle(section)">
 									<div class="speaker-portrait-wrapper" v-if="section.section_speaker">
 										<img :src="section.photoURL || '/static/speeches/i/a.png'"
-											:style="`border-color: ${getSpeakerColor()}; background-color: ${getSpeakerColor()};`"
+											:style="avatarStyle(section)"
 											:alt="section.name || ''"
 											class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
 									</div>

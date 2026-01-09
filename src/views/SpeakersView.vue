@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { getSpeakerColor } from '../utils/speakerColor'
 import { headForSpeakers } from '../ssr/heads'
 
 interface Speaker {
@@ -11,6 +12,11 @@ interface Speaker {
 
 const props = defineProps<{ speakers?: Speaker[] }>()
 const speakers = computed<Speaker[]>(() => props.speakers ?? [])
+
+const colorStyle = (route: string, name?: string) => {
+	const color = getSpeakerColor(route || name || '')
+	return { borderColor: color, backgroundColor: color }
+}
 
 </script>
 
@@ -28,7 +34,8 @@ const speakers = computed<Speaker[]>(() => props.speakers ?? [])
 							<a :href="'/speaker/' + speaker.route_pathname">
 								<div class="speaker-card">
 									<img :src="speaker.photoURL || '/static/speeches/i/a.png'"
-										style="border-color: #9c4f2d; background-color: #9c4f2d;" :alt="speaker.name || 'Speaker Photo'"
+										:style="colorStyle(speaker.route_pathname, speaker.name)"
+										:alt="speaker.name || 'Speaker Photo'"
 										class="speaker-card__portrait speaker-portrait round-image speaker-portrait--small">
 									<span class="speaker-card__name"> {{ speaker.name || 'Speaker' }}</span>
 								</div>

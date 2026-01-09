@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getSpeakerColor } from '../utils/speakerColor'
 
 type Section = {
 	filename: string;
@@ -15,6 +16,14 @@ type Section = {
 };
 
 const props = defineProps<{ section: Section }>();
+
+const speakerColor = getSpeakerColor(
+	props.section?.section_speaker ||
+	props.section?.name ||
+	props.section?.filename ||
+	''
+);
+const avatarStyle = { borderColor: speakerColor, backgroundColor: speakerColor };
 
 function parseContent(raw?: string | null) {
 	if (!raw) return '';
@@ -68,7 +77,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 								>
 									<img
 										:src="section.photoURL"
-										:style="`border-color: #4d89d2; background-color: #4d89d2;`"
+										:style="avatarStyle"
 										:alt="section.name || ''"
 										class="speaker-portrait speaker-portrait--left round-image speaker-portrait--large"
 									/>

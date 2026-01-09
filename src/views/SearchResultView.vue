@@ -122,6 +122,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { getSpeakerColor } from '../utils/speakerColor';
 
 type SpeakerResult = {
 	route_pathname: string;
@@ -189,27 +190,18 @@ const hasNext = computed(() => safePage.value < totalPages.value);
 // 供 SSR 使用：有講者篩選時帶入分頁與連結
 const speakerIdForFilter = computed(() => (props.filteredSpeakerId ? props.filteredSpeakerId.toString() : null));
 
-const borderPalette = ['#4d89d2', '#b17656', '#c17660', '#f5b68d', '#9c245d', '#6229d3', '#01055f', '#15895c', '#8a279e', '#1e27b1'];
-
-function hashString(value: string): number {
-	let hash = 0;
-	for (let i = 0; i < value.length; i++) {
-		hash = (hash << 5) - hash + value.charCodeAt(i);
-		hash |= 0;
-	}
-	return Math.abs(hash);
+function colorKey(section: SectionResult) {
+	return section.section_speaker || section.filename || section.speaker_name || '';
 }
 
 function sectionBorderStyle(section: SectionResult) {
-	const key = section.section_speaker || section.filename || '';
-	const index = key ? hashString(key) % borderPalette.length : 0;
-	return { borderColor: borderPalette[index] };
+	const color = getSpeakerColor(colorKey(section));
+	return { borderColor: color };
 }
 
 function avatarStyle(section: SectionResult) {
-	const key = section.section_speaker || section.filename || '';
-	const index = key ? hashString(key) % borderPalette.length : 0;
-	return { borderColor: borderPalette[index], backgroundColor: borderPalette[index] };
+	const color = getSpeakerColor(colorKey(section));
+	return { borderColor: color, backgroundColor: color };
 }
 
 function sectionLink(section: SectionResult) {
