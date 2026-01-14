@@ -7,6 +7,7 @@ import { speechContent } from './api/speech';
 import { sectionDetail } from './api/section';
 import { speechAn } from './api/an';
 import { runSearchHomepage, searchHomepage } from './api/search_homepage';
+import { uploadMarkdown } from './api/upload_markdown';
 import type { ApiEnv } from './api/types';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
 import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
@@ -279,6 +280,7 @@ app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
 app.on(['GET', 'HEAD'], '/api/an/*', (c) => speechAn(c));
 app.get('/api/search_homepage.json', (c) => searchHomepage(c));
+app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
 
 // SSR 搜尋結果頁
 async function renderSearchPage(c: any) {
