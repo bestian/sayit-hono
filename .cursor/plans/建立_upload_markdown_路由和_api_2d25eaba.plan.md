@@ -4,13 +4,13 @@ overview: 建立測試用的 `/upload_markdown` 路由和 `/api/upload_markdown.
 todos:
   - id: create-api-file
     content: 建立 src/api/upload_markdown.ts，實作 TOKEN 驗證和 markdown 內容處理邏輯
-    status: pending
+    status: completed
   - id: register-route
     content: 在 src/index.ts 中註冊 POST /api/upload_markdown 路由
-    status: pending
+    status: completed
   - id: add-cors-options
     content: 確保 /api/upload_markdown 的 OPTIONS 請求由現有的 CORS handler 處理
-    status: pending
+    status: completed
 ---
 
 # 建立 upload_markdown 路由和 API
