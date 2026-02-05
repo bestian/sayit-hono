@@ -295,18 +295,13 @@ async function renderSearchPage(c: any) {
 app.get('/search', (c) => renderSearchPage(c));
 app.get('/search/', (c) => renderSearchPage(c));
 
-// /speech/:id.md -> 轉到 .md 處理（須在 /speech/:section_id 之前）
+// /speech/:section_id -> .md/.an 轉專用處理，否則為動態段落頁
 app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 	const param = c.req.param('section_id');
 	if (param.endsWith('.md')) {
 		console.log('serving md by key', param);
 		return serveMdByKey(c, param);
 	}
-});
-
-// /speech/:id.an -> 轉到 .an 處理（須在 /speech/:section_id 之前）
-app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
-	const param = c.req.param('section_id');
 	if (param.endsWith('.an')) {
 		console.log('serving an by key', param);
 		return serveAnByKey(c, param);
