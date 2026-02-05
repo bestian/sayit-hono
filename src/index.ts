@@ -5,7 +5,7 @@ import { speakersIndex } from './api/speakers_index';
 import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
 import { sectionDetail } from './api/section';
-import { speechAn } from './api/an';
+import { speechAn, serveAnByKey } from './api/an';
 import { runSearchHomepage, searchHomepage } from './api/search_homepage';
 import { uploadMarkdown } from './api/upload_markdown';
 import type { ApiEnv } from './api/types';
@@ -214,7 +214,7 @@ app.get('/api/speakers_index.json', (c) => speakersIndex(c));
 app.get('/api/speaker_detail/:route_pathname_with_json', (c) => speakerDetail(c));
 app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
-app.on(['GET', 'HEAD'], '/api/an/*', (c) => speechAn(c));
+app.on(['GET', 'HEAD'], '/api/an/:path{[^/]+\\.an}', (c) => speechAn(c));
 app.get('/api/search_homepage.json', (c) => searchHomepage(c));
 app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
 
@@ -288,11 +288,15 @@ async function renderSearchPage(c: any) {
 app.get('/search', (c) => renderSearchPage(c));
 app.get('/search/', (c) => renderSearchPage(c));
 
-// 動態段落頁（不預先產生）
-app.get('/speech/:section_id', async (c) => {
-	const sectionIdParam = c.req.param('section_id');
-	const sectionId = Number(sectionIdParam);
-
+// /speech/:id.an -> 轉到 .an 處理（須在 /speech/:section_id 之前）
+app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
+	const param = c.req.param('section_id');
+	if (param.endsWith('.an')) {
+		console.log('serving an by key', param);
+		return serveAnByKey(c, param);
+	}
+	// 以下為動態段落頁
+	const sectionId = Number(param);
 	if (!Number.isInteger(sectionId)) {
 		return c.text('Bad Request', 400);
 	}
@@ -620,6 +624,9 @@ app.get('/:filename/:nest_filename', async (c) => {
 
 	return response;
 });
+
+// .an 檔案
+app.on(['GET', 'HEAD'], '/:path{[^/]+\\.an}', (c) => serveAnByKey(c, c.req.param('path')));
 
 // SSR 演講頁（單一演講或巢狀清單，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
 app.get('/:filename', async (c) => {
