@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
 import type { ApiEnv } from './types';
+import { normalizeSections } from '../utils/sectionUtils';
 
 type Section = {
 	filename: string;
@@ -15,68 +16,6 @@ type Section = {
 	photoURL: string | null;
 	name: string | null;
 };
-
-function checkMonotonic(sections: Section[]): boolean {
-	if (sections.length <= 1) return true;
-	for (let i = 1; i < sections.length; i++) {
-		const current = sections[i];
-		const previous = sections[i - 1];
-		if (current && previous && current.section_id <= previous.section_id) {
-			return false;
-		}
-	}
-	return true;
-}
-
-function reorderSections(sections: Section[]): Section[] {
-	if (sections.length === 0) return [];
-
-	const newArray: Section[] = [];
-	const remaining = [...sections];
-
-	let minIndex = 0;
-	let minSectionId = remaining[0]?.section_id ?? 0;
-	for (let i = 1; i < remaining.length; i++) {
-		const current = remaining[i];
-		if (current && current.section_id < minSectionId) {
-			minSectionId = current.section_id;
-			minIndex = i;
-		}
-	}
-
-	const firstSection = remaining[minIndex];
-	if (firstSection) {
-		newArray.push(firstSection);
-		remaining.splice(minIndex, 1);
-	}
-
-	const arrayLength = sections.length;
-	for (let i = 0; i < arrayLength - 1; i++) {
-		const lastItem = newArray[newArray.length - 1];
-		if (!lastItem) break;
-
-		const lastSectionId = lastItem.section_id;
-		let found = false;
-
-		for (let j = 0; j < remaining.length; j++) {
-			const current = remaining[j];
-			if (current && current.previous_section_id === lastSectionId) {
-				newArray.push(current);
-				remaining.splice(j, 1);
-				found = true;
-				break;
-			}
-		}
-
-		if (!found) break;
-	}
-
-	return newArray;
-}
-
-function normalizeSections(rawData: Section[]): Section[] {
-	return checkMonotonic(rawData) ? rawData : reorderSections(rawData);
-}
 
 export async function speechContent(c: Context<ApiEnv>) {
 	const origin = c.req.header('Origin') ?? null;
