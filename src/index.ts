@@ -27,6 +27,7 @@ import {
 	headForSearch
 } from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
+import { normalizeSections } from './utils/sectionUtils';
 
 type WorkerEnv = ApiEnv['Bindings'];
 
@@ -155,10 +156,10 @@ function parseToArray(raw?: string | null): string[] {
 }
 
 async function loadSection(c: any, sectionId: number) {
-	const result = await c.env.DB.prepare('SELECT * FROM sections WHERE section_id = ?').bind(sectionId).all();
-	if (!result.success) throw new Error('Database query failed');
-	if (result.results.length === 0) return null;
-	return result.results[0] as any;
+	const row = await c.env.DB.prepare('SELECT * FROM sections WHERE section_id = ?')
+		.bind(sectionId)
+		.first();
+	return row as any;
 }
 
 type Section = {
@@ -194,71 +195,6 @@ async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow 
 	return result as SpeechIndexRow ?? null;
 }
 
-
-function checkMonotonic(sections: Section[]): boolean {
-	if (sections.length <= 1) return true;
-	for (let i = 1; i < sections.length; i++) {
-		const current = sections[i];
-		const previous = sections[i - 1];
-		if (current && previous && current.section_id <= previous.section_id) {
-			return false;
-		}
-	}
-	return true;
-}
-
-function reorderSections(sections: Section[]): Section[] {
-	if (sections.length === 0) return [];
-
-	const newArray: Section[] = [];
-	const remaining = [...sections];
-
-	let minIndex = 0;
-	let minSectionId = remaining[0]?.section_id ?? 0;
-	for (let i = 1; i < remaining.length; i++) {
-		const current = remaining[i];
-		if (current && current.section_id < minSectionId) {
-			minSectionId = current.section_id;
-			minIndex = i;
-		}
-	}
-
-	const firstSection = remaining[minIndex];
-	if (firstSection) {
-		newArray.push(firstSection);
-		remaining.splice(minIndex, 1);
-	}
-
-	const arrayLength = sections.length;
-	for (let i = 0; i < arrayLength - 1; i++) {
-		const lastItem = newArray[newArray.length - 1];
-		if (!lastItem) break;
-
-		const lastSectionId = lastItem.section_id;
-		let found = false;
-
-		for (let j = 0; j < remaining.length; j++) {
-			const current = remaining[j];
-			if (current && current.previous_section_id === lastSectionId) {
-				newArray.push(current);
-				remaining.splice(j, 1);
-				found = true;
-				break;
-			}
-		}
-
-		if (!found) break;
-	}
-
-	return newArray;
-}
-
-function normalizeSections(rawData: Section[], allowReorder = true): Section[] {
-	// 在分頁情境下（只拿到部分資料），不要依照 previous_section_id 重新串接，
-	// 否則會因為缺少第一頁資料而中途提前停止，導致頁面只剩少量項目。
-	if (!allowReorder) return rawData;
-	return checkMonotonic(rawData) ? rawData : reorderSections(rawData);
-}
 
 app.get('/', (c) => serveAsset(c, '/index.html'));
 
@@ -813,8 +749,23 @@ app.get('/:filename', async (c) => {
 
 	let sections: Section[];
 	try {
+		// 直接查 speech_content + JOIN，避免 sections view 在大資料量時效能問題
 		const result = await c.env.DB.prepare(
-			'SELECT filename, section_id, previous_section_id, next_section_id, section_speaker, section_content, display_name, photoURL, name FROM sections WHERE filename = ? ORDER BY section_id ASC'
+			`SELECT
+				sc.filename,
+				sc.section_id,
+				sc.previous_section_id,
+				sc.next_section_id,
+				sc.section_speaker,
+				sc.section_content,
+				si.display_name,
+				sp.photoURL,
+				sp.name
+			FROM speech_content sc
+			LEFT JOIN speech_index si ON sc.filename = si.filename
+			LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+			WHERE sc.filename = ?
+			ORDER BY sc.section_id ASC`
 		)
 			.bind(filename)
 			.all();
@@ -831,8 +782,8 @@ app.get('/:filename', async (c) => {
 			section_speaker: row.section_speaker,
 			section_content: row.section_content,
 			display_name: row.display_name,
-			photoURL: row.photoURL,
-			name: row.name
+			photoURL: row.photoURL ?? null,
+			name: row.name ?? null
 		}));
 
 		if (rawSections.length === 0) {
