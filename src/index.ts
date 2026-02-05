@@ -6,6 +6,7 @@ import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
 import { sectionDetail } from './api/section';
 import { speechAn, serveAnByKey } from './api/an';
+import { serveMdByKey } from './api/md';
 import { runSearchHomepage, searchHomepage } from './api/search_homepage';
 import { uploadMarkdown } from './api/upload_markdown';
 import type { ApiEnv } from './api/types';
@@ -215,6 +216,12 @@ app.get('/api/speaker_detail/:route_pathname_with_json', (c) => speakerDetail(c)
 app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
 app.on(['GET', 'HEAD'], '/api/an/:path{[^/]+\\.an}', (c) => speechAn(c));
+app.get('/api/md/:path{[^/]+\\.md}', async (c) => {
+	const pathParam = c.req.param('path');
+	const key = pathParam ? decodeURIComponent(pathParam) : null;
+	if (!key) return c.text('Not found', 404);
+	return serveMdByKey(c, key);
+});
 app.get('/api/search_homepage.json', (c) => searchHomepage(c));
 app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
 
@@ -287,6 +294,15 @@ async function renderSearchPage(c: any) {
 
 app.get('/search', (c) => renderSearchPage(c));
 app.get('/search/', (c) => renderSearchPage(c));
+
+// /speech/:id.md -> 轉到 .md 處理（須在 /speech/:section_id 之前）
+app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
+	const param = c.req.param('section_id');
+	if (param.endsWith('.md')) {
+		console.log('serving md by key', param);
+		return serveMdByKey(c, param);
+	}
+});
 
 // /speech/:id.an -> 轉到 .an 處理（須在 /speech/:section_id 之前）
 app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
@@ -624,6 +640,9 @@ app.get('/:filename/:nest_filename', async (c) => {
 
 	return response;
 });
+
+// .md 檔案
+app.on(['GET', 'HEAD'], '/:path{[^/]+\\.md}', (c) => serveMdByKey(c, c.req.param('path')));
 
 // .an 檔案
 app.on(['GET', 'HEAD'], '/:path{[^/]+\\.an}', (c) => serveAnByKey(c, c.req.param('path')));
