@@ -14,19 +14,14 @@ export async function sectionDetail(c: Context<ApiEnv>) {
 			return c.json({ error: 'Invalid section id' }, 400, corsHeaders);
 		}
 
-		const result = await c.env.DB.prepare('SELECT * FROM sections WHERE section_id = ?')
+		const sectionData = await c.env.DB.prepare('SELECT * FROM sections WHERE section_id = ?')
 			.bind(sectionId)
-			.all();
+			.first();
 
-		if (!result.success) {
-			return c.json({ error: 'Database query failed' }, 500, corsHeaders);
-		}
-
-		if (result.results.length === 0) {
+		if (!sectionData) {
 			return c.json({ error: 'Section not found' }, 404, corsHeaders);
 		}
 
-		const sectionData = result.results[0] as any;
 		return c.json(sectionData, 200, corsHeaders);
 	} catch (error) {
 		console.error('[section] query failed', error);
