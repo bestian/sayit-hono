@@ -305,6 +305,63 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 	});
 }
 
+/** 取得 .an 內容字串，供 md 等轉換使用。objectKey 格式同 serveAnByKey（如 629603.an 或 filename.an） */
+export async function getAnContentAsString(c: Context<ApiEnv>, objectKey: string): Promise<string | null> {
+	if (!objectKey || !objectKey.endsWith(SPEECH_FILE_EXTENSION)) return null;
+	const baseKey = objectKey.slice(0, -SPEECH_FILE_EXTENSION.length);
+
+	if (isNumericAnKey(objectKey)) {
+		const sectionId = parseInt(baseKey, 10);
+		const sectionRow = await c.env.DB.prepare(
+			'SELECT section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?'
+		)
+			.bind(sectionId)
+			.first();
+		if (!sectionRow) return null;
+		const section = sectionRow as {
+			section_speaker: string | null;
+			section_content: string | null;
+			display_name: string | null;
+			name: string | null;
+		};
+		return generateSingleSectionAn(section);
+	}
+
+	const tryR2Key = (key: string) => c.env.SPEECH_AN.get(key);
+	let r2Object = await tryR2Key(objectKey);
+	if (!r2Object && objectKey !== encodeURIComponent(objectKey)) {
+		r2Object = await tryR2Key(encodeURIComponent(objectKey));
+	}
+	if (r2Object) {
+		return (r2Object as R2ObjectBody).text();
+	}
+
+	const filename = baseKey;
+	const result = await c.env.DB.prepare(
+		`SELECT sc.section_speaker, sc.section_content, si.display_name, sp.name
+		 FROM speech_content sc
+		 LEFT JOIN speech_index si ON sc.filename = si.filename
+		 LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+		 WHERE sc.filename = ?
+		 ORDER BY sc.section_id ASC`
+	)
+		.bind(filename)
+		.all();
+	if (!result.success || (result.results as unknown[]).length === 0) return null;
+	const sections = (result.results as Array<{
+		section_speaker: string | null;
+		section_content: string | null;
+		display_name: string | null;
+		name: string | null;
+	}>).map((r) => ({
+		section_speaker: r.section_speaker,
+		section_content: r.section_content,
+		display_name: r.display_name,
+		name: r.name
+	}));
+	return generateFullSpeechAn(sections);
+}
+
 export async function speechAn(c: Context<ApiEnv>) {
 	// 優先使用 route param（/api/an/:path{...}），否則從 pathname 解析
 	const pathParam = c.req.param('path');
