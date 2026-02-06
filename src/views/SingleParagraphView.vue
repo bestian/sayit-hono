@@ -71,12 +71,12 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 						<div class="single-speech-layout__speech-column">
 							<div class="speech speech-single-speech">
 								<a
-									v-if="section.section_speaker && section.photoURL"
+									v-if="section.section_speaker"
 									class="speech-single-speech__speaker-portrait"
 									:href="getSpeakerUrl(section.section_speaker)"
 								>
 									<img
-										:src="section.photoURL"
+										:src="section.photoURL || '/static/speeches/i/a.png'"
 										:style="avatarStyle"
 										:alt="section.name || ''"
 										class="speaker-portrait speaker-portrait--left round-image speaker-portrait--large"
