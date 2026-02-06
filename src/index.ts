@@ -9,6 +9,7 @@ import { speechAn, serveAnByKey } from './api/an';
 import { serveMdByKey } from './api/md';
 import { runSearchHomepage, searchHomepage } from './api/search_homepage';
 import { uploadMarkdown } from './api/upload_markdown';
+import { deleteMarkdown } from './api/delete_markdown';
 import type { ApiEnv } from './api/types';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
 import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
@@ -224,6 +225,7 @@ app.get('/api/md/:path{[^/]+\\.md}', async (c) => {
 });
 app.get('/api/search_homepage.json', (c) => searchHomepage(c));
 app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
+app.delete('/api/upload_markdown', (c) => deleteMarkdown(c));
 
 // SSR 搜尋結果頁
 async function renderSearchPage(c: any) {
