@@ -30,11 +30,6 @@
 	],
 	"r2_buckets": [
 		{
-			"binding": "SPEECH_AN",
-			"bucket_name": "sayit-speech-an",
-			"preview_bucket_name": "sayit-speech-an-preview"
-		},
-		{
 			"binding": "SPEECH_CACHE",
 			"bucket_name": "sayit-speech-cache",
 			"preview_bucket_name": "sayit-speech-cache-preview"
