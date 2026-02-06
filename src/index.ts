@@ -91,7 +91,28 @@ function parseToArray(raw?: string | null): string[] {
 }
 
 async function loadSection(c: any, sectionId: number) {
-	const row = await c.env.DB.prepare('SELECT * FROM sections WHERE section_id = ?')
+	const row = await c.env.DB.prepare(
+		`SELECT
+			a.filename,
+			a.nest_filename,
+			a.nest_display_name,
+			a.section_id,
+			a.previous_section_id,
+			a.next_section_id,
+			a.section_speaker,
+			a.section_content,
+			si.display_name,
+			sp.photoURL,
+			sp.name,
+			prev_section.section_content AS previous_content,
+			next_section.section_content AS next_content
+		FROM speech_content a
+		LEFT JOIN speech_index si ON a.filename = si.filename
+		LEFT JOIN speakers sp ON a.section_speaker = sp.route_pathname
+		LEFT JOIN speech_content prev_section ON a.section_id = prev_section.next_section_id
+		LEFT JOIN speech_content next_section ON a.section_id = next_section.previous_section_id
+		WHERE a.section_id = ?`
+	)
 		.bind(sectionId)
 		.first();
 	return row as any;
