@@ -29,6 +29,12 @@ const colorStyle = (route: string, name?: string) => {
 					<div class="page-header">
 						<h1>All Speakers</h1>
 					</div>
+					<form class="site-search site-search--on-results-page" action="/search/" method="get">
+						<div class="search-wrapper">
+							<input type="search" class="site-search__input" placeholder="Search" name="q" />
+							<input type="submit" class="icon-search" value="Search" />
+						</div>
+					</form>
 					<ul class="speaker-list">
 						<li v-for="speaker in speakers" :key="speaker.id">
 							<a :href="'/speaker/' + speaker.route_pathname">
