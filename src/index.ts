@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
+import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
 import { speakersIndex } from './api/speakers_index';
 import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
@@ -48,73 +49,6 @@ function buildCacheKey(url: string): string {
 	}
 }
 
-async function readEdgeCache(cacheKey: string): Promise<Response | null> {
-	try {
-		const cached = await caches.default.match(cacheKey);
-		return cached ?? null;
-	} catch (err) {
-		console.error('[edge cache] read error', err);
-		return null;
-	}
-}
-
-async function writeEdgeCache(cacheKey: string, response: Response) {
-	try {
-		console.log('writing to edge cache', cacheKey);
-		const res = new Response(response.body, response);
-		res.headers.set('Cache-Control', response.headers.get('Cache-Control') ?? DEFAULT_HTML_CACHE_CONTROL);
-		await caches.default.put(cacheKey, res);
-	} catch (err) {
-		console.error('[edge cache] write error', err);
-	}
-}
-
-async function readR2Cache(bucket: R2Bucket, cacheKey: string): Promise<Response | null> {
-	try {
-		console.log('reading from r2 cache', cacheKey);
-		const object = await bucket.get(cacheKey);
-		if (!object) return null;
-
-		const body = await object.text();
-		const headers = new Headers();
-		const cacheControl = object.httpMetadata?.cacheControl ?? DEFAULT_HTML_CACHE_CONTROL;
-		const contentType = object.httpMetadata?.contentType ?? 'text/html; charset=utf-8';
-
-		headers.set('Cache-Control', cacheControl);
-		headers.set('Content-Type', contentType);
-
-		if (typeof object.size === 'number') {
-			headers.set('Content-Length', object.size.toString());
-		}
-		if (object.httpEtag) {
-			headers.set('ETag', object.httpEtag);
-		}
-
-		return new Response(body, { status: 200, headers });
-	} catch (err) {
-		console.error('[r2 cache] read error', err);
-		return null;
-	}
-}
-
-async function writeR2Cache(bucket: R2Bucket, cacheKey: string, response: Response) {
-	try {
-		const cloned = response.clone();
-		const body = await cloned.text();
-		const cacheControl = cloned.headers.get('Cache-Control') ?? DEFAULT_HTML_CACHE_CONTROL;
-		const contentType = cloned.headers.get('Content-Type') ?? 'text/html; charset=utf-8';
-
-		await bucket.put(cacheKey, body, {
-			httpMetadata: {
-				cacheControl,
-				contentType
-			}
-		});
-	} catch (err) {
-		console.error('[r2 cache] write error', err);
-	}
-}
-
 function withCacheHeaders(response: Response): Response {
 	const res = new Response(response.body, response);
 	res.headers.set('Cache-Control', DEFAULT_HTML_CACHE_CONTROL);
@@ -158,7 +92,28 @@ function parseToArray(raw?: string | null): string[] {
 }
 
 async function loadSection(c: any, sectionId: number) {
-	const row = await c.env.DB.prepare('SELECT * FROM sections WHERE section_id = ?')
+	const row = await c.env.DB.prepare(
+		`SELECT
+			a.filename,
+			a.nest_filename,
+			a.nest_display_name,
+			a.section_id,
+			a.previous_section_id,
+			a.next_section_id,
+			a.section_speaker,
+			a.section_content,
+			si.display_name,
+			sp.photoURL,
+			sp.name,
+			prev_section.section_content AS previous_content,
+			next_section.section_content AS next_content
+		FROM speech_content a
+		LEFT JOIN speech_index si ON a.filename = si.filename
+		LEFT JOIN speakers sp ON a.section_speaker = sp.route_pathname
+		LEFT JOIN speech_content prev_section ON a.section_id = prev_section.next_section_id
+		LEFT JOIN speech_content next_section ON a.section_id = next_section.previous_section_id
+		WHERE a.section_id = ?`
+	)
 		.bind(sectionId)
 		.first();
 	return row as any;
@@ -354,7 +309,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) {
 		console.log('writing to edge cache', cacheKey);
-		await writeEdgeCache(cacheKey, r2Cached.clone());
+		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
 		return r2Cached;
 	}
 
@@ -471,7 +426,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 	if (response.ok && response.status < 400) {
 		console.log('writing to R2 cache', cacheKey);
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	}
 
 	return response;
@@ -512,7 +467,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone());
+		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
 		return r2Cached;
 	}
 
@@ -632,7 +587,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	}
 
 	return response;
@@ -648,11 +603,15 @@ app.on(['GET', 'HEAD'], '/:path{[^/]+\\.an}', (c) => serveAnByKey(c, c.req.param
 app.get('/:filename', async (c) => {
 	const cacheKey = buildCacheKey(c.req.url);
 	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
+	if (edgeCached) {
+		console.log('[edge cache] hit', cacheKey);
+		return edgeCached;
+	}
 
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone());
+		console.log('[r2 cache] hit', cacheKey);
+		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
 		return r2Cached;
 	}
 
@@ -835,7 +794,7 @@ app.get('/:filename', async (c) => {
 
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	}
 
 	return response;
