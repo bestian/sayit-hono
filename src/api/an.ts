@@ -1,12 +1,14 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
+import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 
 const SPEECH_API_PREFIX = '/api/an/';
 const SPEECH_FILE_EXTENSION = '.an';
+const PERSON_ONTOLOGY_PREFIX = '/ontology/person/13657c62c311/';
 
 /** 判斷 key 是否為純數字（section_id），如 "629603.an" -> true */
-function isNumericAnKey(key: string): boolean {
+export function isNumericAnKey(key: string): boolean {
 	const base = key.endsWith(SPEECH_FILE_EXTENSION) ? key.slice(0, -SPEECH_FILE_EXTENSION.length) : key;
 	return /^\d+$/.test(base);
 }
@@ -147,50 +149,120 @@ function escapeXml(s: string): string {
 		.replace(/'/g, '&apos;');
 }
 
-function getSpeechObjectKey(pathname: string): string | null {
-	if (!pathname || pathname === '/') {
-		return null;
-	}
-
-	if (!pathname.startsWith(SPEECH_API_PREFIX)) {
-		return null;
-	}
+function getSpeechFilename(pathname: string): string | null {
+	if (!pathname || pathname === '/') return null;
+	if (!pathname.startsWith(SPEECH_API_PREFIX)) return null;
 
 	try {
 		const decoded = decodeURIComponent(pathname);
-		if (!decoded.endsWith(SPEECH_FILE_EXTENSION)) {
-			return null;
-		}
-
-		const key = decoded.slice(SPEECH_API_PREFIX.length);
-		return key.length > 0 ? key : null;
+		if (!decoded.endsWith(SPEECH_FILE_EXTENSION)) return null;
+		const keyWithExt = decoded.slice(SPEECH_API_PREFIX.length);
+		if (!keyWithExt) return null;
+		return keyWithExt.slice(0, -SPEECH_FILE_EXTENSION.length);
 	} catch {
 		return null;
 	}
 }
 
-function buildSpeechHeaders(baseHeaders: Record<string, string>, object: R2Object | R2ObjectBody) {
-	const headers = new Headers(baseHeaders);
-	const fallbackContentType = 'text/plain; charset=utf-8';
-	const fallbackCacheControl = 'public, max-age=3600';
-
-	headers.set('Cache-Control', object.httpMetadata?.cacheControl ?? fallbackCacheControl);
-	headers.set('Content-Type', object.httpMetadata?.contentType ?? fallbackContentType);
-
-	if (typeof object.size === 'number') {
-		headers.set('Content-Length', object.size.toString());
+/** 從 path 解析出 .an 的 object key（含副檔名），供 speechAn 使用 */
+function getSpeechObjectKey(path: string): string | null {
+	if (!path || path === '/') return null;
+	if (!path.startsWith(SPEECH_API_PREFIX)) return null;
+	try {
+		const decoded = decodeURIComponent(path);
+		const key = decoded.slice(SPEECH_API_PREFIX.length);
+		if (!key || !key.endsWith(SPEECH_FILE_EXTENSION)) return null;
+		return key;
+	} catch {
+		return null;
 	}
+}
 
-	if (object.httpEtag) {
-		headers.set('ETag', object.httpEtag);
+function xmlEscape(value: string): string {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&apos;');
+}
+
+function normalizeContent(raw?: string | null): string {
+	if (!raw) return '';
+	try {
+		const parsed = JSON.parse(raw);
+		if (typeof parsed === 'string') return parsed;
+		return raw;
+	} catch {
+		return raw;
 	}
+}
 
-	return headers;
+function sanitizeHtmlForXml(html: string): string {
+	// XML 不支援 &nbsp;，轉成數值實體；保留其他標籤與已合法的實體
+	return html.replace(/&(nbsp|#160);/gi, '&#160;');
+}
+
+function safeDecode(value: string): string {
+	try {
+		return decodeURIComponent(value);
+	} catch {
+		return value;
+	}
+}
+
+type SectionRow = {
+	section_id: number;
+	section_content: string | null;
+	section_speaker: string | null;
+	display_name: string | null;
+	speaker_name: string | null;
+	filename: string;
+};
+
+function buildAkomaNtosoXml(
+	heading: string,
+	persons: Array<{ id: string; showAs: string }>,
+	speeches: Array<{ by: string; content: string }>
+) {
+	const personNodes = persons
+		.map(
+			(p) =>
+				`        <TLCPerson href="${PERSON_ONTOLOGY_PREFIX}${xmlEscape(p.id)}" id="${xmlEscape(p.id)}" showAs="${xmlEscape(p.showAs)}"/>`
+		)
+		.join('\n');
+
+	const speechNodes = speeches
+		.map((s) => {
+			const body = (s.content ?? '').trim();
+			if (!s.by) {
+				return `        <narrative>\n${body}\n        </narrative>`;
+			}
+			return `        <speech by="#${xmlEscape(s.by)}">\n${body}\n        </speech>`;
+		})
+		.join('\n\n');
+
+	return `<akomaNtoso>
+  <debate>
+    <meta>
+      <references>
+${personNodes}
+      </references>
+    </meta>
+    <debateBody>
+      <debateSection>
+        <heading>${xmlEscape(heading)}</heading>
+
+${speechNodes}
+      </debateSection>
+    </debateBody>
+  </debate>
+</akomaNtoso>`;
 }
 
 /** 依 R2 object key 提供 .an 檔案，供 /api/an/* 與 /speech/:id.an 共用
  * - 若 key 為純數字（如 629603.an）：從 DB 查 section，即時生成該 section 的 .an
- * - 否則：直接從 R2 取得完整演講的 .an
+ * - 否則：從 SPEECH_CACHE 或 DB 即時生成完整演講的 .an
  */
 export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 	const origin = c.req.header('Origin') ?? null;
@@ -235,74 +307,78 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 			headers.set('Content-Length', new TextEncoder().encode(singleAn).length.toString());
 			return new Response(null, { status: 200, headers });
 		}
-
 		return new Response(singleAn, { status: 200, headers });
 	}
 
-	// 完整演講：直接從 R2 取得（若 decoded key 無結果，嘗試 encoded key）
-	const tryR2Key = (key: string) =>
-		c.req.method === 'HEAD' ? c.env.SPEECH_AN.head(key) : c.env.SPEECH_AN.get(key);
-
-	let r2Object = await tryR2Key(objectKey);
-	if (!r2Object && objectKey !== encodeURIComponent(objectKey)) {
-		r2Object = await tryR2Key(encodeURIComponent(objectKey));
-	}
-
-	if (!r2Object) {
-		// R2 沒有：從 DB 查 speech_content 即時生成 .an
-		const filename = baseKey;
-		const result = await c.env.DB.prepare(
-			`SELECT sc.section_speaker, sc.section_content, si.display_name, sp.name
-			 FROM speech_content sc
-			 LEFT JOIN speech_index si ON sc.filename = si.filename
-			 LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
-			 WHERE sc.filename = ?
-			 ORDER BY sc.section_id ASC`
-		)
-			.bind(filename)
-			.all();
-
-		if (!result.success || (result.results as unknown[]).length === 0) {
-			return c.text('Speech not found', 404, corsHeaders);
-		}
-
-		const sections = (result.results as Array<{
-			section_speaker: string | null;
-			section_content: string | null;
-			display_name: string | null;
-			name: string | null;
-		}>).map((r) => ({
-			section_speaker: r.section_speaker,
-			section_content: r.section_content,
-			display_name: r.display_name,
-			name: r.name
-		}));
-
-		const generatedAn = generateFullSpeechAn(sections);
-
-		const headers = new Headers(corsHeaders);
-		headers.set('Content-Type', 'text/plain; charset=utf-8');
-		headers.set('Cache-Control', 'public, max-age=3600');
-
+	// 完整演講：先查 Edge cache，再查 SPEECH_CACHE（an/filename）
+	const cacheKey = `an/${baseKey}`;
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) {
+		console.log('[an cache] hit edge', cacheKey);
+		const headers = new Headers(edgeCached.headers);
+		Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
 		if (c.req.method === 'HEAD') {
-			headers.set('Content-Length', new TextEncoder().encode(generatedAn).length.toString());
 			return new Response(null, { status: 200, headers });
 		}
-
-		return new Response(generatedAn, { status: 200, headers });
+		return new Response(await edgeCached.text(), { status: 200, headers });
 	}
+	const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/plain; charset=utf-8');
+	if (cached) {
+		console.log('[an cache] hit r2', cacheKey);
+		const headers = new Headers(cached.headers);
+		Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+		if (c.req.method === 'HEAD') {
+			return new Response(null, { status: 200, headers });
+		}
+		const body = await cached.text();
+		const response = new Response(body, { status: 200, headers });
+		await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
+		return response;
+	}
+
+	// 從 DB 查 speech_content 即時生成 .an
+	const result = await c.env.DB.prepare(
+		`SELECT sc.section_speaker, sc.section_content, si.display_name, sp.name
+		 FROM speech_content sc
+		 LEFT JOIN speech_index si ON sc.filename = si.filename
+		 LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+		 WHERE sc.filename = ?
+		 ORDER BY sc.section_id ASC`
+	)
+		.bind(baseKey)
+		.all();
+
+	if (!result.success || (result.results as unknown[]).length === 0) {
+		return c.text('Speech not found', 404, corsHeaders);
+	}
+
+	const sections = (result.results as Array<{
+		section_speaker: string | null;
+		section_content: string | null;
+		display_name: string | null;
+		name: string | null;
+	}>).map((r) => ({
+		section_speaker: r.section_speaker,
+		section_content: r.section_content,
+		display_name: r.display_name,
+		name: r.name
+	}));
+
+	const generatedAn = generateFullSpeechAn(sections);
+
+	const headers = new Headers(corsHeaders);
+	headers.set('Content-Type', 'text/plain; charset=utf-8');
+	headers.set('Cache-Control', 'public, max-age=3600');
 
 	if (c.req.method === 'HEAD') {
-		return new Response(null, {
-			status: 200,
-			headers: buildSpeechHeaders(corsHeaders, r2Object as R2Object),
-		});
+		headers.set('Content-Length', new TextEncoder().encode(generatedAn).length.toString());
+		return new Response(null, { status: 200, headers });
 	}
 
-	return new Response((r2Object as R2ObjectBody).body, {
-		status: 200,
-		headers: buildSpeechHeaders(corsHeaders, r2Object as R2ObjectBody),
-	});
+	const response = new Response(generatedAn, { status: 200, headers });
+	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response, 'text/plain; charset=utf-8');
+	await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
+	return response;
 }
 
 /** 取得 .an 內容字串，供 md 等轉換使用。objectKey 格式同 serveAnByKey（如 629603.an 或 filename.an） */
@@ -325,15 +401,6 @@ export async function getAnContentAsString(c: Context<ApiEnv>, objectKey: string
 			name: string | null;
 		};
 		return generateSingleSectionAn(section);
-	}
-
-	const tryR2Key = (key: string) => c.env.SPEECH_AN.get(key);
-	let r2Object = await tryR2Key(objectKey);
-	if (!r2Object && objectKey !== encodeURIComponent(objectKey)) {
-		r2Object = await tryR2Key(encodeURIComponent(objectKey));
-	}
-	if (r2Object) {
-		return (r2Object as R2ObjectBody).text();
 	}
 
 	const filename = baseKey;

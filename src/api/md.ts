@@ -1,15 +1,62 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
+import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 import { getAnContentAsString } from './an';
+import { isNumericAnKey } from './an';
 
 const MD_FILE_EXTENSION = '.md';
+
+/** 需完整保留的 HTML 標籤（含內容） */
+const PRESERVE_TAGS = ['iframe', 'video', 'audio', 'object'];
+
+function preserveSpecialTags(html: string): { result: string; restores: Map<string, string> } {
+	const restores = new Map<string, string>();
+	let counter = 0;
+	let result = html;
+	for (const tag of PRESERVE_TAGS) {
+		// 有內容的標籤，如 <iframe>...</iframe>
+		const withContent = new RegExp(`<${tag}[^>]*>[\\s\\S]*?<\\/${tag}>`, 'gi');
+		result = result.replace(withContent, (match) => {
+			const key = `\u0000MD_PRESERVE_${counter++}\u0000`;
+			restores.set(key, match);
+			return key;
+		});
+		// 自閉合標籤，如 <iframe ... />
+		const selfClose = new RegExp(`<${tag}[^>]*\\/?>`, 'gi');
+		result = result.replace(selfClose, (match) => {
+			const key = `\u0000MD_PRESERVE_${counter++}\u0000`;
+			restores.set(key, match);
+			return key;
+		});
+	}
+	return { result, restores };
+}
+
+function restoreSpecialTags(text: string, restores: Map<string, string>): string {
+	let result = text;
+	for (const [key, value] of restores) {
+		result = result.split(key).join(value);
+	}
+	return result;
+}
 
 /** 純 JS 實作：Akoma Ntoso .an 轉 Markdown（相容 sayit/md2an 格式） */
 function an2md(anXml: string): string {
 	const headingMatch = anXml.match(/<heading>([\s\S]*?)<\/heading>/);
 	const heading = headingMatch
-		? headingMatch[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
+		? (() => {
+				const { result: preserved, restores } = preserveSpecialTags(headingMatch[1]);
+				let out = preserved
+					.replace(/<[^>]+>/g, '')
+					.replace(/&amp;/g, '&')
+					.replace(/&lt;/g, '<')
+					.replace(/&gt;/g, '>')
+					.replace(/&quot;/g, '"')
+					.replace(/&apos;/g, "'")
+					.trim();
+				return restoreSpecialTags(out, restores);
+			})()
 		: '';
 
 	const tlcPersons = new Map<string, string>();
@@ -25,7 +72,7 @@ function an2md(anXml: string): string {
 	}
 
 	const speechRegex = /<speech\s[^>]*by="#([^"]*)"[^>]*>([\s\S]*?)<\/speech>/gi;
-	const blocks: string[] = [];
+	const blocks: Array<{ showAs: string; content: string }> = [];
 	let sm: RegExpExecArray | null;
 	while ((sm = speechRegex.exec(anXml)) !== null) {
 		const speakerId = sm[1];
@@ -36,8 +83,9 @@ function an2md(anXml: string): string {
 			.map((s) => s.replace(/<\/p>/gi, '').trim())
 			.filter(Boolean);
 		const content = paragraphs
-			.map((p) =>
-				p
+			.map((p) => {
+				const { result: preserved, restores } = preserveSpecialTags(p);
+				let out = preserved
 					.replace(/<br\s*\/?>/gi, '\n')
 					.replace(/<[^>]+>/g, '')
 					.replace(/&amp;/g, '&')
@@ -45,12 +93,25 @@ function an2md(anXml: string): string {
 					.replace(/&gt;/g, '>')
 					.replace(/&quot;/g, '"')
 					.replace(/&apos;/g, "'")
-					.trim()
-			)
+					.trim();
+				return restoreSpecialTags(out, restores);
+			})
 			.filter(Boolean)
 			.join('\n\n');
 		if (content) {
-			blocks.push(`### ${showAs}: \n\n${content}`);
+			blocks.push({ showAs, content });
+		}
+	}
+
+	// 合併連續相同 Speaker，只保留一次 ###
+	const merged: string[] = [];
+	let prevShowAs: string | null = null;
+	for (const { showAs, content } of blocks) {
+		if (showAs === prevShowAs) {
+			merged.push(content);
+		} else {
+			merged.push(`### ${showAs}: \n\n${content}`);
+			prevShowAs = showAs;
 		}
 	}
 
@@ -58,13 +119,13 @@ function an2md(anXml: string): string {
 	if (heading) {
 		lines.push(`# ${heading}\n`);
 	}
-	lines.push(blocks.join('\n\n'));
+	lines.push(merged.join('\n\n'));
 	return lines.join('\n');
 }
 
 /** 提供 .md 檔案，依 objectKey 取得 .an 後轉成 markdown
- * - 629603.md：單一 section
- * - 2025-11-08-解學習監管.md：完整演講
+ * - 629603.md：單一 section（不快取）
+ * - 2025-11-08-解學習監管.md：完整演講（快取於 md/filename）
  */
 export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 	const origin = c.req.header('Origin') ?? null;
@@ -75,6 +136,30 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 	}
 
 	const anKey = objectKey.slice(0, -MD_FILE_EXTENSION.length) + '.an';
+	const baseKey = objectKey.slice(0, -MD_FILE_EXTENSION.length);
+
+	// 單一演講才快取，段落不快取
+	if (!isNumericAnKey(anKey)) {
+		const cacheKey = `md/${baseKey}`;
+		const edgeCached = await readEdgeCache(cacheKey);
+		if (edgeCached) {
+			console.log('[md cache] hit edge', cacheKey);
+			const headers = new Headers(edgeCached.headers);
+			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+			return new Response(await edgeCached.text(), { status: 200, headers });
+		}
+		const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/markdown; charset=utf-8');
+		if (cached) {
+			console.log('[md cache] hit r2', cacheKey);
+			const headers = new Headers(cached.headers);
+			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+			const body = await cached.text();
+			const response = new Response(body, { status: 200, headers });
+			await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
+			return response;
+		}
+	}
+
 	const anContent = await getAnContentAsString(c, anKey);
 	if (!anContent) {
 		return c.text('Markdown not found', 404, corsHeaders);
@@ -85,6 +170,14 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 	const headers = new Headers(corsHeaders);
 	headers.set('Content-Type', 'text/markdown; charset=utf-8');
 	headers.set('Cache-Control', 'public, max-age=3600');
+
+	if (!isNumericAnKey(anKey)) {
+		const cacheKey = `md/${baseKey}`;
+		const response = new Response(mdContent, { status: 200, headers });
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response, 'text/markdown; charset=utf-8');
+		await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
+		return response;
+	}
 
 	return new Response(mdContent, { status: 200, headers });
 }
