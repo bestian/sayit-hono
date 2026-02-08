@@ -179,6 +179,7 @@ app.get('/api/md/:path{[^/]+\\.md}', async (c) => {
 });
 app.get('/api/search_homepage.json', (c) => searchHomepage(c));
 app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
+app.delete('/api/upload_markdown', (c) => uploadMarkdown(c));
 
 // SSR 搜尋結果頁
 async function renderSearchPage(c: any) {
