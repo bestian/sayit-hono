@@ -7,7 +7,7 @@ export const ALLOWED_ORIGINS = [
 	'https://sayit.archive.tw',
 ];
 
-const DEFAULT_ALLOWED_METHODS = 'GET, HEAD, OPTIONS';
+const DEFAULT_ALLOWED_METHODS = 'GET, HEAD, OPTIONS, POST, PUT, DELETE';
 const DEFAULT_ALLOWED_HEADERS = 'Content-Type, Authorization, X-GitHub-Repository';
 
 export function isOriginAllowed(origin: string | null) {
