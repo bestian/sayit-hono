@@ -10,6 +10,15 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+# parsed output
+data/speech/*
+!data/speech/1999年全國司法改革會議.json
+!data/speech/2025-11-10-柏林自由會議ai-的角色.json
+sql/speech/*
+!sql/speech/1999年全國司法改革會議.sql
+!sql/speech/2025-11-10-柏林自由會議ai-的角色.sql
+sql/fill-all-speech_content.sql
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
