@@ -42,20 +42,15 @@ const getSpeechPageUrl = (sectionId: number) => `/speech/${sectionId}`
 
 const getSpeakerUrl = (sectionSpeaker: string) => `/speaker/${sectionSpeaker}`
 
-const colorForSpeaker = (section: Section): string => {
-	const key =
-		section.section_speaker ||
-		section.name ||
-		section.filename ||
-		(section.display_name ?? '')
-	return getSpeakerColor(key)
-}
+// 以 section_speaker（等同 route_pathname）決定顏色，與 SpeakersView 一致
+const colorForSpeaker = (section: Section): string =>
+	getSpeakerColor(section.section_speaker ?? section.name ?? '')
 
 const borderStyle = (section: Section) =>
 	section.section_speaker ? { borderLeftColor: colorForSpeaker(section) } : {}
 
 const avatarStyle = (section: Section) => {
-	const color = colorForSpeaker(section)
+	const color = getSpeakerColor(section.section_speaker ?? '')
 	return { borderColor: color, backgroundColor: color }
 }
 
