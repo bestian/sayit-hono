@@ -134,7 +134,7 @@ sqlStatements.push('-- 自動生成的 SQL 插入語句');
 sqlStatements.push(`-- 來源: raw_sample_data/${htmlFilename}`);
 sqlStatements.push('-- 生成時間: ' + new Date().toISOString());
 sqlStatements.push('');
-sqlStatements.push('-- 使用 INSERT OR IGNORE 避免插入重複的 section_id（需要 PRIMARY KEY 約束）');
+sqlStatements.push('-- 使用 UPSERT 避免插入重複的 section_id（需要 PRIMARY KEY 約束）');
 sqlStatements.push('');
 
 // 為每筆資料生成 INSERT 語句
@@ -151,13 +151,13 @@ speechData.forEach((item) => {
   const contentValue = item.section_content ? `'${escapedContent}'` : 'NULL';
 
   sqlStatements.push(
-    `INSERT OR IGNORE INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapedFilename}', NULL, NULL, ${sectionId}, ${previousSectionId}, ${nextSectionId}, ${speakerValue}, ${contentValue});`
+    `UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapedFilename}', NULL, NULL, ${sectionId}, ${previousSectionId}, ${nextSectionId}, ${speakerValue}, ${contentValue});`
   );
 });
 
 sqlStatements.push('');
 sqlStatements.push('-- 插入演講-講者關係到 speech_speakers 表');
-sqlStatements.push('-- 使用 INSERT OR IGNORE 避免插入重複的 (speech_filename, speaker_route_pathname) 組合');
+sqlStatements.push('-- 使用 INSERT OR IGNORE INTO 避免插入重複的 (speech_filename, speaker_route_pathname) 組合');
 sqlStatements.push('');
 
 // 為每個唯一的演講-講者關係生成 INSERT 語句
