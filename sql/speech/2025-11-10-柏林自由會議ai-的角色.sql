@@ -1,6 +1,6 @@
 -- 自動生成的 SQL 插入語句
 -- 來源: raw_sample_data/2025-11-10-柏林自由會議ai-的角色.html
--- 生成時間: 2026-02-09T00:30:44.150Z
+-- 生成時間: 2026-02-09T00:38:11.510Z
 
 -- 使用 UPSERT 避免插入重複的 section_id（需要 PRIMARY KEY 約束）
 
@@ -56,3 +56,7 @@ UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_
 -- 使用 INSERT OR IGNORE INTO 避免插入重複的 (speech_filename, speaker_route_pathname) 組合
 
 INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES ('2025-11-10-柏林自由會議ai-的角色', '%E5%94%90%E9%B3%B3-3');
+
+-- 插入 speech_index（演講索引，用於顯示名稱與搜尋）
+-- 使用 INSERT OR IGNORE 避免插入重複的 filename
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-11-10-柏林自由會議ai-的角色', '2025-11-10 柏林自由會議：AI 的角色', 0, '', '');

@@ -20,6 +20,13 @@ console.log('提取的檔名:', filename);
 const htmlContent = fs.readFileSync(inputHtmlPath, 'utf8');
 const $ = cheerio.load(htmlContent);
 
+// 提取 display_name：優先從 .page-header--speech h1，否則由檔名推導（YYYY-MM-DD- → YYYY-MM-DD ）
+let displayName = $('.page-header--speech h1').first().text().trim();
+if (!displayName) {
+  displayName = filename.replace(/^(\d{4}-\d{2}-\d{2})-/, '$1 ');
+}
+console.log('演講顯示名稱:', displayName);
+
 // 找到 <ul class="section-list"> 元素
 const $sectionList = $('ul.section-list');
 if ($sectionList.length === 0) {
@@ -137,6 +144,7 @@ sqlStatements.push('');
 sqlStatements.push('-- 使用 UPSERT 避免插入重複的 section_id（需要 PRIMARY KEY 約束）');
 sqlStatements.push('');
 
+
 // 為每筆資料生成 INSERT 語句
 speechData.forEach((item) => {
   // 轉義單引號（SQL 字符串中的單引號需要轉義為兩個單引號）
@@ -172,6 +180,13 @@ speechSpeakersSet.forEach((key) => {
 });
 
 sqlStatements.push('');
+sqlStatements.push('-- 插入 speech_index（演講索引，用於顯示名稱與搜尋）');
+sqlStatements.push('-- 使用 INSERT OR IGNORE 避免插入重複的 filename');
+const escapedDisplayName = (displayName || '').replace(/'/g, "''");
+const escapedFilenameForIndex = (filename || '').replace(/'/g, "''");
+sqlStatements.push(
+  `INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('${escapedFilenameForIndex}', '${escapedDisplayName}', 0, '', '');`
+);
 
 // 寫入 SQL 文件
 const sqlContent = sqlStatements.join('\n');
