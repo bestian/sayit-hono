@@ -1,9 +1,21 @@
 -- 自動生成的 SQL 插入語句
 -- 來源: raw_sample_data/speeches.html
--- 生成時間: 2025-12-12T08:53:41.880Z
+-- 生成時間: 2026-02-09T20:35:41.665Z
 
 -- 使用 INSERT OR IGNORE 避免插入重複的 filename（需要 UNIQUE 約束）
 
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-02-02-看不見的國家為何臺灣必須被納入國際組織', '2026-02-02 《看不見的國家》：為何臺灣必須被納入國際組織', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-02-02-invisible-nation-why-taiwan-must-be-inc', '2026-02-02 Invisible Nation: Why Taiwan must be included in International Organizations', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-01-29-商周專欄從印度看合作式-ai-主權', '2026-01-29 商周專欄：從印度看合作式 AI 主權', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-01-29-bw-column-collaborative-ai-sovereignty-', '2026-01-29 BW Column: Collaborative AI Sovereignty: A Perspective from India', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-01-20-末日辯論', '2026-01-20 末日辯論', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-01-20-doom-debate', '2026-01-20 Doom Debate', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-01-17-from-taiwan-to-germany-how-radical-part', '2026-01-17 From Taiwan to Germany: How Radical Participation Leapfrogs Public Trust', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-31-商周專欄小心ai-狂牛症', '2025-12-31 商周專欄：小心「AI 狂牛症」', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-31-bw-column-beware-of-ai-mad-cow-disease', '2025-12-31 BW Column: Beware of "AI Mad Cow Disease"', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-28-新聞真假掰專訪', '2025-12-28 「新聞真假掰」專訪', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-08-日經新聞專訪', '2025-12-08 日經新聞專訪', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-08-interview-with-nikkei', '2025-12-08 Interview with Nikkei', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-04-正命講座', '2025-12-04 正命講座', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-04-商周專欄假分身滿街跑更需要正版-ai-分身', '2025-12-04 商周專欄：假分身滿街跑，更需要正版 AI 分身', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-04-right-livelihood-lecture', '2025-12-04 Right Livelihood Lecture', 0, '', '');
@@ -11,6 +23,8 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-02-正命獎得獎感言', '2025-12-02 正命獎得獎感言', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-02-right-livelihood-award-acceptance-speec', '2025-12-02 Right Livelihood Award Acceptance Speech', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-11-28-how-to-save-democracy', '2025-11-28 How To Save Democracy', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-11-27-the-interview-with-bbc', '2025-11-27 The Interview with BBC', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-11-27-bbc-專訪', '2025-11-27 BBC 專訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-11-20-katerina-oikonomakou-專訪', '2025-11-20 Katerina Oikonomakou 專訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-11-20-interview-with-katerina-oikonomakou', '2025-11-20 Interview with Katerina Oikonomakou', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-11-10-柏林自由會議ai-的角色', '2025-11-10 柏林自由會議：AI 的角色', 0, '', '');
@@ -1527,7 +1541,7 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-07-23-conversation-with-hannes-hofer', '2018-07-23 Conversation with Hannes Hofer', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-07-20-開放政府聯絡人第三十九次協作會議第一次會前會', '2018-07-20 開放政府聯絡人第三十九次協作會議第一次會前會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-07-20-台灣青年政治工作者的養成之路訪談', '2018-07-20 「台灣青年政治工作者的養成之路」訪談', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-07-18-社創中心-第二十四次-office-hour', '2018-07-18 社創中心 第二十四次 Office Hour', 1, '楊涵柔,余劼林穎佑,paulwaynegeorgejyunwei,李韋廷,judy,王昱蘋,蕭瑞洋,鄭淑麗', '楊涵柔,余劼、林穎佑,Paul、Wayne、George、Jyunwei,李韋廷,Judy,王昱蘋,蕭瑞洋,鄭淑麗');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-07-18-社創中心-第二十四次-office-hour', '2018-07-18 社創中心 第二十四次 Office Hour', 1, '楊涵柔,余劼林穎佑,paulwaynegeorgejyunwei,李韋廷,judy,王昱蘋,蕭瑞洋,鄭淑麗', '楊涵柔,余劼、林穎佑,Paul、Wayne、George、Jyunwei,李韋廷,Judy,王昱蘋,蕭瑞洋,鄭淑麗');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-07-18-conversation-with-hajime-hotta', '2018-07-18 Conversation with Hajime Hotta', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-07-17-開放政府聯絡人第三十八次協作會議', '2018-07-17 開放政府聯絡人第三十八次協作會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-07-17-李孟聰石錦航來訪', '2018-07-17 李孟聰、石錦航來訪', 0, '', '');
@@ -1565,7 +1579,7 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-28-行政院青年諮詢委員會第6次會議會前會', '2018-05-28 行政院青年諮詢委員會第6次會議會前會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-25-開放政府聯絡人第三十四次協作會議', '2018-05-25 開放政府聯絡人第三十四次協作會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-25-臺北大學張同學訪談', '2018-05-25 臺北大學張同學訪談', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-23-社創中心-第二十次-office-hour', '2018-05-23 社創中心 第二十次 Office Hour', 1, '蘇友珊孫瑀張冠羣,陳敬恒,brad-hsu,許又仁凃又文郭鴻儀', '蘇友珊、孫瑀、張冠羣,陳敬恒,Brad Hsu,許又仁、凃又文、郭鴻儀');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-23-社創中心-第二十次-office-hour', '2018-05-23 社創中心 第二十次 Office Hour', 1, '蘇友珊孫瑀張冠羣,陳敬恒,brad-hsu,許又仁凃又文郭鴻儀', '蘇友珊、孫瑀、張冠羣,陳敬恒,Brad Hsu,許又仁、凃又文、郭鴻儀');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-22-社會企業第十六次巡迴會議', '2018-05-22 社會企業第十六次巡迴會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-21-開放政府聯絡人第三十六次協作會議會前會', '2018-05-21 開放政府聯絡人第三十六次協作會議會前會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-18-司法院來訪', '2018-05-18 司法院來訪', 0, '', '');
@@ -1581,7 +1595,7 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-14-fish-yu-來訪', '2018-05-14 Fish Yu 來訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-14-bloomberg-visit', '2018-05-14 Bloomberg visit', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-11-開放政府聯絡人第三十四次協作會議會前會', '2018-05-11 開放政府聯絡人第三十四次協作會議會前會', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-09-社創中心-第十八次-office-hour', '2018-05-09 社創中心 第十八次 Office Hour', 1, '余若凡王琍瑩賴文智沈宗原', '余若凡、王琍瑩、賴文智、沈宗原');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-09-社創中心-第十八次-office-hour', '2018-05-09 社創中心 第十八次 Office Hour', 1, '余若凡王琍瑩賴文智沈宗原', '余若凡、王琍瑩、賴文智、沈宗原');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-09-中企處創新法規沙盒執行團隊來訪', '2018-05-09 中企處創新法規沙盒執行團隊來訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-08-開放政府-po-第十五次月會', '2018-05-08 開放政府 PO 第十五次月會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2018-05-08-conversation-with-international-journal', '2018-05-08 Conversation with international journalists', 0, '', '');
@@ -1687,7 +1701,7 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-25-開放政府106年第4季會議', '2017-12-25 開放政府106年第4季會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-21-開放政府第二十六次協作會議第一次會前會', '2017-12-21 開放政府第二十六次協作會議第一次會前會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-14-社會企業行動方案第15次聯繫會議', '2017-12-14 社會企業行動方案第15次聯繫會議', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-13-社創中心-第五次-office-hour', '2017-12-13 社創中心 第五次 Office Hour', 1, '陳彥輔,林念慈,陳麗珠謝博丞,汪健雯', '陳彥輔,林念慈,陳麗珠、謝博丞,汪健雯');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-13-社創中心-第五次-office-hour', '2017-12-13 社創中心 第五次 Office Hour', 1, '陳彥輔,林念慈,陳麗珠謝博丞,汪健雯', '陳彥輔,林念慈,陳麗珠、謝博丞,汪健雯');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-13-南方四島國家公園海域劃設自然人文生態景觀區記者會', '2017-12-13 南方四島國家公園海域劃設自然人文生態景觀區記者會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-13-meeting-with-reporters-sans-frontières', '2017-12-13 Meeting with Reporters sans frontières', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-12-社會企業第四次巡迴會議', '2017-12-12 社會企業第四次巡迴會議', 0, '', '');
@@ -1697,7 +1711,7 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-06-社創中心-第四次-office-hour', '2017-12-06 社創中心 第四次 Office Hour', 1, 'pcars人與車公司,大發社企,朱俊嘉', 'Pcars人與車公司,大發社企,朱俊嘉');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-06-conversation-with-naina-batra', '2017-12-06 Conversation with Naina Batra', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-05-junge-union-visit', '2017-12-05 Junge Union visit', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-04-南方四島國家公園海域劃設自然人文生態景觀區記者會前會議', '2017-12-04  南方四島國家公園海域劃設自然人文生態景觀區記者會前會議', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-04-南方四島國家公園海域劃設自然人文生態景觀區記者會前會議', '2017-12-04  南方四島國家公園海域劃設自然人文生態景觀區記者會前會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-04-開放政府-po-第十次月會', '2017-12-04 開放政府 PO 第十次月會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-12-01-開放政府聯絡人第二十五次協作會議', '2017-12-01 開放政府聯絡人第二十五次協作會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-11-30-interview-with-carfagna-barbara', '2017-11-30 Interview with Carfagna Barbara', 0, '', '');
@@ -1726,14 +1740,14 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-26-研商避難收容處所人員管理機制及系統會議', '2017-10-26 研商避難收容處所人員管理機制及系統會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-26-建構民生公共物聯網督導會議', '2017-10-26 建構民生公共物聯網督導會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-26-vtaiwan-醫師心理師透過網路平台提供專業服務之法規調適研究', '2017-10-26 vTaiwan 醫師、心理師透過網路平台提供專業服務之法規調適研究', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-25-開放政府聯絡人第二十一次協作會議', '2017-10-25 開放政府聯絡人第二十一次協作會議', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-25-開放政府聯絡人第二十一次協作會議', '2017-10-25 開放政府聯絡人第二十一次協作會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-25-interview-with-cindy-sui', '2017-10-25 Interview with Cindy Sui', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-24-討論人權博物館事宜', '2017-10-24 討論人權博物館事宜', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-23-七天假第二次會前會', '2017-10-23 「七天假」第二次會前會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-20-開放政府聯絡人會議-澎湖案第二次會前會', '2017-10-20 開放政府聯絡人會議-澎湖案第二次會前會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-20-七天假會前會', '2017-10-20 「七天假」會前會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-19-meeting-with-british-council', '2017-10-19 Meeting with British Council', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-18-開放政府聯絡人第二十次協作會議', '2017-10-18 開放政府聯絡人第二十次協作會議', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-18-開放政府聯絡人第二十次協作會議', '2017-10-18 開放政府聯絡人第二十次協作會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-18-社會企業亞太區域論壇第二次討論會', '2017-10-18 社會企業亞太區域論壇第二次討論會', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-16-interview-with-james-bray', '2017-10-16 Interview with James Bray', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-10-13-google-簡立峰陳幼臻來訪', '2017-10-13 Google 簡立峰、陳幼臻來訪', 0, '', '');
@@ -1781,7 +1795,7 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-08-16-社會創新實驗中心設計說明', '2017-08-16 社會創新實驗中心設計說明', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-08-16-李姿嫻來訪', '2017-08-16 李姿嫻來訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-08-16-台史博來談當代典藏計畫', '2017-08-16 台史博來談當代典藏計畫', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-08-11-po轉譯課程', '2017-08-11 PO轉譯課程', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-08-11-po轉譯課程', '2017-08-11 PO轉譯課程', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-08-11-度度客來訪', '2017-08-11 度度客來訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-08-10-黃光芹來訪', '2017-08-10 黃光芹來訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-08-10-討論政府資料跨部門運用之法制研析', '2017-08-10 討論「政府資料跨部門運用之法制研析」', 0, '', '');
@@ -1807,7 +1821,7 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-07-13-研商精進綜合所得稅電子申報系統第三次會議', '2017-07-13 研商精進綜合所得稅電子申報系統第三次會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-07-13-社會創新實驗中心第二場諮詢會議', '2017-07-13 「社會創新實驗中心」第二場諮詢會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-07-09-社企流五週年論壇政府來相挺', '2017-07-09 社企流五週年論壇：政府來相挺', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-07-07-社會企業交流座談南區', '2017-07-07 社會企業交流座談（南區）', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-07-07-社會企業交流座談南區', '2017-07-07 社會企業交流座談（南區）', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-07-06-中小企業處談空總提案', '2017-07-06 中小企業處談空總提案', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-07-06-cosa來訪', '2017-07-06 COSA來訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-07-04-張宸邦來訪', '2017-07-04 張宸邦來訪', 0, '', '');
@@ -1854,14 +1868,14 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-05-05-開放政府聯絡人第六次協作會議', '2017-05-05 開放政府聯絡人第六次協作會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-05-04-沈春華對談', '2017-05-04 沈春華對談', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-05-02-青年諮詢委員會階段性成果呈現架構與方式會議規劃情形', '2017-05-02 青年諮詢委員會階段性成果呈現架構與方式會議規劃情形', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-28-開放政府聯絡人第五次協作會議', '2017-04-28  開放政府聯絡人第五次協作會議', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-28-開放政府聯絡人第五次協作會議', '2017-04-28  開放政府聯絡人第五次協作會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-28-共享經濟重要議題之探討', '2017-04-28 共享經濟重要議題之探討', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-25-社企流來訪', '2017-04-25 社企流來訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-25-interview-with-javier-c-hernández', '2017-04-25 Interview with Javier C. Hernández', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-24-刑事卷證電子化會議', '2017-04-24 刑事卷證電子化會議', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-21-開放政府聯絡人第四次協作會議', '2017-04-21  開放政府聯絡人第四次協作會議', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-21-開放政府聯絡人第四次協作會議', '2017-04-21  開放政府聯絡人第四次協作會議', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-21-計畫審議精進案第1次會議', '2017-04-21 計畫審議精進案第1次會議', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-19-cheers-盧智芳補訪', '2017-04-19  Cheers 盧智芳補訪', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-19-cheers-盧智芳補訪', '2017-04-19  Cheers 盧智芳補訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-19-中山大學廖達琪來訪', '2017-04-19 中山大學廖達琪來訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-17-philip-epps-visit', '2017-04-17 Philip Epps visit', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2017-04-17-nick-budden-visit', '2017-04-17 Nick Budden visit', 0, '', '');
@@ -2005,8 +2019,8 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2016-vtaiwan及join平台之分析訪談呂家華', '2016 vTaiwan及Join平台之分析訪談（呂家華）', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2015-12-29-眾開講工作坊-內政部未婚聯誼活動經濟部未登記工廠輔導政策檢討', '2015-12-29 眾開講工作坊 - 內政部未婚聯誼活動、經濟部未登記工廠輔導政策檢討', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2015-11-26-眾開講工作坊-內政部eid環保署機車定檢', '2015-11-26 眾開講工作坊 - 內政部eID、環保署機車定檢', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2015-11-26-政問-1126柯文哲-醫療與健保-2', '2015-11-26 政問 11.26：柯文哲 醫療與健保', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2015-11-26-政問-1126柯文哲-醫療與健保', '2015-11-26 政問 11.26：柯文哲 醫療與健保', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2015-11-26-政問-1126柯文哲-醫療與健保-2', '2015-11-26 政問 11.26：柯文哲 醫療與健保', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2015-11-23-課發會第三群組第五次會議紀錄', '2015-11-23 課發會第三群組第五次會議紀錄', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2015-11-10-焦點座談', '2015-11-10 焦點座談', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2015-11-07-課發會第十二次會議紀錄', '2015-11-07 課發會第十二次會議紀錄', 0, '', '');
