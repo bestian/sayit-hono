@@ -290,7 +290,7 @@ speechIndex.forEach((item, index) => {
       sqlStatements.push(`-- 母檔: ${htmlPath}`);
       sqlStatements.push(`-- 生成時間: ${new Date().toISOString()}`);
       sqlStatements.push('');
-      sqlStatements.push('-- 使用 INSERT OR IGNORE 避免重複');
+      sqlStatements.push('-- 使用 UPSERT 避免插入重複的 section_id（個別檔案）');
       sqlStatements.push('');
 
       speechData.forEach((item) => {
@@ -300,9 +300,10 @@ speechIndex.forEach((item, index) => {
         const speakerVal = item.section_speaker ? `'${escapeSql(item.section_speaker)}'` : 'NULL';
         const contentVal = item.section_content ? `'${escapeSql(item.section_content)}'` : 'NULL';
 
-        const sqlLine = `INSERT OR IGNORE INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapeSql(item.filename)}', '${escapeSql(item.nest_filename)}', '${escapeSql(item.nest_display_name)}', ${sectionIdVal}, ${prevIdVal}, ${nextIdVal}, ${speakerVal}, ${contentVal});`;
-        sqlStatements.push(sqlLine);
-        allSqlStatements.push(sqlLine);
+        const sqlLineForFile = `UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapeSql(item.filename)}', '${escapeSql(item.nest_filename)}', '${escapeSql(item.nest_display_name)}', ${sectionIdVal}, ${prevIdVal}, ${nextIdVal}, ${speakerVal}, ${contentVal});`;
+        const sqlLineForMerge = `INSERT OR IGNORE INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapeSql(item.filename)}', '${escapeSql(item.nest_filename)}', '${escapeSql(item.nest_display_name)}', ${sectionIdVal}, ${prevIdVal}, ${nextIdVal}, ${speakerVal}, ${contentVal});`;
+        sqlStatements.push(sqlLineForFile);
+        allSqlStatements.push(sqlLineForMerge);
       });
 
       sqlStatements.push('');
@@ -446,7 +447,7 @@ speechIndex.forEach((item, index) => {
     sqlStatements.push(`-- 來源: ${targetFolder}/${filename}.html`);
     sqlStatements.push(`-- 生成時間: ${new Date().toISOString()}`);
     sqlStatements.push('');
-    sqlStatements.push('-- 使用 INSERT OR IGNORE 避免插入重複的 section_id（需要 PRIMARY KEY 約束）');
+    sqlStatements.push('-- 使用 UPSERT 避免插入重複的 section_id（個別檔案）');
     sqlStatements.push('');
 
     speechData.forEach((item) => {
@@ -456,9 +457,10 @@ speechIndex.forEach((item, index) => {
       const speakerValue = item.section_speaker ? `'${escapeSql(item.section_speaker)}'` : 'NULL';
       const contentValue = item.section_content ? `'${escapeSql(item.section_content)}'` : 'NULL';
 
-      const sqlLine = `INSERT OR IGNORE INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapeSql(item.filename)}', NULL, NULL, ${sectionId}, ${previousSectionId}, ${nextSectionId}, ${speakerValue}, ${contentValue});`;
-      sqlStatements.push(sqlLine);
-      allSqlStatements.push(sqlLine);
+      const sqlLineForFile = `UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapeSql(item.filename)}', NULL, NULL, ${sectionId}, ${previousSectionId}, ${nextSectionId}, ${speakerValue}, ${contentValue});`;
+      const sqlLineForMerge = `INSERT OR IGNORE INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapeSql(item.filename)}', NULL, NULL, ${sectionId}, ${previousSectionId}, ${nextSectionId}, ${speakerValue}, ${contentValue});`;
+      sqlStatements.push(sqlLineForFile);
+      allSqlStatements.push(sqlLineForMerge);
     });
 
     sqlStatements.push('');
