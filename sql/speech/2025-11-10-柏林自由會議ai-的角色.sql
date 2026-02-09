@@ -1,8 +1,8 @@
 -- 自動生成的 SQL 插入語句
--- 來源: raw_sample_data/2025-11-10-柏林自由會議ai-的角色.html
--- 生成時間: 2026-02-09T00:38:11.510Z
+-- 來源: /Users/bestian/sayit-archive-static/sayit.archive.tw/2025-11-10-柏林自由會議ai-的角色.html
+-- 生成時間: 2026-02-09T00:45:06.357Z
 
--- 使用 UPSERT 避免插入重複的 section_id（需要 PRIMARY KEY 約束）
+-- 使用 UPSERT 避免插入重複的 section_id（個別檔案）
 
 UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('2025-11-10-柏林自由會議ai-的角色', NULL, NULL, 628196, NULL, 628197, NULL, '<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/-DjvtvI4k9o?si=XQ_UUNtKTHCVgtnQ&amp;start=184" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen=""></iframe>');
 UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('2025-11-10-柏林自由會議ai-的角色', NULL, NULL, 628197, 628196, 628198, NULL, '<p><i>（我們全民就是超級智慧）</i></p>');
@@ -53,10 +53,6 @@ UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_
 UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('2025-11-10-柏林自由會議ai-的角色', NULL, NULL, 628242, 628241, NULL, '%E5%94%90%E9%B3%B3-3', '<p>謝謝大家。</p>');
 
 -- 插入演講-講者關係到 speech_speakers 表
--- 使用 INSERT OR IGNORE INTO 避免插入重複的 (speech_filename, speaker_route_pathname) 組合
+-- 使用 INSERT OR IGNORE 避免插入重複的 (speech_filename, speaker_route_pathname) 組合
 
 INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES ('2025-11-10-柏林自由會議ai-的角色', '%E5%94%90%E9%B3%B3-3');
-
--- 插入 speech_index（演講索引，用於顯示名稱與搜尋）
--- 使用 INSERT OR IGNORE 避免插入重複的 filename
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-11-10-柏林自由會議ai-的角色', '2025-11-10 柏林自由會議：AI 的角色', 0, '', '');
