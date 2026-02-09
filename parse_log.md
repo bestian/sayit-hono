@@ -1,17 +1,29 @@
 # 解析報告 (parse_all_speeches)
 
-生成時間: 2026-02-09T00:46:29.855Z
+生成時間: 2026-02-09T21:01:22.057Z
 
 ## 摘要
-- 成功: 2020
+- 成功: 2034
 - 失敗: 0
-- 總段落數: 401574
-- 總講者關係數: 16712
+- 總段落數: 403403
+- 總講者關係數: 16740
 - 例外檔案: 59
 
 ## 詳細紀錄
 | 檔名 | 狀態 | 備註 |
 |------|------|------|
+| 2026-02-02-看不見的國家為何臺灣必須被納入國際組織 | success | 段落數: 145 |
+| 2026-02-02-invisible-nation-why-taiwan-must-be-inc | success | 段落數: 146 |
+| 2026-01-29-商周專欄從印度看合作式-ai-主權 | success | 段落數: 2 |
+| 2026-01-29-bw-column-collaborative-ai-sovereignty- | success | 段落數: 2 |
+| 2026-01-20-末日辯論 | success | 段落數: 413 |
+| 2026-01-20-doom-debate | success | 段落數: 416 |
+| 2026-01-17-from-taiwan-to-germany-how-radical-part | success | 段落數: 90 |
+| 2025-12-31-商周專欄小心ai-狂牛症 | success | 段落數: 2 |
+| 2025-12-31-bw-column-beware-of-ai-mad-cow-disease | success | 段落數: 2 |
+| 2025-12-28-新聞真假掰專訪 | success | 段落數: 225 |
+| 2025-12-08-日經新聞專訪 | success | 段落數: 65 |
+| 2025-12-08-interview-with-nikkei | success | 段落數: 69 |
 | 2025-12-04-正命講座 | success | 段落數: 144 |
 | 2025-12-04-商周專欄假分身滿街跑更需要正版-ai-分身 | success | 段落數: 2 |
 | 2025-12-04-right-livelihood-lecture | success | 段落數: 144 |
@@ -19,6 +31,8 @@
 | 2025-12-02-正命獎得獎感言 | success | 段落數: 1 |
 | 2025-12-02-right-livelihood-award-acceptance-speec | success | 段落數: 1 |
 | 2025-11-28-how-to-save-democracy | success | 段落數: 100 |
+| 2025-11-27-the-interview-with-bbc | success | 段落數: 126 |
+| 2025-11-27-bbc-專訪 | success | 段落數: 126 |
 | 2025-11-20-katerina-oikonomakou-專訪 | success | 段落數: 146 |
 | 2025-11-20-interview-with-katerina-oikonomakou | success | 段落數: 146 |
 | 2025-11-10-柏林自由會議ai-的角色 | success | 段落數: 47 |
@@ -2013,8 +2027,8 @@
 | 2016-vtaiwan及join平台之分析訪談呂家華 | success | 段落數: 74 |
 | 2015-12-29-眾開講工作坊-內政部未婚聯誼活動經濟部未登記工廠輔導政策檢討 | success | 段落數: 75 |
 | 2015-11-26-眾開講工作坊-內政部eid環保署機車定檢 | success | 段落數: 265 |
-| 2015-11-26-政問-1126柯文哲-醫療與健保-2 | success | 段落數: 280 |
 | 2015-11-26-政問-1126柯文哲-醫療與健保 | success | 段落數: 280 |
+| 2015-11-26-政問-1126柯文哲-醫療與健保-2 | success | 段落數: 280 |
 | 2015-11-23-課發會第三群組第五次會議紀錄 | success | 段落數: 283 |
 | 2015-11-10-焦點座談 | success | 段落數: 36 |
 | 2015-11-07-課發會第十二次會議紀錄 | success | 段落數: 330 |
