@@ -8,7 +8,7 @@
  * - 生成合併的 SQL 文件 (sql/fill-all-speech_content.sql)
  *
  * 執行命令：
- *   node scripts/parse_all_speeches.js ~/sayit-archive-static/sayit.archive.tw
+ *   node command_scripts/parse_all_speeches.js ~/sayit-archive-static/sayit.archive.tw
  *
  * 說明：
  *   - target_folder: 所有 .html 檔所在的檔案目錄
