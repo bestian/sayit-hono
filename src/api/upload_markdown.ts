@@ -134,7 +134,8 @@ function assignSpeakersToSections(parsed: ParsedSection[], speakerMarks: Speaker
 async function findMaxSectionId(c: Context<ApiEnv>): Promise<number> {
 	// 用 MAX(CAST(...)) 取數值最大，不依賴 ORDER BY；WHERE 同用 CAST 避免型別/索引造成漏列
 	const result = await c.env.DB.prepare(
-		'SELECT MAX(section_id) FROM speech_content WHERE section_id < 10000000').first<{ max_id: number | null }>();
+		'SELECT MAX(section_id) AS max_id FROM speech_content WHERE section_id < 10000000'
+	).first<{ max_id: number | null }>();
 	const maxId = result?.max_id;
 	// D1 可能回傳 string，強制轉數值
 	const num = maxId != null ? Number(maxId) : 0;
@@ -316,14 +317,21 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				.run();
 			console.log('[upload_markdown] POST speech_index 新增:', filename);
 
-			const { sections: parsedSections, speakers } = parseMarkdownSections(markdown);
+			// 移除第一行標題（已用於 display_name），不讓它變成段落
+			const mdLines = markdown.split('\n');
+			if (mdLines[0] && /^#\s/.test(mdLines[0].trim())) {
+				mdLines[0] = '';
+			}
+			const markdownForParsing = mdLines.join('\n');
+
+			const { sections: parsedSections, speakers } = parseMarkdownSections(markdownForParsing);
 			const sectionsWithSpeaker = assignSpeakersToSections(parsedSections, speakers);
 			const baseSectionId = await findMaxSectionId(c);
 
 			const normalized: NormalizedSection[] = sectionsWithSpeaker.map((section, idx) => {
-				const section_id = baseSectionId - idx;
-				const previous_section_id = idx === 0 ? null : section_id + 1;
-				const next_section_id = idx === sectionsWithSpeaker.length - 1 ? null : section_id - 1;
+				const section_id = baseSectionId + idx;
+				const previous_section_id = idx === 0 ? null : section_id - 1;
+				const next_section_id = idx === sectionsWithSpeaker.length - 1 ? null : section_id + 1;
 				const section_content = toHtml(section.markdown);
 
 				return {
