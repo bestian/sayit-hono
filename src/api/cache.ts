@@ -97,3 +97,13 @@ export async function writeR2Cache(
 		console.error('[r2 cache] write error', err);
 	}
 }
+
+/** 刪除 R2 快取 */
+export async function deleteR2Cache(bucket: R2Bucket, cacheKey: string) {
+	try {
+		await bucket.delete(cacheKey);
+		console.log('[r2 cache] deleted', cacheKey);
+	} catch (err) {
+		console.error('[r2 cache] delete error', cacheKey, err);
+	}
+}
