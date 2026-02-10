@@ -1,6 +1,6 @@
 -- 自動生成的 SQL 插入語句
 -- 來源: /Users/bestian/sayit-archive-static/sayit.archive.tw/2025-11-10-柏林自由會議ai-的角色.html
--- 生成時間: 2026-02-09T20:59:57.553Z
+-- 生成時間: 2026-02-10T02:46:12.314Z
 
 -- 使用 INSERT ... ON CONFLICT(section_id) DO UPDATE 實作 upsert（個別檔案）
 

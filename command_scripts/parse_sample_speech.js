@@ -4,10 +4,17 @@ const path = require('path');
 // 嘗試載入 cheerio，如果沒有安裝則使用備用方案
 const cheerio = require('cheerio');
 
+// SQL 字串跳脫：僅需處理單引號（' -> ''）
+// 注意：分號在字串常值內本來就合法，不應改寫內容本身
+const escapeSql = (value) => {
+  if (value == null || value === '') return '';
+  return String(value).replace(/'/g, "''");
+};
+
 // 輸入和輸出路徑
-const inputHtmlPath = path.join(__dirname, '..', 'raw_sample_data', '2025-11-10-柏林自由會議ai-的角色.html');
-const outputJsonPath = path.join(__dirname, '..', 'data', 'speech', '2025-11-10-柏林自由會議ai-的角色.json');
-const outputSqlPath = path.join(__dirname, '..', 'sql', 'speech', '2025-11-10-柏林自由會議ai-的角色.sql');
+const inputHtmlPath = path.join(__dirname, '..', 'raw_sample_data', '2026-01-20-doom-debate.html');
+const outputJsonPath = path.join(__dirname, '..', 'data', 'speech', '2026-01-20-doom-debate.json');
+const outputSqlPath = path.join(__dirname, '..', 'sql', 'speech', '2026-01-20-doom-debate.sql');
 
 // 從檔名提取 filename（去掉 .html）
 const htmlFilename = path.basename(inputHtmlPath);
@@ -144,12 +151,11 @@ sqlStatements.push('');
 sqlStatements.push('-- 使用 INSERT ... ON CONFLICT(section_id) DO UPDATE 實作 upsert');
 sqlStatements.push('');
 
-// 為每筆資料生成 INSERT 語句
+// 為每筆資料生成 INSERT 語句（使用 escapeSql 處理單引號）
 speechData.forEach((item) => {
-  // 轉義單引號（SQL 字符串中的單引號需要轉義為兩個單引號）
-  const escapedFilename = (item.filename || '').replace(/'/g, "''");
-  const escapedSpeaker = (item.section_speaker || '').replace(/'/g, "''");
-  const escapedContent = (item.section_content || '').replace(/'/g, "''");
+  const escapedFilename = escapeSql(item.filename);
+  const escapedSpeaker = escapeSql(item.section_speaker);
+  const escapedContent = escapeSql(item.section_content);
 
   const sectionId = item.section_id !== null ? item.section_id : 'NULL';
   const previousSectionId = item.previous_section_id !== null ? item.previous_section_id : 'NULL';
@@ -170,8 +176,8 @@ sqlStatements.push('');
 // 為每個唯一的演講-講者關係生成 INSERT 語句
 speechSpeakersSet.forEach((key) => {
   const [speechFilename, speakerRoutePathname] = key.split('||||');
-  const escapedFilename = (speechFilename || '').replace(/'/g, "''");
-  const escapedSpeaker = (speakerRoutePathname || '').replace(/'/g, "''");
+  const escapedFilename = escapeSql(speechFilename);
+  const escapedSpeaker = escapeSql(speakerRoutePathname);
 
   sqlStatements.push(
     `INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES ('${escapedFilename}', '${escapedSpeaker}');`
@@ -179,13 +185,8 @@ speechSpeakersSet.forEach((key) => {
 });
 
 sqlStatements.push('');
-sqlStatements.push('-- 插入 speech_index（演講索引，用於顯示名稱與搜尋）');
-sqlStatements.push('-- 使用 INSERT OR IGNORE 避免插入重複的 filename');
-const escapedDisplayName = (displayName || '').replace(/'/g, "''");
-const escapedFilenameForIndex = (filename || '').replace(/'/g, "''");
-sqlStatements.push(
-  `INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('${escapedFilenameForIndex}', '${escapedDisplayName}', 0, '', '');`
-);
+sqlStatements.push('-- 注意：sample SQL 僅寫入 speech_content / speech_speakers');
+sqlStatements.push('-- speech_index 請使用獨立腳本（如 parse_speech_index.js）維護，以避免目標 DB 未建表時中斷');
 
 // 寫入 SQL 文件
 const sqlContent = sqlStatements.join('\n');

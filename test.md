@@ -26,7 +26,7 @@
 curl -X DELETE "http://localhost:8787/api/upload_markdown" \
   -H "Authorization: Bearer {{TOKEN}}" \
   -H "Content-Type: application/json" \
-  -d '{"filename":"test_upload"}'
+  -d '{"filename":"test_upload.md"}'
 ```
 
 
