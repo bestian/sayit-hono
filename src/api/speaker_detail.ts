@@ -38,6 +38,20 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 		const page = Number.isFinite(pageNumber) && pageNumber >= 1 ? Math.floor(pageNumber) : 1;
 		const offset = (page - 1) * pageSize;
 
+		const appearancesCountRow = await c.env.DB.prepare(
+			'SELECT COUNT(DISTINCT speech_filename) AS count FROM speech_speakers WHERE speaker_route_pathname = ?'
+		)
+			.bind(routePathname)
+			.first<{ count: number | string }>();
+		const appearancesCount = Number(appearancesCountRow?.count ?? 0);
+
+		const sectionsCountRow = await c.env.DB.prepare(
+			'SELECT COUNT(DISTINCT section_id) AS count FROM speech_content WHERE section_speaker = ?'
+		)
+			.bind(routePathname)
+			.first<{ count: number | string }>();
+		const sectionsCount = Number(sectionsCountRow?.count ?? 0);
+
 		const sectionsResult = await c.env.DB.prepare(
 			`SELECT
 				sc.filename,
@@ -85,8 +99,7 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			  }
 			: null;
 
-		const totalSections =
-			(typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length;
+		const totalSections = Number.isFinite(sectionsCount) && sectionsCount >= 0 ? sectionsCount : sections.length;
 		const totalPages = Math.max(1, Math.ceil(totalSections / pageSize));
 		const paginationPages = buildPaginationPages(page, totalPages);
 
@@ -95,7 +108,7 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			route_pathname: speakerRow.route_pathname,
 			name: speakerRow.name,
 			photoURL: speakerRow.photoURL,
-			appearances_count: speakerRow.appearances_count ?? 0,
+			appearances_count: Number.isFinite(appearancesCount) && appearancesCount >= 0 ? appearancesCount : 0,
 			sections_count: totalSections,
 			sections,
 			longest_section: longestSection,
