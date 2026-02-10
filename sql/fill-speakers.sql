@@ -1,6 +1,6 @@
 -- 自動生成的 SQL 插入語句
 -- 來源: raw_sample_data/speakers.html
--- 生成時間: 2025-12-11T23:14:52.884Z
+-- 生成時間: 2026-02-10T11:30:50.653Z
 
 -- 使用 INSERT OR IGNORE 避免插入重複的 route_pathname（需要 UNIQUE 約束）
 
@@ -11,6 +11,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%A8%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%A9%B9%E5%A3%B9%E9%9B%AF-2', ' 詹壹雯', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E5%AD%90%E7%B6%AD-2', ' 黃子維', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('1', '1', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('2026-01-17-from-taiwan-to-germany', '2026-01-17 From Taiwan to Germany', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('a-2', 'A', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('a', 'A', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('aaron', 'Aaron', NULL);
@@ -75,8 +76,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andreas
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrej-matisak', 'Andrej Matisak', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrew-leonard', 'Andrew Leonard', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrew-makridis', 'Andrew Makridis', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrew-pittam', 'Andrew Pittam', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrew-pittam-2', 'Andrew Pittam', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrew-pittam', 'Andrew Pittam', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrew-shikiar', 'Andrew Shikiar', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrew-silver', 'Andrew Silver', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('andrew-sorota', 'Andrew Sorota', NULL);
@@ -127,10 +128,10 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audienc
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audience-member-2', 'Audience Member', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-pon', 'Audrey Pon', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-tang-2', 'Audrey Tang', '/media/speakers/default/audrey-512.jpg.96x96_q85_crop-smart_face_upscale.jpg');
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-tang', 'Audrey Tang', '/media/speakers/default/Audrey.jpg.96x96_q85_crop-smart_face_upscale.jpg');
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-tang-5', 'Audrey Tang', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-tang-3', 'Audrey Tang', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-tang-4', 'audrey tang', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-tang', 'Audrey Tang', '/media/speakers/default/Audrey.jpg.96x96_q85_crop-smart_face_upscale.jpg');
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-tang-3', 'Audrey Tang', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('audrey-tang-5', 'Audrey Tang', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('aurora-tsai', 'Aurora Tsai', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('aurora-wm-tsai', 'Aurora W.M. Tsai', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('automated-voice', 'Automated Voice', NULL);
@@ -176,8 +177,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('brittne
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('bruce-aylward', 'Bruce Aylward', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('bruce-bateman', 'Bruce Bateman', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('bruno-kaufmann', 'Bruno Kaufmann', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('c', 'C', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('c-2', 'C', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('c', 'C', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('cameraman', 'Cameraman', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('camilla-s%C3%B8rensen', 'Camilla Sørensen', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('camille-mcouat', 'Camille McOuat', NULL);
@@ -268,8 +269,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('cynthia
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('cynthia-wang', 'Cynthia Wang', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('cyy', 'cyy', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('c%C3%A9dric-alviani', 'Cédric Alviani', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('d-2', 'D', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('d', 'D', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('d-2', 'D', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('dt-lee', 'D.T. Lee', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('dachi-liao', 'Dachi Liao', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('damien-wong', 'Damien Wong', NULL);
@@ -334,8 +335,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('dr-fr%C
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('dr-todd-lowary', 'Dr. Todd Lowary', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('dumas', 'Dumas', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('duncan-hewitt', 'Duncan Hewitt', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('e', 'E', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('e-2', 'E', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('e', 'E', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ed-deng', 'Ed Deng', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('editor', 'Editor', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('edward-carr', 'Edward Carr', NULL);
@@ -358,8 +359,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('emily-f
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('emily-haws', 'Emily Haws', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('emily-middleton', 'Emily Middleton', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('emily-wu', 'Emily Wu', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('emma', 'Emma', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('emma-2', 'Emma', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('emma', 'Emma', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('emma-hossack', 'Emma Hossack', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('epea%E6%90%96%E7%B1%83%E5%88%B0%E6%90%96%E7%B1%83', 'EPEA搖籃到搖籃', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('eric-chang', 'Eric Chang', NULL);
@@ -375,15 +376,15 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('eshanth
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('eva-maydell', 'Eva Maydell', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('eve-lee', 'Eve Lee', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ezra-klein', 'Ezra Klein', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('f-2', 'F', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('f', 'F', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('f-2', 'F', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('facilitator', 'Facilitator', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fang-jui-chang', 'Fang-Jui Chang', '/media/speakers/default/oBZMfHK1_400x400.jpg.96x96_q85_crop-smart_face_upscale.jpg');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('father-ansensius-guntur', 'Father Ansensius Guntur', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('father-ari', 'Father Ari', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('father-hendrikus-arianto-ukat', 'Father Hendrikus Arianto Ukat', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fatima-ali-2', 'Fatima Ali', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fatima-ali', 'Fatima Ali', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fatima-ali-2', 'Fatima Ali', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('felix-holtermann', 'Felix Holtermann', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('felix-lee', 'Felix Lee', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('felix-lill', 'Felix Lill', NULL);
@@ -409,14 +410,14 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('frances
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('franci-dem%C5%A1ar', 'Franci Demšar', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('franklin-chen', 'Franklin Chen', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fred-a-j-sengers', 'Fred A. J. Sengers', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fred-huang', 'fred Huang', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fred-huang-2', 'fred huang', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fred-huang', 'fred Huang', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('frederic-laloux', 'Frederic Laloux', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fridtjof-detzner', 'Fridtjof Detzner', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fr%C3%A9d%C3%A9ric-krumbein', 'Frédéric Krumbein', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('fr%C3%A9d%C3%A9ric-laffont', 'Frédéric Laffont', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('g-2', 'G', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('g', 'G', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('g-2', 'G', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('gabriella-colarusso', 'Gabriella Colarusso', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('gareth-durrant', 'Gareth Durrant', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('gary-sheng', 'Gary Sheng', NULL);
@@ -460,14 +461,14 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('gundula
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('guy-diedrich', 'Guy Diedrich', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('g%C3%B6ran-marklund', 'Göran Marklund', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('g%C3%BCnter-kohl', 'Günter Kohl', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('h-2', 'H', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('h', 'H', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('h-2', 'H', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hadi-partovi', 'Hadi Partovi', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hajime-hotta', 'Hajime Hotta', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hajime-izawa', 'Hajime IZAWA', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hakima-abbas', 'Hakima Abbas', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hal-seki', 'Hal Seki', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hal-seki-2', 'Hal seki', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hal-seki', 'Hal Seki', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('halli-watson', 'Halli Watson', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hanako-zhang', 'Hanako Zhang', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('hank-huang', 'Hank Huang', NULL);
@@ -689,8 +690,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('karan-b
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('karen-chang', 'Karen Chang', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('karen-yu', 'Karen Yu', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('karman-lucero', 'Karman Lucero', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kate-oflaherty-2', 'Kate O’Flaherty', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kate-oflaherty', 'Kate O’Flaherty', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kate-oflaherty-2', 'Kate O’Flaherty', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('katerina-oikonomakou', 'Katerina Oikonomakou', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('katharin-tai', 'Katharin Tai', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('katharina-michaelowa', 'Katharina Michaelowa', NULL);
@@ -723,8 +724,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kidera-
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kieran-james-garvey', 'Kieran James Garvey', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kim-hill', 'Kim Hill', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kimberly-rogovin', 'Kimberly Rogovin', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kip-wainscott', 'Kip Wainscott', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kip-wainscott-2', 'Kip Wainscott', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kip-wainscott', 'Kip Wainscott', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('kiyoko-nagashiro', 'Kiyoko Nagashiro', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('klaikong-vaidhyakarn', 'Klaikong Vaidhyakarn', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('klaus-bardenhagen', 'Klaus Bardenhagen', NULL);
@@ -767,6 +768,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('lin-cec
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('lin-ching-yi', 'Lin Ching-yi', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('lin-shan-ju', 'Lin Shan-ju', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('linien-yen', 'Linien Yen', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('liron-shapira', 'Liron Shapira', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('lisa', 'Lisa', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('lisa-lin', 'Lisa Lin', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('lisa-moon', 'Lisa Moon', NULL);
@@ -801,8 +803,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('male-pa
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('maljeveljevtiudjalimaw-%E7%91%AA%E5%8B%92%E8%8A%99%E5%8B%92%E8%8A%99%E6%9D%9C%E5%A6%B2%E5%88%A9%E8%8C%82', 'Maljeveljev‧Tiudjalimaw 瑪勒芙勒芙．杜妲利茂', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('mamela-fiallo-fior', 'Mamela Fiallo Fior', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('mami-takesada', 'Mami Takesada', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('manpreet-singh-anand', 'Manpreet Singh Anand', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('manpreet-singh-anand-2', 'Manpreet Singh Anand', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('manpreet-singh-anand', 'Manpreet Singh Anand', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('manuel-edghill', 'Manuel Edghill', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('marc-brost', 'Marc Brost', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('marc-marmino', 'Marc Marmino', NULL);
@@ -862,6 +864,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('michael
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('michael-braungart', 'Michael Braungart', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('michael-chou', 'Michael Chou', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('michael-connor', 'Michael Connor', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('michael-fern', 'Michael Fern', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('michael-henretty', 'Michael Henretty', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('michael-jung', 'Michael Jung', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('michael-kuck', 'Michael Kuck', NULL);
@@ -1042,14 +1045,14 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ralph-j
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('raman-jit-singh-chima', 'Raman Jit Singh Chima', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('rana-foroohar', 'Rana Foroohar', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('raven', 'Raven', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-2', 'Ravi Nataraju', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-6', 'Ravi Nataraju', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-4', 'Ravi Nataraju', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-7', 'Ravi Nataraju', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-5', 'Ravi Nataraju', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju', 'Ravi Nataraju', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-8', 'Ravi Nataraju', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-3', 'Ravi Nataraju', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-4', 'Ravi Nataraju', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-5', 'Ravi Nataraju', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-6', 'Ravi Nataraju', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-7', 'Ravi Nataraju', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-8', 'Ravi Nataraju', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju-2', 'Ravi Nataraju', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-nataraju', 'Ravi Nataraju', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravi-vig', 'Ravi Vig', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ravindra-de-silva', 'Ravindra De Silva', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('ray', 'Ray', NULL);
@@ -1175,6 +1178,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('stanley
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('star', 'Star', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('stefan', 'Stefan', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('stefan-heumann', 'Stefan Heumann', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('steffi-czerny', 'Steffi Czerny', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('stella-lai', 'Stella Lai', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('stephan-kuester', 'Stephan Kuester', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('stephan-vincent', 'Stephan Vincent', NULL);
@@ -1265,6 +1269,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('valenti
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('valery-alzaga', 'Valery Alzaga', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('valery-alzago', 'Valery Alzago', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('vanessa-duarte-de-sousa', 'Vanessa Duarte de Sousa', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('vanessa-hope', 'Vanessa Hope', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('vehbi-deger-turan', 'Vehbi Deger Turan', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('vera-tsai', 'Vera Tsai', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('vicki-cheng', 'Vicki Cheng', NULL);
@@ -1292,7 +1297,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('voiceov
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('voiceover-jaclyn-tsai', 'VoiceOver — Jaclyn Tsai', '/media/speakers/default/Jaclyn.jpg.96x96_q85_crop-smart_face_upscale.jpg');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('voiceover-jeffrey-mamber', 'Voiceover — Jeffrey Mamber', '/media/speakers/default/Jeffery.jpg.96x96_q85_crop-smart_face_upscale.jpg');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('voiceover-richard-gariott', 'Voiceover — Richard Gariott', '/media/speakers/default/Richard.jpg.96x96_q85_crop-smart_face_upscale.jpg');
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('voiceover-spacevr-staff', 'Voiceover —  SpaceVR staff', '/media/speakers/default/SpaceVR.jpg.96x96_q85_crop-smart_face_upscale.jpg');
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('voiceover-spacevr-staff', 'Voiceover —  SpaceVR staff', '/media/speakers/default/SpaceVR.jpg.96x96_q85_crop-smart_face_upscale.jpg');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('wa', 'WA', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('wallis-liu', 'Wallis Liu', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('wayne', 'Wayne', NULL);
@@ -1362,6 +1367,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('yws', '
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('yyc', 'yyc', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('zach-huang', 'Zach Huang', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('zack-polizzi', 'Zack Polizzi', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('zarah-bruhn', 'Zarah Bruhn', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('zeinab-badawi', 'Zeinab Badawi', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('zeno-lin', 'Zeno lin', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('zero', 'Zero', NULL);
@@ -1405,8 +1411,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E5%8E%9F%E9%80%B2', '丁原進', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E5%AE%87%E5%BE%B5', '丁宇徵', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E5%BB%BA%E4%BB%81', '丁建仁', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E5%BF%97%E4%BB%81-2', '丁志仁', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E5%BF%97%E4%BB%81', '丁志仁', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E5%BF%97%E4%BB%81-2', '丁志仁', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E6%80%A7%E4%BD%83', '丁性佃', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E6%96%87%E8%81%B0', '丁文聰', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E4%B8%81%E6%9B%89%E8%8F%81', '丁曉菁', NULL);
@@ -1581,9 +1587,9 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%82%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%82%85%E7%91%8B%E7%91%8B', '傅瑋瑋', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%89%E5%AD%90', '光子', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%A7%E6%94%BF%E8%99%95%E4%BB%A3%E8%A1%A8', '內政處代表', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%A7%E6%94%BF%E9%83%A8-2', '內政部', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%A7%E6%94%BF%E9%83%A8', '內政部', '/media/speakers/default/200px-ROC_Ministry_of_Interior_Seal.svg.png.96x96_q85_crop-smart_face_upscale.png');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%A7%E6%94%BF%E9%83%A8-3', '內政部', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%A7%E6%94%BF%E9%83%A8-2', '內政部', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%A7%E6%94%BF%E9%83%A8%E8%A3%9C%E5%85%85%E8%AA%AA%E6%98%8E-2', '內政部(補充說明)', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%A7%E6%94%BF%E9%83%A8%E8%A3%9C%E5%85%85%E8%AA%AA%E6%98%8E', '內政部(補充說明）', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%85%A7%E6%94%BF%E9%83%A8%E4%BB%A3%E8%A1%A8', '內政部代表', NULL);
@@ -1995,8 +2001,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%96%87%E6%A5%A6', '吳文楦', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%96%87%E7%8F%9E', '吳文珞', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%96%87%E7%90%B3', '吳文琳', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%96%87%E9%BE%8D', '吳文龍', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%96%87%E9%BE%8D-2', '吳文龍', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%96%87%E9%BE%8D', '吳文龍', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%97%BB%E6%BD%94', '吳旻潔', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%98%80%E5%80%A2', '吳昀倢', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%90%B3%E6%98%86%E5%84%92', '吳昆儒', NULL);
@@ -2250,12 +2256,12 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%88%BA%E6%98%80', '唐鈺昀', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%99%A2%E9%95%B7', '唐院長', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%AF', '唐鳯', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3-5', '唐鳳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3', '唐鳳', '/media/speakers/default/35a3cba.jpg.96x96_q85_crop-smart_face_upscale.jpg');
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3-4', '唐鳳', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3-5', '唐鳳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3-2', '唐鳳', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3-6', '唐鳳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3-3', '唐鳳', '/media/speakers/default/pic_AudreyTang-small.jpg.96x96_q85_crop-smart_face_upscale.jpg');
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3-6', '唐鳳', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3-4', '唐鳳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3%E5%85%B1%E5%90%8C%E5%8F%AC%E9%9B%86%E4%BA%BA', '唐鳳共同召集人', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3%E5%8F%AC%E9%9B%86%E4%BA%BA', '唐鳳召集人', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%94%90%E9%B3%B3%E5%A4%A7%E4%BD%BF', '唐鳳大使', NULL);
@@ -2383,8 +2389,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E6%96%8C', '孫斌', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E6%96%8C-2', '孫斌', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E6%97%BB%E5%84%80', '孫旻儀', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E6%98%8E%E9%9C%9E', '孫明霞', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E6%98%8E%E9%9C%9E-2', '孫明霞', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E6%98%8E%E9%9C%9E', '孫明霞', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E6%A2%93%E4%BA%91', '孫梓云', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E6%B5%A9%E6%B7%B3', '孫浩淳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AD%AB%E7%91%80', '孫瑀', NULL);
@@ -2446,8 +2452,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%89%E6%9F%8F%E7%BF%B0', '安柏翰', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%8B%E4%BB%A5%E4%BB%81', '宋以仁', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%8B%E4%BD%BE%E4%BF%BD', '宋佾俽', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%8B%E4%BF%AE%E5%BE%B7-2', '宋修德', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%8B%E4%BF%AE%E5%BE%B7', '宋修德', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%8B%E4%BF%AE%E5%BE%B7-2', '宋修德', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%8B%E5%85%86%E5%96%BB', '宋兆喻', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%8B%E5%85%8B%E7%BE%A9', '宋克義', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%AE%8B%E5%98%89%E5%80%AB', '宋嘉倫', NULL);
@@ -3017,8 +3023,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E6%AD%A3%E8%AA%A0', '徐正誠', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E6%B0%B8%E7%A6%8F', '徐永福', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E6%B6%B5%E8%8A%B3', '徐涵芳', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E6%B7%91%E8%8A%B7', '徐淑芷', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E6%B7%91%E8%8A%B7-2', '徐淑芷', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E6%B7%91%E8%8A%B7', '徐淑芷', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E7%85%87%E5%A6%83', '徐煇妃', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E7%88%BE%E7%83%88', '徐爾烈', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E5%BE%90%E7%8E%89%E8%8A%B3', '徐玉芳', NULL);
@@ -3105,9 +3111,9 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%94%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%94%BF%E9%A2%A8%E8%99%95', '政風處', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E5%A3%AB', '教士', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E5%B8%AB23%E9%99%B3%E8%80%81%E5%B8%AB', '教師23陳老師', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E8%82%B2%E9%83%A8-2', '教育部', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E8%82%B2%E9%83%A8-3', '教育部', '/media/speakers/default/goi5.jpg.96x96_q85_crop-smart_face_upscale.jpg');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E8%82%B2%E9%83%A8', '教育部', '/media/speakers/default/2000px-ROC_Ministry_of_Education_Seal.svg.png.96x96_q85_crop-smart_face_upscale.png');
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E8%82%B2%E9%83%A8-2', '教育部', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E8%82%B2%E9%83%A8%E4%BB%A3%E8%A1%A8', '教育部代表', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E8%82%B2%E9%83%A8%E4%BB%A3%E8%A1%A8%E8%B6%99%E5%89%AF%E7%B5%84%E9%95%B7%E7%94%B1%E9%9D%96', '教育部代表（趙副組長由靖）', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%99%E8%82%B2%E9%83%A8%E5%90%8C%E4%BB%81', '教育部同仁', NULL);
@@ -3136,8 +3142,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%B8%E4%BD%8D%E7%94%A2%E6%A5%AD%E7%BD%B2', '數位產業署', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%B8%E4%BD%8D%E7%AD%96%E7%95%A5%E5%8F%B8', '數位策略司', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%95%B8%E5%90%8D', '數名', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%96%87%E5%8C%96%E9%83%A8-2', '文化部', '/media/speakers/default/goi9.jpg.96x96_q85_crop-smart_face_upscale.jpg');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%96%87%E5%8C%96%E9%83%A8', '文化部', '/media/speakers/default/photo.jpg.96x96_q85_crop-smart_face_upscale.jpg');
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%96%87%E5%8C%96%E9%83%A8-2', '文化部', '/media/speakers/default/goi9.jpg.96x96_q85_crop-smart_face_upscale.jpg');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%96%87%E5%8C%96%E9%83%A8%E8%A3%9C%E5%85%85%E8%AA%AA%E6%98%8E-2', '文化部(補充說明)', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%96%87%E5%8C%96%E9%83%A8%E8%A3%9C%E5%85%85%E8%AA%AA%E6%98%8E', '文化部(補充說明）', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%96%87%E5%8C%96%E9%83%A8%E4%BB%A3%E8%A1%A8', '文化部代表', NULL);
@@ -3214,8 +3220,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%97%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%97%A5%E6%9C%9F', '日期', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%97%A5%E6%9C%AC%E6%94%BE%E9%80%81%E5%8D%94%E6%9C%83', '日本放送協會', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%97%A5%E6%9C%AC%E8%A8%98%E8%80%85', '日本記者', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%97%A9%E5%B7%9D%E5%85%88%E7%94%9F-2', '早川先生', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%97%A9%E5%B7%9D%E5%85%88%E7%94%9F', '早川先生', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%97%A9%E5%B7%9D%E5%85%88%E7%94%9F-2', '早川先生', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%98%8E%E8%89%AF%E8%87%BB', '明良臻', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%98%8E%E9%A6%AC%E4%B8%81', '明馬丁', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%98%93%E5%BB%BA%E6%88%90', '易建成', NULL);
@@ -3978,15 +3984,15 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%87%E6%85%A7', '林昇慧', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8C%E6%98%8E', '林昌明', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E4%BB%81', '林明仁', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E4%BD%B3-2', '林明佳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E4%BD%B3', '林明佳', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E4%BD%B3-2', '林明佳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E5%AE%97', '林明宗', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E5%BE%B7', '林明德', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E6%98%8C', '林明昌', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E7%A9%8E', '林明穎', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%8E%E9%8F%98', '林明鏘', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%93%E5%BF%97', '林易志', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%93%E5%BF%97-2', '林易志', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%93%E5%BF%97', '林易志', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%A0%E5%A7%BF', '林映姿', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%A5%E7%87%95', '林春燕', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%9E%97%E6%98%A5%E8%93%89', '林春蓉', NULL);
@@ -4470,8 +4476,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E6%85%B6%E8%B3%A2', '歐慶賢', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E6%9B%9C%E7%91%8B', '歐曜瑋', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E6%AD%A3%E8%88%88', '歐正興', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E7%94%A8%E7%94%9F', '歐用生', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E7%94%A8%E7%94%9F-2', '歐用生', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E7%94%A8%E7%94%9F', '歐用生', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E8%82%B2%E8%AA%A0', '歐育誠', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E8%89%AF%E6%A6%AE', '歐良榮', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%AD%90%E8%8A%AF%E8%90%8C', '歐芯萌', NULL);
@@ -4585,9 +4591,9 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B2%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B2%B3%E9%87%8E-%E7%B6%93%E5%A4%AB-%E6%A7%98', '河野 經夫 様', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B2%B3%E9%87%8E%E7%B6%93%E5%A4%AB%E6%A7%98', '河野經夫様', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B3%95%E5%88%B6%E8%99%95', '法制處', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B3%95%E5%8B%99%E9%83%A8-3', '法務部', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B3%95%E5%8B%99%E9%83%A8', '法務部', '/media/speakers/default/400px-%E4%B8%AD%E8%8F%AF%E6%B0%91%E5%9C%8B%E6%B3%95%E5%8B%99%E9%83%A8.svg.png.96x96_q85_crop-smart_face_upscale.png');
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B3%95%E5%8B%99%E9%83%A8-2', '法務部', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B3%95%E5%8B%99%E9%83%A8-3', '法務部', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B3%95%E5%8B%99%E9%83%A8%E4%BB%A3%E8%A1%A8', '法務部代表', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B3%95%E5%8B%99%E9%83%A8%E5%A0%B1%E5%91%8A%E4%BA%BA%E8%91%89%E5%BB%BA%E8%8F%AF', '法務部報告人葉建華', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B3%95%E5%8B%99%E9%83%A8%E5%BB%89%E6%94%BF%E7%BD%B2%E8%82%85%E8%B2%AA%E7%B5%84%E9%99%B3%E9%8C%AB%E6%9F%B1%E7%B5%84%E9%95%B7', '法務部廉政署肅貪組陳錫柱組長', NULL);
@@ -4664,8 +4670,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E8%81%96%E5%87%B1', '洪聖凱', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E8%8B%B1%E4%BF%AE', '洪英修', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E8%8F%8A%E5%90%9F', '洪菊吟', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E8%A9%A0%E5%96%84-3', '洪詠善', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E8%A9%A0%E5%96%84', '洪詠善', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E8%A9%A0%E5%96%84-3', '洪詠善', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E8%A9%A0%E5%96%84-2', '洪詠善', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E8%AA%8C%E8%87%A8', '洪誌臨', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B4%AA%E9%80%B2%E7%A6%8F', '洪進福', NULL);
@@ -4691,8 +4697,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E4%B9%BE%E8%B3%9C', '游乾賜', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E4%BB%B2%E6%96%B9', '游仲方', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E4%BC%AF%E5%A0%85', '游伯堅', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E5%85%89%E6%98%AD', '游光昭', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E5%85%89%E6%98%AD-2', '游光昭', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E5%85%89%E6%98%AD', '游光昭', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E5%87%B1%E7%BF%94', '游凱翔', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E5%8D%83%E6%83%A0', '游千惠', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E6%B8%B8%E5%8D%83%E6%85%A7', '游千慧', NULL);
@@ -4834,8 +4840,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9C%8B%E7%BE%BD', '王國羽', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9C%8B%E9%9A%86', '王國隆', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9C%8B%E9%9B%84', '王國雄', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9E%A0-2', '王垠', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9E%A0', '王垠', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9E%A0-2', '王垠', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9F%8E%E8%81%B0', '王城聰', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9F%BA%E5%85%A8', '王基全', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%8E%8B%E5%9F%BA%E6%B4%B2', '王基洲', NULL);
@@ -5081,8 +5087,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%90%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%91%9E%E8%8A%B3%E5%8D%80%E6%BC%81%E6%9C%83%E4%BB%A3%E8%A1%A8', '瑞芳區漁會代表', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%91%AA%E5%8B%92%E8%8A%99%E5%8B%92%E8%8A%99', '瑪勒芙勒芙', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%92%A9%E7%A7%80%E5%90%9B', '璩秀君', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%92%B0%E4%BF%9D%E7%BD%B2', '環保署', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%92%B0%E4%BF%9D%E7%BD%B2-2', '環保署', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%92%B0%E4%BF%9D%E7%BD%B2', '環保署', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%92%B0%E4%BF%9D%E7%BD%B2%E4%BB%A3%E8%A1%A8', '環保署代表', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%92%B0%E4%BF%9D%E7%BD%B2%E5%BB%A2%E6%A3%84%E7%89%A9%E7%AE%A1%E7%90%86%E8%99%95%E8%B3%B4%E7%91%A9%E7%91%A9%E8%99%95%E9%95%B7', '環保署廢棄物管理處賴瑩瑩處長', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%92%B0%E4%BF%9D%E7%BD%B2%E5%BE%90%E5%98%89%E6%AC%A3%E7%A7%91%E9%95%B7', '環保署徐嘉欣科長', NULL);
@@ -5254,8 +5260,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%AD%9D%E5%A6%82', '簡孝如', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%AD%9D%E6%A8%BA', '簡孝樺', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%AD%A3%E5%A9%95', '簡季婕', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%AE%8F%E5%81%89', '簡宏偉', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%AE%8F%E5%81%89-2', '簡宏偉', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%AE%8F%E5%81%89', '簡宏偉', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%B0%8F%E5%93%B2', '簡小哲', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%B0%B1%E5%8F%AF', '簡就可', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E7%B0%A1%E5%BE%B7%E6%BA%90', '簡德源', '/media/speakers/default/IMG_5719_jEF7EBl.jpeg.96x96_q85_crop-smart_face_upscale.jpg');
@@ -5440,6 +5446,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%81%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%81%BD%E7%9C%BEi', '聽眾I', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%81%BD%E7%9C%BEj', '聽眾J', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%81%BD%E7%9C%BEk', '聽眾K', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%82%B2%E9%A8%B0', '育騰', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%83%A1%E4%B8%80%E5%A4%A9', '胡一天', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%83%A1%E4%B8%AD%E6%AD%A6', '胡中武', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%83%A1%E4%B8%AD%E8%88%88', '胡中興', NULL);
@@ -5536,8 +5543,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E5%B4%91%E5%B1%B1', '莊崑山', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E5%BA%AD%E7%91%9E', '莊庭瑞', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E5%BF%A0%E6%9E%97', '莊忠林', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E6%83%A0%E5%A6%82', '莊惠如', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E6%83%A0%E5%A6%82-2', '莊惠如', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E6%83%A0%E5%A6%82', '莊惠如', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E6%85%A7%E6%96%87', '莊慧文', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E6%8C%AF%E5%BE%B7', '莊振德', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%8E%8A%E6%96%87%E5%82%91', '莊文傑', NULL);
@@ -5648,6 +5655,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%91%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%91%9B%E5%A6%82%E9%88%9E', '葛如鈞', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%91%9B%E5%BB%A3%E6%BC%A2', '葛廣漢', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%91%9B%E6%98%A0%E6%BF%A4', '葛映濤', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%91%9B%E9%9D%9C%E6%96%87', '葛靜文', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%91%A3%E5%BB%BA%E5%AE%8F', '董建宏', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%91%A3%E6%95%8F%E7%AD%91', '董敏筑', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%91%A3%E7%91%8B%E8%8B%93', '董瑋苓', NULL);
@@ -5744,8 +5752,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%98%8E%E8%AC%99', '蔡明謙', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%98%8E%E9%BE%8D', '蔡明龍', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%99%8F%E6%98%87', '蔡晏昇', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%9B%89%E6%A5%93', '蔡曉楓', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%9B%89%E6%A5%93-2', '蔡曉楓', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%9B%89%E6%A5%93', '蔡曉楓', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%9B%89%E9%9B%AF%E7%A4%BE%E5%9C%98%E6%B3%95%E4%BA%BA%E4%B8%AD%E8%8F%AF%E6%B0%91%E5%9C%8B%E8%AB%AE%E5%95%86%E5%BF%83%E7%90%86%E5%B8%AB%E5%85%AC%E6%9C%83%E5%85%A8%E8%81%AF%E6%9C%83', '蔡曉雯（社團法人中華民國諮商心理師公會全聯會）', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%9B%9C%E9%9A%86', '蔡曜隆', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%94%A1%E6%9C%88%E5%AC%8C', '蔡月嬌', NULL);
@@ -6288,8 +6296,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%81%94%E6%96%8C%E5%A7%94%E5%93%A1', '謝達斌委員', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%82%A6%E4%BF%8A', '謝邦俊', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%87%87%E5%80%AA', '謝采倪', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%87%91%E5%9F%8E-2', '謝金城', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%87%91%E5%9F%8E', '謝金城', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%87%91%E5%9F%8E-2', '謝金城', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%88%B4%E5%AA%9B', '謝鈴媛', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%8C%A6%E8%8A%B3', '謝錦芳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E8%AC%9D%E9%9B%85%E5%90%9B', '謝雅君', NULL);
@@ -6667,8 +6675,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BB%B2%E5%B5%90', '鄭仲嵐', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BC%8A%E5%A8%9F', '鄭伊娟', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BC%8A%E5%BA%AD', '鄭伊庭', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BC%8A%E7%BF%94', '鄭伊翔', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BC%8A%E7%BF%94-2', '鄭伊翔', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BC%8A%E7%BF%94', '鄭伊翔', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BD%B3%E8%8F%81', '鄭佳菁', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BE%86%E5%AE%87', '鄭來宇', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E4%BF%8A%E5%B2%B3', '鄭俊岳', NULL);
@@ -6726,8 +6734,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E6%B7%91%E8%8F%AF', '鄭淑華', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E6%B7%91%E9%BA%97', '鄭淑麗', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E6%B7%BB%E6%88%90', '鄭添成', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E6%BC%A2%E6%96%87-2', '鄭漢文', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E6%BC%A2%E6%96%87', '鄭漢文', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E6%BC%A2%E6%96%87-2', '鄭漢文', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E7%80%9A%E6%B7%B3', '鄭瀚淳', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E7%8E%89%E7%8E%B2', '鄭玉玲', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%84%AD%E7%8E%89%E8%98%AD', '鄭玉蘭', NULL);
@@ -7235,8 +7243,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B2%BB%E6%A3%8B', '陳治棋', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B2%BB%E7%B6%AD%E5%A7%94%E5%93%A1', '陳治維委員', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B3%89%E9%8C%AB', '陳泉錫', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B3%B0%E7%84%B6-2', '陳泰然', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B3%B0%E7%84%B6', '陳泰然', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B3%B0%E7%84%B6-2', '陳泰然', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B4%8B%E6%94%BF', '陳洋政', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B4%B2%E4%BB%BB', '陳洲任', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E6%B7%91%E5%A8%9F', '陳淑娟', NULL);
@@ -7385,8 +7393,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8A%8B%E8%8F%81', '陳芋菁', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8A%B8%E8%96%87', '陳芸薇', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8B%A5%E6%85%88', '陳若慈', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8B%B1%E5%82%91-2', '陳英傑', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8B%B1%E5%82%91', '陳英傑', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8B%B1%E5%82%91-2', '陳英傑', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8B%B1%E9%88%90', '陳英鈐', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8C%82%E6%98%A5', '陳茂春', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E8%8C%82%E6%AC%BD', '陳茂欽', NULL);
@@ -7447,8 +7455,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9B%85%E8%8B%A5', '陳雅若', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9B%85%E8%A8%80', '陳雅言', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9B%8B%E7%BF%94', '陳雋翔', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9B%A8%E5%87%A1', '陳雨凡', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9B%A8%E5%87%A1-2', '陳雨凡', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9B%A8%E5%87%A1', '陳雨凡', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9B%AA%E7%8E%89', '陳雪玉', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9B%AA%E9%A8%B0', '陳雪騰', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%99%B3%E9%9D%92%E7%90%AA', '陳青琪', NULL);
@@ -7557,6 +7565,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%A6%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%A6%AC%E7%91%9E%E5%BD%A3', '馬瑞彣', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%A6%AC%E9%8C%A6%E8%8F%AF', '馬錦華', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%A6%AE%E4%BF%8A%E7%9B%8A', '馮俊益', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%A6%AE%E5%85%88%E6%8D%B7', '馮先捷', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%A6%AE%E5%96%AC%E8%98%AD', '馮喬蘭', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%A6%AE%E5%BD%A5%E6%96%87', '馮彥文', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%A6%AE%E5%BF%97%E8%89%AF', '馮志良', NULL);
@@ -7701,6 +7710,7 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E5%81%89%E7%BF%94', '黃偉翔', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E5%85%83%E5%BB%BA', '黃元建', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E5%85%83%E8%B2%9E', '黃元貞', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E5%85%86%E5%BE%BD', '黃兆徽', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E5%85%86%E6%9D%B0', '黃兆杰', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E5%85%89%E8%8A%B9', '黃光芹', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E5%86%A0%E5%82%91', '黃冠傑', NULL);
@@ -7801,8 +7811,8 @@ INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%96%87%E9%80%B8', '黃文逸', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%96%87%E9%91%91', '黃文鑑', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%96%B0%E8%96%B0', '黃新薰', NULL);
-INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%97%AD%E5%88%9D-2', '黃旭初', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%97%AD%E5%88%9D', '黃旭初', NULL);
+INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%97%AD%E5%88%9D-2', '黃旭初', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%97%AD%E5%AE%8F', '黃旭宏', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%97%AD%E7%94%B0', '黃旭田', NULL);
 INSERT OR IGNORE INTO speakers (route_pathname, name, photoURL) VALUES ('%E9%BB%83%E6%98%80%E6%98%8C', '黃昀昌', NULL);
