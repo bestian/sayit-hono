@@ -141,9 +141,8 @@ sqlStatements.push('-- 自動生成的 SQL 插入語句');
 sqlStatements.push(`-- 來源: raw_sample_data/${htmlFilename}`);
 sqlStatements.push('-- 生成時間: ' + new Date().toISOString());
 sqlStatements.push('');
-sqlStatements.push('-- 使用 UPSERT 避免插入重複的 section_id（需要 PRIMARY KEY 約束）');
+sqlStatements.push('-- 使用 INSERT ... ON CONFLICT(section_id) DO UPDATE 實作 upsert');
 sqlStatements.push('');
-
 
 // 為每筆資料生成 INSERT 語句
 speechData.forEach((item) => {
@@ -159,7 +158,7 @@ speechData.forEach((item) => {
   const contentValue = item.section_content ? `'${escapedContent}'` : 'NULL';
 
   sqlStatements.push(
-    `UPSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapedFilename}', NULL, NULL, ${sectionId}, ${previousSectionId}, ${nextSectionId}, ${speakerValue}, ${contentValue});`
+    `INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES ('${escapedFilename}', NULL, NULL, ${sectionId}, ${previousSectionId}, ${nextSectionId}, ${speakerValue}, ${contentValue}) ON CONFLICT(section_id) DO UPDATE SET filename = excluded.filename, nest_filename = excluded.nest_filename, nest_display_name = excluded.nest_display_name, previous_section_id = excluded.previous_section_id, next_section_id = excluded.next_section_id, section_speaker = excluded.section_speaker, section_content = excluded.section_content;`
   );
 });
 
