@@ -18,6 +18,7 @@ sql/speech/*
 !sql/speech/1999年全國司法改革會議.sql
 !sql/speech/2025-11-10-柏林自由會議ai-的角色.sql
 sql/fill-all-speech_content.sql
+*.db
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 
