@@ -51,11 +51,13 @@ isProject: false
 ## 4. section_speaker（往前看最近一位）
 
 - 在「整份 markdown」中定義「speaker 行」：例如 `### 名稱：` 或 `### 名稱:`（以 `#` 開頭的標題行且行尾有 `：` 或 `:`）。
-- 正則範例：`/^#{1,6}\s*(.+?)\s*[:：]\s*$/`，擷取到的為 speaker 名稱（如「唐鳳」）。
+- 正則範例：`/^#{1,6}\s*(.+?)\s*[:：]\s*$/`，擷取到的為 speaker 名稱（可能含結尾空白或冒號）。
+- **正規化名稱**：把結尾的 `：` 或 `:` 拿掉，例如 `rawName.replace(/\s*[:：]\s*$/, '').trim()`，得到顯示用名稱（如「唐鳳」）。
+- **寫入前處理**：若名稱為 `'唐鳳'`，先改為 `'唐鳳-3'`；再以 `encodeURIComponent(名稱)` 的結果寫入 `section_speaker`（與現有 DB 講者 route 一致，例如 `%E5%94%90%E9%B3%B3-3`）。
 - 掃描方式：從檔案開頭往後掃（可先做「去 `>`  行」再掃），每遇到一條 speaker 行就更新「當前 speaker」；每個段落對應到「該段落在全文中的位置」時，取「該段落之前、往前看最近的一條 speaker 行」作為該段的 `section_speaker`。
 - 若段落前沒有出現過 speaker 行，`section_speaker` 可為 `NULL` 或空字串（依現有 DB 慣例）。
 
-實作建議：先掃一遍所有行，建出「行號 → 該行是否為 speaker 行、speaker 名稱」；再對每個段落依「段落起始行號」往前找最近一筆 speaker，賦值給該段。
+實作建議：先掃一遍所有行，建出「行號 → 該行是否為 speaker 行、speaker 名稱（已去結尾冒號）」；對每個名稱做「唐鳳 → 唐鳳-3」後再 `encodeURIComponent`；再對每個段落依「段落起始行號」往前找最近一筆 speaker，賦值給該段。
 
 ---
 
@@ -83,6 +85,7 @@ isProject: false
 - `filename`：目前 POST 已算好的 `filename`（transform 後）。
 - `nest_filename`、`nest_display_name`：此流程為單一演講、非巢狀，填 `NULL`。
 - 其餘欄位為上述算出的 `section_id`、`previous_section_id`、`next_section_id`、`section_speaker`、`section_content`。
+- **SQL 特殊字元**：英文 `;` 與 `,` 在 SQL 中有語法意義，必須避免被當成語法解析。一律使用 **參數化查詢**（`prepare().bind(...)`），將 `section_content`、`section_speaker` 等字串以參數傳入，不要拼進 SQL 字串；若日後有產出 raw SQL 的程式路徑，則需對字串內之 `'`、`;`、`,` 等做跳脫或改用參數。
 
 可依 D1 是否支援 batch 決定用多個 `prepare().bind().run()` 或單一 transaction；若 D1 有 batch API 可一次插入多筆以減少 RTT。
 
@@ -107,6 +110,7 @@ sequenceDiagram
     API->>D1: SELECT MAX(section_id) WHERE section_id < 10000000
     API->>API: 為每段算 section_id, prev/next, speaker, content(HTML)
     API->>D1: INSERT 每段進 speech_content
+    API->>API: console.log 剖析後存入之 section_content，以 '\n\n' join
     API->>Client: 200 + body.markdown (或改為 JSON 成功與段落數)
   end
 ```
@@ -115,8 +119,9 @@ sequenceDiagram
 
 ---
 
-## 9. 回應格式（可選）
+## 9. 回應前 log 與回應格式（可選）
 
+- **Response 前**：在回傳給 client 之前，`console.log` 剖析後並已存入之所有 `section_content`，以 `'\n\n'` 串接成一個字串後輸出，例如：`console.log('[upload_markdown] POST section_content:\n', sections.map(s => s.section_content).join('\n\n'))`（依實際欄位名調整）。
 - 目前成功時回傳 `c.text(body.markdown, 200, ...)`。若希望讓前端知道已寫入段落數，可改為 `c.json({ success: true, sectionsCount: sections.length, filename }, 200, ...)`，或保留回傳 markdown 並在 header 加 `X-Sections-Count`。此為產品選擇，不影響上述邏輯實作。
 
 ---
