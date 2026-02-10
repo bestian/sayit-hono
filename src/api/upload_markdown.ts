@@ -32,6 +32,16 @@ type NormalizedSection = {
 	section_content: string;
 };
 
+function getUniqueSpeakerRoutePathnames(speakerMarks: SpeakerMark[]): string[] {
+	return Array.from(
+		new Set(
+			speakerMarks
+				.map((s) => s.speakerSlug)
+				.filter((slug): slug is string => typeof slug === 'string' && slug.length > 0)
+		)
+	);
+}
+
 function normalizeSpeakerName(raw: string): string | null {
 	const withoutColon = raw.replace(/\s*[:：]\s*$/, '').trim();
 	if (!withoutColon) return null;
@@ -134,18 +144,85 @@ function assignSpeakersToSections(parsed: ParsedSection[], speakerMarks: Speaker
 async function findMaxSectionId(c: Context<ApiEnv>): Promise<number> {
 	// 用 MAX(CAST(...)) 取數值最大，不依賴 ORDER BY；WHERE 同用 CAST 避免型別/索引造成漏列
 	const result = await c.env.DB.prepare(
-		'SELECT MAX(section_id) FROM speech_content WHERE section_id < 10000000').first<{ max_id: number | null }>();
+		'SELECT MAX(section_id) AS max_id FROM speech_content WHERE section_id < 10000000'
+	).first<{ max_id: number | null }>();
 	const maxId = result?.max_id;
 	// D1 可能回傳 string，強制轉數值
 	const num = maxId != null ? Number(maxId) : 0;
 	const next = Number.isNaN(num) ? 0 : num + 1;
-	console.log('[upload_markdown] findMaxSectionId raw:', maxId, '-> next:', next);
 	return next;
 }
 
 function toHtml(markdown: string): string {
 	const html = marked.parse(markdown);
 	return stripScripts(typeof html === 'string' ? html : '');
+}
+
+async function ensureSpeakersExist(c: Context<ApiEnv>, speakerMarks: SpeakerMark[]) {
+	const uniqueRoutePathnames = getUniqueSpeakerRoutePathnames(speakerMarks);
+
+	for (const routePathname of uniqueRoutePathnames) {
+		let speakerName = routePathname;
+		try {
+			speakerName = decodeURIComponent(routePathname);
+		} catch {
+			// route_pathname 非合法 URI 編碼時，退回原字串，避免整批中斷
+			speakerName = routePathname;
+		}
+
+		await c.env.DB.prepare(
+			'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
+		)
+			.bind(routePathname, speakerName)
+			.run();
+	}
+}
+
+async function ensureSpeechSpeakerRelations(c: Context<ApiEnv>, filename: string, speakerMarks: SpeakerMark[]) {
+	const uniqueRoutePathnames = getUniqueSpeakerRoutePathnames(speakerMarks);
+
+	console.log('[upload_markdown][relation] target filename:', filename);
+	console.log('[upload_markdown][relation] parsed speakers:', uniqueRoutePathnames);
+
+	const beforeCountRow = await c.env.DB.prepare(
+		'SELECT COUNT(*) AS count FROM speech_speakers WHERE speech_filename = ?'
+	)
+		.bind(filename)
+		.first<{ count: number | string }>();
+	const beforeCount = Number(beforeCountRow?.count ?? 0);
+	console.log('[upload_markdown][relation] before count:', beforeCount);
+
+	let inserted = 0;
+	let ignored = 0;
+	for (const routePathname of uniqueRoutePathnames) {
+		const relationInsertResult = await c.env.DB.prepare(
+			'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
+		)
+			.bind(filename, routePathname)
+			.run();
+		const changes = relationInsertResult.meta?.changes ?? 0;
+		if (changes > 0) inserted += changes;
+		else ignored += 1;
+		console.log('[upload_markdown][relation] upsert', {
+			filename,
+			routePathname,
+			changes
+		});
+	}
+
+	const afterCountRow = await c.env.DB.prepare(
+		'SELECT COUNT(*) AS count FROM speech_speakers WHERE speech_filename = ?'
+	)
+		.bind(filename)
+		.first<{ count: number | string }>();
+	const afterCount = Number(afterCountRow?.count ?? 0);
+	console.log('[upload_markdown][relation] summary', {
+		beforeCount,
+		parsedCount: uniqueRoutePathnames.length,
+		inserted,
+		ignored,
+		afterCount
+	});
 }
 
 async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
@@ -159,6 +236,19 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	];
 
 	await Promise.allSettled(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+}
+
+async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]) {
+	const host = new URL(c.req.url).host;
+	const keys = new Set<string>([`${host}/speakers`]);
+
+	for (const routePathname of speakerRoutePathnames) {
+		if (!routePathname) continue;
+		keys.add(`${host}/speaker/${routePathname}`);
+		keys.add(`${host}/speaker/${encodeURIComponent(routePathname)}`);
+	}
+
+	await Promise.allSettled(Array.from(keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 }
 
 export async function uploadMarkdown(c: Context<ApiEnv>) {
@@ -223,6 +313,42 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					.bind(filename)
 					.run();
 
+				// 先找出此演講關聯到的講者，供後續孤兒講者清理
+				const linkedSpeakers = await c.env.DB.prepare(
+					'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
+				)
+					.bind(filename)
+					.all<{ speaker_route_pathname: string }>();
+				const speakerRoutePathnames = Array.from(
+					new Set((linkedSpeakers.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
+				);
+
+				// Delete from D1: speech_speakers (speech-speaker relations)
+				console.log('[upload_markdown] DELETE speech_speakers from D1:', filename);
+				const deleteSpeechSpeakersResult = await c.env.DB.prepare(
+					'DELETE FROM speech_speakers WHERE speech_filename = ?'
+				)
+					.bind(filename)
+					.run();
+
+				// 刪除僅屬於此演講、且已無任何關聯的講者
+				let speakersDeleted = 0;
+				for (const routePathname of speakerRoutePathnames) {
+					const stillLinked = await c.env.DB.prepare(
+						'SELECT 1 AS linked FROM speech_speakers WHERE speaker_route_pathname = ? LIMIT 1'
+					)
+						.bind(routePathname)
+						.first<{ linked: number }>();
+					if (!stillLinked) {
+						const deleteSpeakerResult = await c.env.DB.prepare(
+							'DELETE FROM speakers WHERE route_pathname = ?'
+						)
+							.bind(routePathname)
+							.run();
+						speakersDeleted += deleteSpeakerResult.meta?.changes ?? 0;
+					}
+				}
+
 				// Delete from D1: speech_index (speech metadata)
 				console.log('[upload_markdown] DELETE speech_index from D1:', filename);
 				const deleteSpeechResult = await c.env.DB.prepare(
@@ -232,14 +358,15 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					.run();
 
 				const sectionsDeleted = deleteSectionsResult.meta?.changes ?? 0;
+				const relationsDeleted = deleteSpeechSpeakersResult.meta?.changes ?? 0;
 				const speechDeleted = deleteSpeechResult.meta?.changes ?? 0;
 
-				if (sectionsDeleted === 0 && speechDeleted === 0) {
+				if (sectionsDeleted === 0 && relationsDeleted === 0 && speechDeleted === 0) {
 					return c.json(
 						{
 							success: false,
 							message: `No records found for filename: ${filename}`,
-							deleted: { sections: 0, speech: 0 }
+							deleted: { sections: 0, relations: 0, speakers: 0, speech: 0 }
 						},
 						404,
 						corsHeadersWithMethods
@@ -247,6 +374,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				}
 
 				await invalidateSpeechCaches(c, filename);
+				await invalidateSpeakerCaches(c, speakerRoutePathnames);
 
 				return c.json(
 					{
@@ -254,6 +382,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 						message: `Successfully deleted ${filename}`,
 						deleted: {
 							sections: sectionsDeleted,
+							relations: relationsDeleted,
+							speakers: speakersDeleted,
 							speech: speechDeleted
 						}
 					},
@@ -269,7 +399,6 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			let body: { filename?: string; markdown?: string };
 			try {
 				body = await c.req.json();
-				console.log('[upload_markdown] POST body:', body);
 			} catch (err) {
 				console.error('[upload_markdown] POST JSON parse error', err);
 				return c.json({ error: 'Invalid JSON body' }, 400, corsHeadersWithMethods);
@@ -281,8 +410,6 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			}
 			const filename = transformFilename(raw_filename.trim());
 			const markdown = body.markdown as string;
-			console.log('[upload_markdown] POST filename:', filename);
-			console.log('[upload_markdown] POST markdown:', markdown);
 
 			if (!body.markdown || typeof body.markdown !== 'string') {
 				return c.json({ error: 'Missing or invalid markdown field' }, 400, corsHeadersWithMethods);
@@ -314,16 +441,25 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			)
 				.bind(filename, display_name, '', '')
 				.run();
-			console.log('[upload_markdown] POST speech_index 新增:', filename);
 
-			const { sections: parsedSections, speakers } = parseMarkdownSections(markdown);
+			// 移除第一行標題（已用於 display_name），不讓它變成段落
+			const mdLines = markdown.split('\n');
+			if (mdLines[0] && /^#\s/.test(mdLines[0].trim())) {
+				mdLines[0] = '';
+			}
+			const markdownForParsing = mdLines.join('\n');
+
+			const { sections: parsedSections, speakers } = parseMarkdownSections(markdownForParsing);
+			const speakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
+			await ensureSpeakersExist(c, speakers);
+			await ensureSpeechSpeakerRelations(c, filename, speakers);
 			const sectionsWithSpeaker = assignSpeakersToSections(parsedSections, speakers);
 			const baseSectionId = await findMaxSectionId(c);
 
 			const normalized: NormalizedSection[] = sectionsWithSpeaker.map((section, idx) => {
-				const section_id = baseSectionId - idx;
-				const previous_section_id = idx === 0 ? null : section_id + 1;
-				const next_section_id = idx === sectionsWithSpeaker.length - 1 ? null : section_id - 1;
+				const section_id = baseSectionId + idx;
+				const previous_section_id = idx === 0 ? null : section_id - 1;
+				const next_section_id = idx === sectionsWithSpeaker.length - 1 ? null : section_id + 1;
 				const section_content = toHtml(section.markdown);
 
 				return {
@@ -352,10 +488,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					.run();
 			}
 
-			console.log(
-				'[upload_markdown] POST section_content:\n',
-				normalized.map((s) => s.section_content).join('\n\n')
-			);
+			await invalidateSpeechCaches(c, filename);
+			await invalidateSpeakerCaches(c, speakerRoutePathnames);
 
 			return c.json(
 				{ success: true, filename, sectionsCount: normalized.length },
