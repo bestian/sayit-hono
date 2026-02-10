@@ -1,6 +1,6 @@
 -- 自動生成的 SQL 插入語句（巢狀資料）
 -- 母檔: /Users/bestian/sayit-archive-static/sayit.archive.tw/1999年全國司法改革會議.html
--- 生成時間: 2026-02-09T21:01:21.156Z
+-- 生成時間: 2026-02-10T02:47:33.165Z
 
 -- 使用 INSERT ... ON CONFLICT(section_id) DO UPDATE 實作 upsert（個別檔案）
 
