@@ -73,8 +73,12 @@ const splitCsv = (value = '') =>
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
-// SQL 單引號轉義
-const escapeSql = (value) => (value || '').replace(/'/g, "''");
+// SQL 字串跳脫：僅需處理單引號（' -> ''）
+// 注意：分號在字串常值內本來就合法，不應改寫內容本身
+const escapeSql = (value) => {
+  if (value == null || value === '') return '';
+  return String(value).replace(/'/g, "''");
+};
 
 // 從母檔抓巢狀連結（適用 isNested）
 const collectNestedEntriesFromMother = ($mother) => {
