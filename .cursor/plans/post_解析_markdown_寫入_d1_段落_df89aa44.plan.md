@@ -21,13 +21,14 @@ isProject: false
 
 ## 1. 切段落邏輯
 
-- **略過**：以 `>`  開頭的行（整行不參與分段與內容）。
-- **分段**：其餘內容以「兩個以上換行」切開，再對每塊做 trim，得到段落陣列。
+- **引用行處理**：以字串 `'> '` 開頭的行不略過，改為先移除前綴 `'> '`，將剩餘文字視為一般內容納入分段。
+- **分段**：處理後的全文以「兩個以上換行」切開，再對每塊做 trim，得到段落陣列。
 
 實作要點：
 
-- 先將 markdown 依 `\n` 拆成行，過濾掉 `line.startsWith('> ')` 的行，再合併回字串。
+- 先將 markdown 依 `\n` 拆成行；若 `line.startsWith('> ')` 則轉成 `line.slice(2)`（只剝掉前綴，不丟棄內容），再合併回字串。
 - 用 `.split(/\n{2,}/).map(s => s.trim()).filter(Boolean)` 得到 `sections[]`（每項為該段落的「原始 markdown」字串）。
+- 建議同時為每段記錄 `isFromQuoteLine`（或等價旗標）：當段落內容來自 `'> '` 行時，後續 speaker 指派需強制為無發言者。
 
 ---
 
@@ -48,16 +49,17 @@ isProject: false
 
 ---
 
-## 4. section_speaker（往前看最近一位）
+## 4. section_speaker（往前看最近一位；引用行例外）
 
 - 在「整份 markdown」中定義「speaker 行」：例如 `### 名稱：` 或 `### 名稱:`（以 `#` 開頭的標題行且行尾有 `：` 或 `:`）。
 - 正則範例：`/^#{1,6}\s*(.+?)\s*[:：]\s*$/`，擷取到的為 speaker 名稱（可能含結尾空白或冒號）。
 - **正規化名稱**：把結尾的 `：` 或 `:` 拿掉，例如 `rawName.replace(/\s*[:：]\s*$/, '').trim()`，得到顯示用名稱（如「唐鳳」）。
 - **寫入前處理**：若名稱為 `'唐鳳'`，先改為 `'唐鳳-3'`；再以 `encodeURIComponent(名稱)` 的結果寫入 `section_speaker`（與現有 DB 講者 route 一致，例如 `%E5%94%90%E9%B3%B3-3`）。
-- 掃描方式：從檔案開頭往後掃（可先做「去 `>`  行」再掃），每遇到一條 speaker 行就更新「當前 speaker」；每個段落對應到「該段落在全文中的位置」時，取「該段落之前、往前看最近的一條 speaker 行」作為該段的 `section_speaker`。
+- 掃描方式：從檔案開頭往後掃（引用行已先剝掉 `'> '` 前綴並保留內容），每遇到一條 speaker 行就更新「當前 speaker」；每個段落對應到「該段落在全文中的位置」時，取「該段落之前、往前看最近的一條 speaker 行」作為該段的 `section_speaker`。
+- **引用行例外規則**：若段落來自 `'> '` 行（`isFromQuoteLine = true`），則不套用「往前看最近 speaker」，直接將 `section_speaker` 設為 `NULL`（或專案慣例的無發言者值）。
 - 若段落前沒有出現過 speaker 行，`section_speaker` 可為 `NULL` 或空字串（依現有 DB 慣例）。
 
-實作建議：先掃一遍所有行，建出「行號 → 該行是否為 speaker 行、speaker 名稱（已去結尾冒號）」；對每個名稱做「唐鳳 → 唐鳳-3」後再 `encodeURIComponent`；再對每個段落依「段落起始行號」往前找最近一筆 speaker，賦值給該段。
+實作建議：先掃一遍所有行，建出「行號 → 該行是否為 speaker 行、speaker 名稱（已去結尾冒號）、是否原為 `'> '` 行」；對每個名稱做「唐鳳 → 唐鳳-3」後再 `encodeURIComponent`；再對每個段落依「段落起始行號」往前找最近一筆 speaker。若段落 `isFromQuoteLine = true`，直接寫入無發言者。
 
 ---
 
@@ -106,7 +108,7 @@ sequenceDiagram
     API->>Client: 409 filename already exists
   else 不存在
     API->>D1: INSERT speech_index (display_name 從第一行 # 解析)
-    API->>API: 過濾 "> " 行後 split(/\n{2,}/) 得 sections[]
+    API->>API: 將 "> " 行剝掉前綴後保留內容，再 split(/\n{2,}/) 得 sections[]
     API->>D1: SELECT MAX(section_id) WHERE section_id < 10000000
     API->>API: 為每段算 section_id, prev/next, speaker, content(HTML)
     API->>D1: INSERT 每段進 speech_content
@@ -129,10 +131,10 @@ sequenceDiagram
 ## 10. 檔案與改動摘要
 
 
-| 項目                                                       | 說明                                                                                                    |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [src/api/upload_markdown.ts](src/api/upload_markdown.ts) | 新增：過濾 `>` 、split 段落、查 MAX(section_id)、speaker 掃描、markdown→HTML、strip script、迴圈 INSERT speech_content。 |
-| [package.json](package.json)                             | 新增依賴：`marked`（或 `markdown-it`）。                                                                       |
+| 項目                                                       | 說明                                                                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [src/api/upload_markdown.ts](src/api/upload_markdown.ts) | 新增：`'> '` 行剝前綴保留內容、split 段落、查 MAX(section_id)、speaker 掃描（含引用行無發言者例外）、markdown→HTML、strip script、迴圈 INSERT speech_content。 |
+| [package.json](package.json)                             | 新增依賴：`marked`（或 `markdown-it`）。                                                                                           |
 
 
 巢狀演講（nest_filename / nest_display_name）本階段不處理，只寫單一 filename、nest 欄位為 NULL。
