@@ -5,7 +5,7 @@
 ## 檔案結構
 - `src/views/*.vue`：頁面來源。
 - `scripts/build-views.ts`：將 `.vue` 轉成 Worker 可用的 SSR 元件，輸出到 `src/.generated/views`。
-- `scripts/prerender.ts`：使用 SSR 輸出靜態 HTML 到 `www/`。
+- `scripts/build-assets.ts`：將 `public/` 靜態資源複製到 `www/`（給 ASSETS 使用）。
 - `src/index.ts`：Hono Worker，直接渲染各頁。
 
 ## 開發
@@ -42,32 +42,32 @@ npm run dev
 
 
 
-## 靜態預先輸出
+## 靜態資源建置
 ```bash
-npm run build:static
+npm run build:assets
 ```
-會在 `www/` 產生 `index.html`等。若要近端預覽靜態檔：
+會把 `public/` 同步到 `www/`。若要近端預覽靜態檔：
 ```bash
-npm run preview:static
+npm run preview:assets
 ```
 （等同 `python3 -m http.server 4173 -d www`）
 
-### 僅動態渲染、不要預先靜態的路由
-- 不想預生成的頁面，直接從 `scripts/prerender.ts` 的 `pages` 陣列移除，並保留對應的 Hono 路由（例如在 `src/index.ts` 用 `renderHtml` 於收到請求時才渲染）。
-- 若頁面只存在動態路由，仍需在部署或開發前先執行 `npm run build:views` 以生成 `src/.generated/views` 供 Worker 匯入。
+### SSR 路由注意事項
+- 所有頁面皆為 SSR 路由，並搭配 R2/Edge 快取。
+- 部署或開發前，仍需先執行 `npm run build:views` 生成 `src/.generated/views` 供 Worker 匯入。
 
 ## 部署
 ```bash
 npm run deploy
 ```
-會先編譯視圖再交給 `wrangler deploy`。靜態輸出在 `www/` 可獨立部署到 Pages 或其他靜態空間。
+會先編譯視圖再交給 `wrangler deploy`。ASSETS 來源為 `www/`（由 `build:assets` 產生）。
 
-### 用靜態建置更新 Worker 頁（ASSETS）
-若要在遠端或本地先跑完 `build:static` 後，再像 `npm run deploy` 一樣更新 Worker 與 ASSETS：
+### 先建置資源再部署 Worker（ASSETS）
+若要在遠端或本地先跑完 `build:assets` 後，再像 `npm run deploy` 一樣更新 Worker 與 ASSETS：
 ```bash
-npm run deploy:static
+npm run deploy:assets
 ```
-等同 `npm run build:static && wrangler deploy`：先產出 `www/`，再一併上傳 Worker 與靜態資源。CI 上可依序執行 `build:static` 與 `wrangler deploy` 達到相同效果。
+等同 `npm run build:assets && wrangler deploy`：先產出 `www/`，再一併上傳 Worker 與靜態資源。CI 上可依序執行 `build:assets` 與 `wrangler deploy` 達到相同效果。
 
 
 
