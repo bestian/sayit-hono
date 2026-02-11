@@ -291,11 +291,25 @@ function assignPatchedSections(oldRows: ExistingSection[], newSections: SectionP
 		speaker: row.section_speaker,
 		section_content: row.section_content
 	}));
-	const lcsPairs = buildLcsPairs(oldSections, newSections);
 	const output: PatchAssignedSection[] = [];
 	const usedIds = new Set<number>(oldRows.map((row) => row.section_id));
 	let oldCursor = 0;
 	let newCursor = 0;
+
+	// Special case: 改第一段（新第一段是陌生內容）時，強制沿用舊第一段 section_id
+	if (
+		oldSections.length > 0 &&
+		newSections.length > 0 &&
+		sectionMatchKey(oldSections[0]) !== sectionMatchKey(newSections[0])
+	) {
+		output.push({ ...newSections[0], section_id: oldSections[0].section_id });
+		oldCursor = 1;
+		newCursor = 1;
+	}
+
+	const lcsPairs = buildLcsPairs(oldSections.slice(oldCursor), newSections.slice(newCursor)).map(
+		([oldIdx, newIdx]) => [oldIdx + oldCursor, newIdx + newCursor] as [number, number]
+	);
 
 	for (const [oldMatchIdx, newMatchIdx] of lcsPairs) {
 		const oldGap = oldSections.slice(oldCursor, oldMatchIdx);
