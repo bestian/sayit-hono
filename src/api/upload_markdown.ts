@@ -8,10 +8,10 @@ const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
 /** 辨識「講者標題行」：開頭 1～6 個 #、結尾為 : 或 ： */
 const speakerLineRegExp = /^#{1,6}\s*(.+?)\s*[:：]\s*$/;
 
-/** 將使用者輸入的檔名正規化（小寫、-ai- 修正、去 .md、最多 50 字） */
+/** 將使用者輸入的檔名正規化（小寫、去 .md、最多 50 字） */
 function transformFilename(input: string): string {
 	const lower = input.toLowerCase();
-	const replaced = lower.replace(/-ai-/g, 'ai-').replace(/\.md$/, '');
+	const replaced = lower.replace(/\.md$/, '');
 	return replaced.slice(0, 50);
 }
 
@@ -826,10 +826,6 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const firstLine = markdown.split('\n')[0]?.trim() ?? '';
 			const displayName = firstLine.replace(/^#\s*/, '') || filename;
-			await c.env.DB.prepare('UPDATE speech_index SET display_name = ? WHERE filename = ?')
-				.bind(displayName, filename)
-				.run();
-
 			const oldSectionsRaw = await c.env.DB.prepare(
 				`SELECT section_id, previous_section_id, next_section_id, section_speaker, section_content
 				 FROM speech_content
@@ -858,24 +854,55 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const newSpeakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
-			await ensureSpeakersExist(c, speakers);
 
 			let assignedPatched: PatchAssignedSection[];
-			try {
-				assignedPatched = assignPatchedSections(oldSections, sectionPayloads);
-			} catch (err) {
-				const message = err instanceof Error ? err.message : 'Failed to assign section ids for PATCH';
-				return c.json({ success: false, message, filename }, 409, corsHeadersWithMethods);
+			if (oldSections.length === 0) {
+				// 安全補強：若舊資料沒有任何段落，改用 POST 式連號分配，避免 ID 無基準導致失敗
+				const baseSectionId = await findMaxSectionId(c);
+				assignedPatched = sectionPayloads.map((section, idx) => ({
+					...section,
+					section_id: baseSectionId + idx
+				}));
+			} else {
+				try {
+					assignedPatched = assignPatchedSections(oldSections, sectionPayloads);
+				} catch (err) {
+					const message = err instanceof Error ? err.message : 'Failed to assign section ids for PATCH';
+					return c.json({ success: false, message, filename }, 409, corsHeadersWithMethods);
+				}
 			}
 
 			const normalized = withSectionLinks(assignedPatched);
 			// 既有段落 ID（DB 原本有的）；finalSectionIds = PATCH 後要保留的 ID（供刪除用）
 			const oldSectionIds = new Set(oldSections.map((section) => section.section_id));
 			const finalSectionIds = new Set(normalized.map((section) => section.section_id));
+			const impactedSpeakers = Array.from(new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames]));
 
-			// 收集所有 D1 寫入為 batch 一次執行（UPDATE 既有、INSERT 新增、DELETE 被移除的段落）
+			// 收集所有 D1 寫入為 batch 一次執行（含 display_name、講者、段落、關聯、孤兒清理）
 			const batchStatements: Parameters<typeof c.env.DB.batch>[0] = [];
 
+			// 1. 更新 display_name
+			batchStatements.push(
+				c.env.DB.prepare('UPDATE speech_index SET display_name = ? WHERE filename = ?')
+					.bind(displayName, filename)
+			);
+
+			// 2. 確保講者存在（冪等 upsert）
+			for (const routePathname of newSpeakerRoutePathnames) {
+				let speakerName = routePathname;
+				try {
+					speakerName = decodeURIComponent(routePathname);
+				} catch {
+					speakerName = routePathname;
+				}
+				batchStatements.push(
+					c.env.DB.prepare(
+						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
+					).bind(routePathname, speakerName)
+				);
+			}
+
+			// 3. UPDATE 既有 / INSERT 新增段落
 			for (const section of normalized) {
 				if (oldSectionIds.has(section.section_id)) {
 					// 此 section_id 已存在 → UPDATE
@@ -915,7 +942,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				}
 			}
 
-			// 舊有但不在最終列表的段落 → DELETE
+			// 4. 舊有但不在最終列表的段落 → DELETE
 			for (const oldSection of oldSections) {
 				if (!finalSectionIds.has(oldSection.section_id)) {
 					batchStatements.push(
@@ -925,12 +952,30 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				}
 			}
 
+			// 5. 重建演講-講者關聯
+			batchStatements.push(
+				c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename)
+			);
+			for (const routePathname of newSpeakerRoutePathnames) {
+				batchStatements.push(
+					c.env.DB.prepare(
+						'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
+					).bind(filename, routePathname)
+				);
+			}
+
+			// 6. 清理孤兒講者
+			for (const routePathname of impactedSpeakers) {
+				batchStatements.push(
+					c.env.DB.prepare(
+						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
+					).bind(routePathname, routePathname)
+				);
+			}
+
 			await c.env.DB.batch(batchStatements);
 
-			await rebuildSpeechSpeakerRelations(c, filename, newSpeakerRoutePathnames);
-			// 新舊講者合併，用來清理孤兒與失效快取
-			const impactedSpeakers = Array.from(new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames]));
-			await pruneOrphanSpeakers(c, impactedSpeakers);
+			// 失效快取（R2，在 D1 交易之外）
 			await invalidateSpeechCaches(c, filename);
 			await invalidateSpeakerCaches(c, impactedSpeakers);
 			await invalidateListPageCaches(c, { home: true, speeches: false, speakers: true });
