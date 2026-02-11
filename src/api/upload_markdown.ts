@@ -484,6 +484,11 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	await Promise.allSettled(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 }
 
+async function invalidateSpeechesList(c: Context<ApiEnv>) {
+	const host = new URL(c.req.url).host;
+	await deleteR2Cache(c.env.SPEECH_CACHE, `${host}/speeches`);
+}
+
 async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]) {
 	const host = new URL(c.req.url).host;
 	const keys = new Set<string>([`${host}/speakers`]);
@@ -621,6 +626,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 				await invalidateSpeechCaches(c, filename);
 				await invalidateSpeakerCaches(c, speakerRoutePathnames);
+				await invalidateSpeechesList(c);
 
 				return c.json(
 					{
@@ -727,6 +733,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			await invalidateSpeechCaches(c, filename);
 			await invalidateSpeakerCaches(c, speakerRoutePathnames);
+			await invalidateSpeechesList(c);
 
 			return c.json(
 				{ success: true, filename, sectionsCount: normalized.length },
