@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { serveStatic } from 'hono/cloudflare-workers';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
 import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
@@ -12,11 +11,14 @@ import { serveMdByKey } from './api/md';
 import { runSearchHomepage, searchHomepage } from './api/search_homepage';
 import { uploadMarkdown } from './api/upload_markdown';
 import type { ApiEnv } from './api/types';
+import HomeView, { styles as HomeViewStyles } from './.generated/views/HomeView';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
 import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
 import NestedSpeechView, { styles as NestedSpeechViewStyles } from './.generated/views/NestedSpeechView';
 import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from './.generated/views/SingleNestedSpeechView';
 import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generated/views/SingleSpeakerView';
+import SpeechesView, { styles as SpeechesViewStyles } from './.generated/views/SpeechesView';
+import SpeakersView, { styles as SpeakersViewStyles } from './.generated/views/SpeakersView';
 import SearchResultView, { styles as SearchResultViewStyles } from './.generated/views/SearchResultView';
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
@@ -27,7 +29,10 @@ import {
 	headForSpeaker,
 	headForNestedSpeech,
 	headForNestedSpeechDetail,
-	headForSearch
+	headForSearch,
+	headForSpeeches,
+	headForSpeakers,
+	headForHome
 } from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
 import { normalizeSections } from './utils/sectionUtils';
@@ -72,6 +77,16 @@ async function serveAsset(c: any, path?: string): Promise<Response> {
 async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 	const pathname = new URL(c.req.url).pathname;
 	if (pathname.startsWith('/api/')) return next();
+	if (
+		pathname === '/' ||
+		pathname === '/index.html' ||
+		pathname === '/speeches' ||
+		pathname === '/speeches/' ||
+		pathname === '/speakers' ||
+		pathname === '/speakers/'
+	) {
+		return next();
+	}
 	const res = await serveAsset(c);
 	if (res && res.status >= 200 && res.status < 400) return res;
 	return next();
@@ -154,6 +169,18 @@ type SpeechIndexRow = {
 	nest_display_names?: string | null;
 };
 
+type SpeechListItem = {
+	filename: string;
+	display_name: string;
+};
+
+type SpeakerListItem = {
+	id: number;
+	route_pathname: string;
+	name: string;
+	photoURL: string | null;
+};
+
 async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow | null> {
 	const result = await c.env.DB.prepare(
 		`SELECT filename, display_name, isNested, nest_filenames, nest_display_names
@@ -165,8 +192,40 @@ async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow 
 	return result as SpeechIndexRow ?? null;
 }
 
+async function loadSpeeches(c: any): Promise<SpeechListItem[]> {
+	const result = await c.env.DB.prepare(
+		'SELECT filename, display_name FROM speech_index ORDER BY id ASC'
+	).all();
 
-// 根與靜態列表頁由 staticFirstMiddleware 從 ASSETS 提供（/ → index.html 等）
+	if (!result.success) {
+		throw new Error('Database query failed');
+	}
+
+	return result.results.map((row: any) => ({
+		filename: row.filename,
+		display_name: row.display_name
+	}));
+}
+
+async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
+	const result = await c.env.DB.prepare(
+		'SELECT id, route_pathname, name, photoURL FROM speakers ORDER BY id ASC'
+	).all();
+
+	if (!result.success) {
+		throw new Error('Database query failed');
+	}
+
+	return result.results.map((row: any) => ({
+		id: row.id,
+		route_pathname: row.route_pathname,
+		name: row.name,
+		photoURL: row.photoURL ?? null
+	}));
+}
+
+
+// /、/speeches、/speakers 由 SSR 路由提供，其餘靜態資源由 staticFirstMiddleware 嘗試從 ASSETS 提供
 
 // API CORS preflight
 app.options('/api/*', (c) => handleOptions(c));
@@ -258,6 +317,115 @@ async function renderSearchPage(c: any) {
 
 app.get('/search', (c) => renderSearchPage(c));
 app.get('/search/', (c) => renderSearchPage(c));
+
+async function renderHomePage(c: any) {
+	const cacheKey = buildCacheKey(c.req.url);
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) {
+		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
+		return r2Cached;
+	}
+
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
+	const styles = [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForHome();
+	const html = await renderHtml(HomeView, {
+		head,
+		styles,
+		components: { Navbar, Footer }
+	});
+
+	let response = c.html(html);
+	response = withCacheHeaders(response);
+	if (response.ok && response.status < 400) {
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
+	}
+	return response;
+}
+
+async function renderSpeechesPage(c: any) {
+	const cacheKey = buildCacheKey(c.req.url);
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) {
+		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
+		return r2Cached;
+	}
+
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
+	let speeches: SpeechListItem[];
+	try {
+		speeches = await loadSpeeches(c);
+	} catch (err) {
+		console.error('[speeches SSR] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	const styles = [SpeechesViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForSpeeches();
+	const html = await renderHtml(SpeechesView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: { speeches }
+	});
+
+	let response = c.html(html);
+	response = withCacheHeaders(response);
+	if (response.ok && response.status < 400) {
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
+	}
+	return response;
+}
+
+async function renderSpeakersPage(c: any) {
+	const cacheKey = buildCacheKey(c.req.url);
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) {
+		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
+		return r2Cached;
+	}
+
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
+	let speakers: SpeakerListItem[];
+	try {
+		speakers = await loadSpeakers(c);
+	} catch (err) {
+		console.error('[speakers SSR] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	const styles = [SpeakersViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForSpeakers();
+	const html = await renderHtml(SpeakersView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: { speakers }
+	});
+
+	let response = c.html(html);
+	response = withCacheHeaders(response);
+	if (response.ok && response.status < 400) {
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
+		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
+	}
+	return response;
+}
+
+app.get('/speeches', (c) => renderSpeechesPage(c));
+app.get('/speeches/', (c) => renderSpeechesPage(c));
+app.get('/speakers', (c) => renderSpeakersPage(c));
+app.get('/speakers/', (c) => renderSpeakersPage(c));
+app.get('/', (c) => renderHomePage(c));
+app.get('/index.html', (c) => renderHomePage(c));
 
 // /speech/:section_id -> .md/.an 轉專用處理，否則為動態段落頁
 app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
