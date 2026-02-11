@@ -4,11 +4,12 @@
 	"private": true,
 	"scripts": {
 		"deploy": "npm run build:views && wrangler deploy",
+		"deploy:assets": "npm run build:views && npm run build:assets && wrangler deploy",
 		"dev": "npm run build:views && wrangler dev --remote",
 		"start": "npm run dev",
 		"build:views": "tsx --tsconfig scripts/tsconfig.json scripts/build-views.ts",
-		"build:static": "npm run build:views && tsx --tsconfig scripts/tsconfig.json scripts/prerender.ts",
-		"preview:static": "npm run build:static && python3 -m http.server 4173 -d www",
+		"build:assets": "tsx --tsconfig scripts/tsconfig.json scripts/build-assets.ts",
+		"preview:assets": "npm run build:assets && python3 -m http.server 4173 -d www",
 		"test": "vitest",
 		"cf-typegen": "wrangler types"
 	},
