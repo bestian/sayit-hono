@@ -4,6 +4,7 @@
 	"private": true,
 	"scripts": {
 		"deploy": "npm run build:views && wrangler deploy",
+		"deploy:static": "npm run build:static && wrangler deploy",
 		"dev": "npm run build:views && wrangler dev --remote",
 		"start": "npm run dev",
 		"build:views": "tsx --tsconfig scripts/tsconfig.json scripts/build-views.ts",

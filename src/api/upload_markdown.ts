@@ -5,8 +5,10 @@ import { marked } from 'marked';
 import { deleteR2Cache } from './cache';
 
 const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
+/** 辨識「講者標題行」：開頭 1～6 個 #、結尾為 : 或 ： */
 const speakerLineRegExp = /^#{1,6}\s*(.+?)\s*[:：]\s*$/;
 
+/** 將使用者輸入的檔名正規化（小寫、-ai- 修正、去 .md、最多 50 字） */
 function transformFilename(input: string): string {
 	const lower = input.toLowerCase();
 	const replaced = lower.replace(/-ai-/g, 'ai-').replace(/\.md$/, '');
@@ -48,6 +50,7 @@ type SectionPayload = {
 
 type PatchAssignedSection = SectionPayload & { section_id: number };
 
+/** 從講者標記陣列取出不重複的 route_pathname（用於 DB 關聯與快取失效） */
 function getUniqueSpeakerRoutePathnames(speakerMarks: SpeakerMark[]): string[] {
 	return Array.from(
 		new Set(
@@ -58,6 +61,7 @@ function getUniqueSpeakerRoutePathnames(speakerMarks: SpeakerMark[]): string[] {
 	);
 }
 
+/** 講者名稱正規化：去結尾冒號、唐鳳→唐鳳-3、最後 encodeURIComponent 作為 route_pathname */
 function normalizeSpeakerName(raw: string): string | null {
 	const withoutColon = raw.replace(/\s*[:：]\s*$/, '').trim();
 	if (!withoutColon) return null;
@@ -65,10 +69,12 @@ function normalizeSpeakerName(raw: string): string | null {
 	return encodeURIComponent(mapped);
 }
 
+/** 移除 HTML 中的 <script> 區塊，避免 XSS */
 function stripScripts(html: string) {
 	return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 }
 
+/** 解析 Markdown：分出段落（sections）與講者標記（speakers），quote 行（> ）會標記 isFromQuote */
 function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; speakers: SpeakerMark[] } {
 	const rawLines = markdown.split('\n');
 	const speakers: SpeakerMark[] = [];
@@ -138,6 +144,7 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 	return { sections, speakers };
 }
 
+/** 為每個段落指派講者：取「該段落 startLine 之前、最近一筆」講者標記；quote 段落不指派 */
 function assignSpeakersToSections(parsed: ParsedSection[], speakerMarks: SpeakerMark[]): Array<ParsedSection & { speaker: string | null }> {
 	return parsed.map((section) => {
 		if (section.isFromQuote) {
@@ -169,11 +176,13 @@ async function findMaxSectionId(c: Context<ApiEnv>): Promise<number> {
 	return next;
 }
 
+/** Markdown 轉 HTML 並移除 <script> */
 function toHtml(markdown: string): string {
 	const html = marked.parse(markdown);
 	return stripScripts(typeof html === 'string' ? html : '');
 }
 
+/** 若第一行是 # 標題則清空，避免重複當成段落內容 */
 function stripMarkdownTitleLine(markdown: string): string {
 	const mdLines = markdown.split('\n');
 	if (mdLines[0] && /^#\s/.test(mdLines[0].trim())) {
@@ -182,14 +191,17 @@ function stripMarkdownTitleLine(markdown: string): string {
 	return mdLines.join('\n');
 }
 
+/** 段落比對鍵：用於 LCS 判斷「同一段」是否相同（講者 + 內容） */
 function sectionMatchKey(section: { markdown: string; speaker: string | null }) {
 	return `${section.speaker ?? ''}\u0000${section.markdown}`;
 }
 
+/** 是否為「子段落 ID」（插入時用 base*100+1 等規則產生的長數字） */
 function isSubSectionId(sectionId: number) {
 	return String(Math.abs(sectionId)).length > 7;
 }
 
+/** 依 previous/next 鏈結將 DB 取出的段落排成正確順序；找不到頭則改依 section_id 排序 */
 function orderSectionsByLinks(rows: ExistingSection[]): ExistingSection[] {
 	if (rows.length <= 1) return rows;
 	const byId = new Map<number, ExistingSection>();
@@ -197,6 +209,7 @@ function orderSectionsByLinks(rows: ExistingSection[]): ExistingSection[] {
 		byId.set(row.section_id, row);
 	}
 
+	// 找出「頭」：previous 為 null 或不在列表內的段落
 	let head: ExistingSection | null = null;
 	for (const row of rows) {
 		if (row.previous_section_id == null || !byId.has(row.previous_section_id)) {
@@ -226,6 +239,7 @@ function orderSectionsByLinks(rows: ExistingSection[]): ExistingSection[] {
 	return ordered;
 }
 
+/** PATCH 用：以 LCS（最長共同子序列）找出舊/新段落對應的 (oldIdx, newIdx)  pairs，供 assignPatchedSections 沿用 section_id */
 function buildLcsPairs(oldSections: SectionPayload[], newSections: SectionPayload[]): Array<[number, number]> {
 	const n = oldSections.length;
 	const m = newSections.length;
@@ -258,6 +272,7 @@ function buildLcsPairs(oldSections: SectionPayload[], newSections: SectionPayloa
 	return pairs.reverse();
 }
 
+/** 在 PATCH 時為「新插入的段落」分配 section_id（子段落用 base*100+1 遞增，最多 99 段） */
 function appendInsertedSections(
 	output: PatchAssignedSection[],
 	newInserts: SectionPayload[],
@@ -284,6 +299,7 @@ function appendInsertedSections(
 	}
 }
 
+/** PATCH 用：以 LCS 對齊舊/新段落，能對上的沿用舊 section_id，多出來的新段落分配新 ID */
 function assignPatchedSections(oldRows: ExistingSection[], newSections: SectionPayload[]): PatchAssignedSection[] {
 	const oldSections: Array<SectionPayload & { section_id: number }> = oldRows.map((row) => ({
 		section_id: row.section_id,
@@ -356,6 +372,7 @@ function assignPatchedSections(oldRows: ExistingSection[], newSections: SectionP
 	return output;
 }
 
+/** 解析上傳的 Markdown：去標題行、切段落、指派講者、轉 HTML，回傳 speakers 與 sectionPayloads */
 async function parseIncomingMarkdown(markdown: string) {
 	const markdownForParsing = stripMarkdownTitleLine(markdown);
 	const { sections: parsedSections, speakers } = parseMarkdownSections(markdownForParsing);
@@ -370,6 +387,7 @@ async function parseIncomingMarkdown(markdown: string) {
 	};
 }
 
+/** 為已分配 section_id 的段落補上 previous_section_id / next_section_id 鏈結 */
 function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[] {
 	return sections.map((section, idx) => ({
 		section_id: section.section_id,
@@ -380,6 +398,7 @@ function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[]
 	}));
 }
 
+/** 確保所有出現的講者 route_pathname 在 speakers 表都有紀錄（INSERT ON CONFLICT DO NOTHING） */
 async function ensureSpeakersExist(c: Context<ApiEnv>, speakerMarks: SpeakerMark[]) {
 	const uniqueRoutePathnames = getUniqueSpeakerRoutePathnames(speakerMarks);
 
@@ -400,6 +419,7 @@ async function ensureSpeakersExist(c: Context<ApiEnv>, speakerMarks: SpeakerMark
 	}
 }
 
+/** POST 用：建立此演講與講者的關聯（speech_speakers），INSERT OR IGNORE 逐筆寫入 */
 async function ensureSpeechSpeakerRelations(c: Context<ApiEnv>, filename: string, speakerMarks: SpeakerMark[]) {
 	const uniqueRoutePathnames = getUniqueSpeakerRoutePathnames(speakerMarks);
 
@@ -447,6 +467,7 @@ async function ensureSpeechSpeakerRelations(c: Context<ApiEnv>, filename: string
 	});
 }
 
+/** PATCH 用：先刪除此演講所有關聯，再依新解析出的講者列表重建 speech_speakers */
 async function rebuildSpeechSpeakerRelations(c: Context<ApiEnv>, filename: string, routePathnames: string[]) {
 	await c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename).run();
 	for (const routePathname of routePathnames) {
@@ -458,6 +479,7 @@ async function rebuildSpeechSpeakerRelations(c: Context<ApiEnv>, filename: strin
 	}
 }
 
+/** 若某講者已無任何 speech_speakers 關聯，則從 speakers 表刪除（孤兒講者） */
 async function pruneOrphanSpeakers(c: Context<ApiEnv>, routePathnames: string[]) {
 	for (const routePathname of routePathnames) {
 		const stillLinked = await c.env.DB.prepare(
@@ -471,6 +493,7 @@ async function pruneOrphanSpeakers(c: Context<ApiEnv>, routePathnames: string[])
 	}
 }
 
+/** 演講內容或 .an/.md 更新後，刪除 R2 上對應的快取 key */
 async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	const host = new URL(c.req.url).host;
 	const encodedFilename = encodeURIComponent(filename);
@@ -484,6 +507,7 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	await Promise.allSettled(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 }
 
+/** 講者或演講-講者關聯更新後，刪除 R2 上 speakers 列表與各講者頁快取 */
 async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]) {
 	const host = new URL(c.req.url).host;
 	const keys = new Set<string>([`${host}/speakers`]);
@@ -497,6 +521,7 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 	await Promise.allSettled(Array.from(keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 }
 
+/** 上傳 Markdown API：支援 POST（新增）、PATCH（更新）、DELETE（刪除），需 Bearer token 驗證 */
 export async function uploadMarkdown(c: Context<ApiEnv>) {
 	const origin = c.req.header('Origin') ?? null;
 	const corsHeaders = getCorsHeaders(origin);
@@ -506,7 +531,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 	};
 
 	try {
-		// Auth check
+		// 驗證：必須帶 Authorization: Bearer <token>，且 token 為允許的其中一個
 		const authHeader = c.req.header('Authorization');
 
 		if (!authHeader) {
@@ -529,7 +554,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 		const method = c.req.method;
 
 		if (method === 'DELETE') {
-			// DELETE: 從 body 讀取 filename，刪除 D1 中的紀錄
+			// DELETE：從 body 讀取 filename，刪除 speech_content、speech_speakers、孤兒講者、speech_index
 
 			console.log('[upload_markdown] DELETE');
 			let body: { filename?: string };
@@ -641,7 +666,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				return c.json({ error: 'Invalid JSON body' }, 400, corsHeadersWithMethods);
 			}
 		} else if (method === 'POST') {
-			// POST: 讀取 filename, markdown 欄位，回傳原始內容
+			// POST：新增一筆演講。寫入 speech_index、speakers、speech_speakers、speech_content（段落）
 			let body: { filename?: string; markdown?: string };
 			try {
 				body = await c.req.json();
@@ -661,7 +686,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				return c.json({ error: 'Missing or invalid markdown field' }, 400, corsHeadersWithMethods);
 			}
 
-			// 檢查 speech_index 是否已有此 filename
+			// 不允許重複：若 speech_index 已有此 filename 則 409
 			const existing = await c.env.DB.prepare(
 				'SELECT filename FROM speech_index WHERE filename = ?'
 			)
@@ -694,6 +719,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			await ensureSpeechSpeakerRelations(c, filename, speakers);
 			const baseSectionId = await findMaxSectionId(c);
 
+			// 為每個段落分配連續的 section_id 與 prev/next 鏈結
 			const normalized: NormalizedSection[] = sectionPayloads.map((section, idx) => {
 				const section_id = baseSectionId + idx;
 				const previous_section_id = idx === 0 ? null : section_id - 1;
@@ -734,6 +760,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				corsHeadersWithMethods
 			);
 		} else if (method === 'PATCH') {
+			// PATCH：更新既有演講。以 LCS 對齊舊/新段落，更新/插入/刪除 speech_content，重建講者關聯
 			let body: { filename?: string; markdown?: string };
 			try {
 				body = await c.req.json();
@@ -810,13 +837,16 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			}
 
 			const normalized = withSectionLinks(assignedPatched);
+			// 既有段落 ID（DB 原本有的）；finalSectionIds = PATCH 後要保留的 ID（供刪除用）
 			const oldSectionIds = new Set(oldSections.map((section) => section.section_id));
 			const finalSectionIds = new Set(normalized.map((section) => section.section_id));
 
+			// 收集所有 D1 寫入為 batch 一次執行（UPDATE 既有、INSERT 新增、DELETE 被移除的段落）
 			const batchStatements: Parameters<typeof c.env.DB.batch>[0] = [];
 
 			for (const section of normalized) {
 				if (oldSectionIds.has(section.section_id)) {
+					// 此 section_id 已存在 → UPDATE
 					batchStatements.push(
 						c.env.DB.prepare(
 							`UPDATE speech_content
@@ -835,6 +865,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 						)
 					);
 				} else {
+					// 此 section_id 為新分配 → INSERT
 					batchStatements.push(
 						c.env.DB.prepare(
 							'INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -852,6 +883,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				}
 			}
 
+			// 舊有但不在最終列表的段落 → DELETE
 			for (const oldSection of oldSections) {
 				if (!finalSectionIds.has(oldSection.section_id)) {
 					batchStatements.push(
@@ -864,6 +896,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			await c.env.DB.batch(batchStatements);
 
 			await rebuildSpeechSpeakerRelations(c, filename, newSpeakerRoutePathnames);
+			// 新舊講者合併，用來清理孤兒與失效快取
 			const impactedSpeakers = Array.from(new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames]));
 			await pruneOrphanSpeakers(c, impactedSpeakers);
 			await invalidateSpeechCaches(c, filename);
