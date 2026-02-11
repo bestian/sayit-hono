@@ -975,9 +975,47 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			await c.env.DB.batch(batchStatements);
 
+			// PATCH 完成後再對帳一次：僅保留「有實際段落」的演講-講者關聯
+			const relationRows = await c.env.DB.prepare(
+				'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
+			)
+				.bind(filename)
+				.all<{ speaker_route_pathname: string }>();
+			const relationRoutePathnames = Array.from(
+				new Set((relationRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
+			);
+
+			const usedSpeakerRows = await c.env.DB.prepare(
+				`SELECT DISTINCT section_speaker
+				 FROM speech_content
+				 WHERE filename = ?
+				   AND section_speaker IS NOT NULL
+				   AND section_speaker != ''`
+			)
+				.bind(filename)
+				.all<{ section_speaker: string }>();
+			const usedSpeakerRoutePathnames = new Set(
+				(usedSpeakerRows.results ?? []).map((row) => row.section_speaker).filter(Boolean)
+			);
+			const relationsToDelete = relationRoutePathnames.filter(
+				(routePathname) => !usedSpeakerRoutePathnames.has(routePathname)
+			);
+
+			for (const routePathname of relationsToDelete) {
+				await c.env.DB.prepare(
+					'DELETE FROM speech_speakers WHERE speech_filename = ? AND speaker_route_pathname = ?'
+				)
+					.bind(filename, routePathname)
+					.run();
+			}
+
+			// 二次清理：移除這次 PATCH 影響到、且已無任何演講關聯的孤兒講者
+			const finalImpactedSpeakers = Array.from(new Set([...impactedSpeakers, ...relationsToDelete]));
+			await pruneOrphanSpeakers(c, finalImpactedSpeakers);
+
 			// 失效快取（R2，在 D1 交易之外）
 			await invalidateSpeechCaches(c, filename);
-			await invalidateSpeakerCaches(c, impactedSpeakers);
+			await invalidateSpeakerCaches(c, finalImpactedSpeakers);
 			await invalidateListPageCaches(c, { home: true, speeches: false, speakers: true });
 
 			return c.json(
