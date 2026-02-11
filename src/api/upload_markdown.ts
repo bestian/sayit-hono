@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
 import type { ApiEnv } from './types';
 import { marked } from 'marked';
-import { deleteR2Cache } from './cache';
+import { deleteEdgeCache, deleteR2Cache } from './cache';
 
 const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
 /** 辨識「講者標題行」：開頭 1～6 個 #、結尾為 : 或 ： */
@@ -497,14 +497,16 @@ async function pruneOrphanSpeakers(c: Context<ApiEnv>, routePathnames: string[])
 async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	const host = new URL(c.req.url).host;
 	const encodedFilename = encodeURIComponent(filename);
-	const r2Keys = [
+	const keys = [
 		`an/${filename}`,
 		`md/${filename}`,
 		`${host}/${filename}`,
 		`${host}/${encodedFilename}`
 	];
 
-	await Promise.allSettled(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	await Promise.allSettled(
+		keys.flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)])
+	);
 }
 
 /** 講者或演講-講者關聯更新後，刪除 R2 上 speakers 列表與各講者頁快取 */
@@ -518,7 +520,35 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 		keys.add(`${host}/speaker/${encodeURIComponent(routePathname)}`);
 	}
 
-	await Promise.allSettled(Array.from(keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	await Promise.allSettled(
+		Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)])
+	);
+}
+
+/** 失效列表頁快取：可選擇 speeches/speakers */
+async function invalidateListPageCaches(
+	c: Context<ApiEnv>,
+	{ home, speeches, speakers }: { home: boolean; speeches: boolean; speakers: boolean }
+) {
+	const host = new URL(c.req.url).host;
+	const keys = new Set<string>();
+
+	if (home) {
+		keys.add(`${host}/`);
+		keys.add(`${host}/index.html`);
+	}
+	if (speeches) {
+		keys.add(`${host}/speeches`);
+		keys.add(`${host}/speeches/`);
+	}
+	if (speakers) {
+		keys.add(`${host}/speakers`);
+		keys.add(`${host}/speakers/`);
+	}
+
+	await Promise.allSettled(
+		Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)])
+	);
 }
 
 /** 上傳 Markdown API：支援 POST（新增）、PATCH（更新）、DELETE（刪除），需 Bearer token 驗證 */
@@ -646,6 +676,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 				await invalidateSpeechCaches(c, filename);
 				await invalidateSpeakerCaches(c, speakerRoutePathnames);
+				await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 
 				return c.json(
 					{
@@ -753,6 +784,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			await invalidateSpeechCaches(c, filename);
 			await invalidateSpeakerCaches(c, speakerRoutePathnames);
+			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 
 			return c.json(
 				{ success: true, filename, sectionsCount: normalized.length },
@@ -901,6 +933,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			await pruneOrphanSpeakers(c, impactedSpeakers);
 			await invalidateSpeechCaches(c, filename);
 			await invalidateSpeakerCaches(c, impactedSpeakers);
+			await invalidateListPageCaches(c, { home: true, speeches: false, speakers: true });
 
 			return c.json(
 				{

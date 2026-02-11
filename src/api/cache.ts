@@ -41,6 +41,17 @@ export async function writeEdgeCache(
 	}
 }
 
+/** 刪除 Edge Cache */
+export async function deleteEdgeCache(cacheKey: string) {
+	try {
+		const normalizedKey = normalizeEdgeCacheKey(cacheKey);
+		await caches.default.delete(normalizedKey);
+		console.log('[edge cache] deleted', cacheKey);
+	} catch (err) {
+		console.error('[edge cache] delete error', cacheKey, err);
+	}
+}
+
 /** 從 R2 讀取快取，回傳 Response 或 null */
 export async function readR2Cache(
 	bucket: R2Bucket,
