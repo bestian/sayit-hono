@@ -12,7 +12,7 @@ INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filen
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-01-20-doom-debate', '2026-01-20 Doom Debate', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2026-01-17-from-taiwan-to-germany-how-radical-part', '2026-01-17 From Taiwan to Germany: How Radical Participation Leapfrogs Public Trust', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-31-商周專欄小心ai-狂牛症', '2025-12-31 商周專欄：小心「AI 狂牛症」', 0, '', '');
-INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-31-bw-column-beware-of-ai-mad-cow-disease', '2025-12-31 BW Column: Beware of "AI Mad Cow Disease"', 0, '', '');
+INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-31-beware-of-ai-mad-cow-disease', '2025-12-31 BW Column: Beware of "AI Mad Cow Disease"', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-28-新聞真假掰專訪', '2025-12-28 「新聞真假掰」專訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-08-日經新聞專訪', '2025-12-08 日經新聞專訪', 0, '', '');
 INSERT OR IGNORE INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES ('2025-12-08-interview-with-nikkei', '2025-12-08 Interview with Nikkei', 0, '', '');
