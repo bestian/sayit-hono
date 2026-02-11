@@ -17,9 +17,6 @@ import NestedSpeechView, { styles as NestedSpeechViewStyles } from './.generated
 import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from './.generated/views/SingleNestedSpeechView';
 import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generated/views/SingleSpeakerView';
 import SearchResultView, { styles as SearchResultViewStyles } from './.generated/views/SearchResultView';
-import SpeechesView, { styles as SpeechesViewStyles } from './.generated/views/SpeechesView';
-import SpeakersView, { styles as SpeakersViewStyles } from './.generated/views/SpeakersView';
-import HomeView, { styles as HomeViewStyles } from './.generated/views/HomeView';
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
 import { renderHtml } from './ssr/render';
@@ -27,34 +24,12 @@ import {
 	headForSpeechContent,
 	headForSingleSpeech,
 	headForSpeaker,
-	headForHome,
-	headForSpeeches,
-	headForSpeakers,
 	headForNestedSpeech,
 	headForNestedSpeechDetail,
 	headForSearch
 } from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
 import { normalizeSections } from './utils/sectionUtils';
-
-function toStringArray(value: unknown): string[] {
-	if (value === null || value === undefined) return [];
-	if (Array.isArray(value)) {
-		return value.map((item) => String(item)).filter((item) => item.length > 0);
-	}
-	if (typeof value !== 'string') return [];
-	const trimmed = value.trim();
-	if (!trimmed) return [];
-	try {
-		const parsed = JSON.parse(trimmed);
-		if (Array.isArray(parsed)) {
-			return parsed.map((item) => String(item)).filter((item) => item.length > 0);
-		}
-	} catch {
-		// fall through to delimiter based parsing
-	}
-	return trimmed.split(/[,;\n\r]+/).map((item) => item.trim()).filter((item) => item.length > 0);
-}
 
 type WorkerEnv = ApiEnv['Bindings'];
 
@@ -177,133 +152,14 @@ async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow 
 }
 
 
-// SSR 首頁
-async function renderHomePage(c: any) {
-	const cacheKey = buildCacheKey(c.req.url).replace(/\/$/, '');
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
+app.get('/', (c) => serveAsset(c, '/index.html'));
 
-	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
-
-	const styles = [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const html = await renderHtml(HomeView, {
-		head: headForHome(),
-		styles,
-		components: { Navbar, Footer }
-	});
-
-	let response = c.html(html);
-	response = withCacheHeaders(response);
-
-	if (response.ok && response.status < 400) {
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
-	}
-
-	return response;
-}
-app.get('/', (c: any) => renderHomePage(c));
-
-// SSR Speeches 列表頁
-async function renderSpeechesPage(c: any) {
-	const cacheKey = buildCacheKey(c.req.url).replace(/\/speeches\/$/, '/speeches');
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
-
-	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
-
-	const result = await c.env.DB.prepare(
-		'SELECT filename, display_name, isNested, nest_filenames, nest_display_names FROM speech_index ORDER BY id ASC'
-	).all();
-
-	const speeches = (result.results ?? []).map((row: any) => {
-		const nestFilenames = toStringArray(row.nest_filenames);
-		const nestDisplayNames = toStringArray(row.nest_display_names);
-		return {
-			filename: row.filename,
-			display_name: row.display_name,
-			isNested: Boolean(row.isNested),
-			nest_filenames: nestFilenames,
-			nest_display_names: nestDisplayNames,
-			nest: nestFilenames.map((name: string, index: number) => ({
-				filename: name,
-				display_name: nestDisplayNames[index] ?? name
-			}))
-		};
-	});
-
-	const styles = [SpeechesViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const html = await renderHtml(SpeechesView, {
-		head: headForSpeeches(),
-		styles,
-		components: { Navbar, Footer },
-		props: { speeches, source: 'D1' }
-	});
-
-	let response = c.html(html);
-	response = withCacheHeaders(response);
-
-	if (response.ok && response.status < 400) {
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
-	}
-
-	return response;
-}
-app.get('/speeches', (c: any) => renderSpeechesPage(c));
-app.get('/speeches/', (c: any) => renderSpeechesPage(c));
-
-// SSR Speakers 列表頁
-async function renderSpeakersPage(c: any) {
-	const cacheKey = buildCacheKey(c.req.url).replace(/\/speakers\/$/, '/speakers');
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
-
-	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
-
-	const result = await c.env.DB.prepare(
-		'SELECT id, route_pathname, name, photoURL FROM speakers ORDER BY id ASC'
-	).all();
-
-	const speakers = (result.results ?? []).map((row: any) => ({
-		id: row.id,
-		route_pathname: row.route_pathname,
-		name: row.name,
-		photoURL: row.photoURL
-	}));
-
-	const styles = [SpeakersViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const html = await renderHtml(SpeakersView, {
-		head: headForSpeakers(),
-		styles,
-		components: { Navbar, Footer },
-		props: { speakers, source: 'D1' }
-	});
-
-	let response = c.html(html);
-	response = withCacheHeaders(response);
-
-	if (response.ok && response.status < 400) {
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
-	}
-
-	return response;
-}
-app.get('/speakers', (c: any) => renderSpeakersPage(c));
-app.get('/speakers/', (c: any) => renderSpeakersPage(c));
+// Speeches 靜態頁
+app.get('/speeches', (c) => serveAsset(c, '/speeches.html'));
+app.get('/speeches/', (c) => serveAsset(c, '/speeches/index.html'));
+// Speakers 靜態頁
+app.get('/speakers', (c) => serveAsset(c, '/speakers.html'));
+app.get('/speakers/', (c) => serveAsset(c, '/speakers/index.html'));
 
 // API CORS preflight
 app.options('/api/*', (c) => handleOptions(c));
