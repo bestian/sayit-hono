@@ -20,9 +20,9 @@
 			<div class="homepage-stats">
 			<div class="full-page__row">
 				<div class="full-page__unit">
-				<a href="/speeches"><strong>400841</strong></a> speeches;
-				<a href="/speakers"><strong>8037</strong></a> speakers;
-				<a href="/speeches"><strong>2193</strong></a> sections
+				<a href="/speeches"><strong>400,841</strong></a> speeches;
+				<a href="/speakers"><strong>8,037</strong></a> speakers;
+				<a href="/speeches"><strong>2,193</strong></a> sections
 				</div>
 			</div>
 			<div class="full-page__row">
