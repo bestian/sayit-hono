@@ -774,10 +774,6 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const firstLine = markdown.split('\n')[0]?.trim() ?? '';
 			const displayName = firstLine.replace(/^#\s*/, '') || filename;
-			await c.env.DB.prepare('UPDATE speech_index SET display_name = ? WHERE filename = ?')
-				.bind(displayName, filename)
-				.run();
-
 			const oldSectionsRaw = await c.env.DB.prepare(
 				`SELECT section_id, previous_section_id, next_section_id, section_speaker, section_content
 				 FROM speech_content
@@ -806,7 +802,6 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const newSpeakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
-			await ensureSpeakersExist(c, speakers);
 
 			let assignedPatched: PatchAssignedSection[];
 			try {
@@ -819,21 +814,47 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const normalized = withSectionLinks(assignedPatched);
 			const oldSectionIds = new Set(oldSections.map((section) => section.section_id));
 			const finalSectionIds = new Set(normalized.map((section) => section.section_id));
+			const impactedSpeakers = Array.from(new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames]));
 
+			// Build all write statements for a single atomic D1 batch
+			const batchStatements: D1PreparedStatement[] = [];
+
+			// 1. Update display_name
+			batchStatements.push(
+				c.env.DB.prepare('UPDATE speech_index SET display_name = ? WHERE filename = ?')
+					.bind(displayName, filename)
+			);
+
+			// 2. Ensure speakers exist (idempotent upserts)
+			for (const routePathname of newSpeakerRoutePathnames) {
+				let speakerName = routePathname;
+				try {
+					speakerName = decodeURIComponent(routePathname);
+				} catch {
+					speakerName = routePathname;
+				}
+				batchStatements.push(
+					c.env.DB.prepare(
+						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
+					).bind(routePathname, speakerName)
+				);
+			}
+
+			// 3. Update/Insert sections
 			for (const section of normalized) {
 				if (oldSectionIds.has(section.section_id)) {
-					await c.env.DB.prepare(
-						`UPDATE speech_content
-						 SET filename = ?,
-							 nest_filename = ?,
-							 nest_display_name = ?,
-							 previous_section_id = ?,
-							 next_section_id = ?,
-							 section_speaker = ?,
-							 section_content = ?
-						 WHERE section_id = ?`
-					)
-						.bind(
+					batchStatements.push(
+						c.env.DB.prepare(
+							`UPDATE speech_content
+							 SET filename = ?,
+								 nest_filename = ?,
+								 nest_display_name = ?,
+								 previous_section_id = ?,
+								 next_section_id = ?,
+								 section_speaker = ?,
+								 section_content = ?
+							 WHERE section_id = ?`
+						).bind(
 							filename,
 							null,
 							null,
@@ -843,12 +864,12 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							section.section_content,
 							section.section_id
 						)
-						.run();
+					);
 				} else {
-					await c.env.DB.prepare(
-						'INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-					)
-						.bind(
+					batchStatements.push(
+						c.env.DB.prepare(
+							'INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+						).bind(
 							filename,
 							null,
 							null,
@@ -858,23 +879,47 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							section.section_speaker,
 							section.section_content
 						)
-						.run();
+					);
 				}
 			}
 
+			// 4. Delete removed sections
 			for (const oldSection of oldSections) {
 				if (!finalSectionIds.has(oldSection.section_id)) {
-					await c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ? AND section_id = ?')
-						.bind(filename, oldSection.section_id)
-						.run();
+					batchStatements.push(
+						c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ? AND section_id = ?')
+							.bind(filename, oldSection.section_id)
+					);
 				}
 			}
 
-			await rebuildSpeechSpeakerRelations(c, filename, newSpeakerRoutePathnames);
-			const impactedSpeakers = Array.from(new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames]));
-			await pruneOrphanSpeakers(c, impactedSpeakers);
+			// 5. Rebuild speech-speaker relations
+			batchStatements.push(
+				c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename)
+			);
+			for (const routePathname of newSpeakerRoutePathnames) {
+				batchStatements.push(
+					c.env.DB.prepare(
+						'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
+					).bind(filename, routePathname)
+				);
+			}
+
+			// 6. Prune orphan speakers
+			for (const routePathname of impactedSpeakers) {
+				batchStatements.push(
+					c.env.DB.prepare(
+						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
+					).bind(routePathname, routePathname)
+				);
+			}
+
+			await c.env.DB.batch(batchStatements);
+
+			// Invalidate caches (R2, outside the D1 transaction)
 			await invalidateSpeechCaches(c, filename);
 			await invalidateSpeakerCaches(c, impactedSpeakers);
+			await invalidateSpeechesList(c);
 
 			return c.json(
 				{
