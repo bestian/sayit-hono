@@ -62,6 +62,13 @@ npm run deploy
 ```
 會先編譯視圖再交給 `wrangler deploy`。靜態輸出在 `www/` 可獨立部署到 Pages 或其他靜態空間。
 
+### 用靜態建置更新 Worker 頁（ASSETS）
+若要在遠端或本地先跑完 `build:static` 後，再像 `npm run deploy` 一樣更新 Worker 與 ASSETS：
+```bash
+npm run deploy:static
+```
+等同 `npm run build:static && wrangler deploy`：先產出 `www/`，再一併上傳 Worker 與靜態資源。CI 上可依序執行 `build:static` 與 `wrangler deploy` 達到相同效果。
+
 
 
 ## 資料庫與儲存

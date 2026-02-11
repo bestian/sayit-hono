@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { serveStatic } from 'hono/cloudflare-workers';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
 import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
@@ -35,6 +36,9 @@ type WorkerEnv = ApiEnv['Bindings'];
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
+// 靜態檔優先：先嘗試 ASSETS（Cloudflare CI 建置），找不到再走 API/SSR
+app.use('*', staticFirstMiddleware);
+
 const EDGE_TTL_SECONDS = 60;
 const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=${EDGE_TTL_SECONDS}, s-maxage=${EDGE_TTL_SECONDS}`;
 
@@ -57,10 +61,20 @@ function withCacheHeaders(response: Response): Response {
 	return res;
 }
 
-async function serveAsset(c: any, path?: string) {
+/** 向 Cloudflare 靜態資源 (ASSETS) 要求檔案，path 可指定子路徑，未指定則用請求 URL */
+async function serveAsset(c: any, path?: string): Promise<Response> {
 	const url = new URL(c.req.url);
 	const assetUrl = path ? new URL(path, url) : url;
 	return c.env.ASSETS.fetch(assetUrl.toString());
+}
+
+/** 優先嘗試從 ASSETS 回應靜態檔，找不到再交給後續 API/SSR 路由 */
+async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
+	const pathname = new URL(c.req.url).pathname;
+	if (pathname.startsWith('/api/')) return next();
+	const res = await serveAsset(c);
+	if (res && res.status >= 200 && res.status < 400) return res;
+	return next();
 }
 
 function parseContent(raw?: string | null) {
@@ -152,14 +166,7 @@ async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow 
 }
 
 
-app.get('/', (c) => serveAsset(c, '/index.html'));
-
-// Speeches 靜態頁
-app.get('/speeches', (c) => serveAsset(c, '/speeches.html'));
-app.get('/speeches/', (c) => serveAsset(c, '/speeches/index.html'));
-// Speakers 靜態頁
-app.get('/speakers', (c) => serveAsset(c, '/speakers.html'));
-app.get('/speakers/', (c) => serveAsset(c, '/speakers/index.html'));
+// 根與靜態列表頁由 staticFirstMiddleware 從 ASSETS 提供（/ → index.html 等）
 
 // API CORS preflight
 app.options('/api/*', (c) => handleOptions(c));
@@ -433,15 +440,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 });
 
 
-// 直接映射根層靜態檔案
-app.get('/favicon.ico', (c) => serveAsset(c, '/favicon.ico'));
-app.get('/robots.txt', (c) => serveAsset(c, '/robots.txt'));
-
-// 媒體資源（圖檔等）
-app.get('/media/*', (c) => serveAsset(c));
-
-// 靜態檔案
-app.get('/static/*', (c) => serveAsset(c));
+// favicon、robots、/media/*、/static/* 由 staticFirstMiddleware 從 ASSETS 提供
 
 const excludedPaths = [
 	'api',
@@ -801,11 +800,7 @@ app.get('/:filename', async (c) => {
 });
 
 
-// 其餘請求交給靜態資源或返回 404
-app.get('*', async (c) => {
-	const res = await serveAsset(c);
-	if (res.ok) return res;
-	return c.text('Not Found', 404);
-});
+// 其餘請求：靜態已由 middleware 嘗試過，未匹配則 404
+app.get('*', (c) => c.text('Not Found', 404));
 
 export default app;
