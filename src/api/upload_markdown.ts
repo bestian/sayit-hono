@@ -856,11 +856,20 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const newSpeakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
 
 			let assignedPatched: PatchAssignedSection[];
-			try {
-				assignedPatched = assignPatchedSections(oldSections, sectionPayloads);
-			} catch (err) {
-				const message = err instanceof Error ? err.message : 'Failed to assign section ids for PATCH';
-				return c.json({ success: false, message, filename }, 409, corsHeadersWithMethods);
+			if (oldSections.length === 0) {
+				// 安全補強：若舊資料沒有任何段落，改用 POST 式連號分配，避免 ID 無基準導致失敗
+				const baseSectionId = await findMaxSectionId(c);
+				assignedPatched = sectionPayloads.map((section, idx) => ({
+					...section,
+					section_id: baseSectionId + idx
+				}));
+			} else {
+				try {
+					assignedPatched = assignPatchedSections(oldSections, sectionPayloads);
+				} catch (err) {
+					const message = err instanceof Error ? err.message : 'Failed to assign section ids for PATCH';
+					return c.json({ success: false, message, filename }, 409, corsHeadersWithMethods);
+				}
 			}
 
 			const normalized = withSectionLinks(assignedPatched);
@@ -969,7 +978,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			// 失效快取（R2，在 D1 交易之外）
 			await invalidateSpeechCaches(c, filename);
 			await invalidateSpeakerCaches(c, impactedSpeakers);
-			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
+			await invalidateListPageCaches(c, { home: true, speeches: false, speakers: true });
 
 			return c.json(
 				{
