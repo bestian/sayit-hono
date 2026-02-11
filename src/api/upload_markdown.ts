@@ -813,35 +813,32 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const oldSectionIds = new Set(oldSections.map((section) => section.section_id));
 			const finalSectionIds = new Set(normalized.map((section) => section.section_id));
 
+			const batchStatements: Parameters<typeof c.env.DB.batch>[0] = [];
+
 			for (const section of normalized) {
 				if (oldSectionIds.has(section.section_id)) {
-					await c.env.DB.prepare(
-						`UPDATE speech_content
-						 SET filename = ?,
-							 nest_filename = ?,
-							 nest_display_name = ?,
-							 previous_section_id = ?,
-							 next_section_id = ?,
-							 section_speaker = ?,
-							 section_content = ?
-						 WHERE section_id = ?`
-					)
-						.bind(
-							filename,
-							null,
-							null,
+					batchStatements.push(
+						c.env.DB.prepare(
+							`UPDATE speech_content
+							 SET previous_section_id = ?,
+								 next_section_id = ?,
+								 section_speaker = ?,
+								 section_content = ?
+							 WHERE filename = ? AND section_id = ?`
+						).bind(
 							section.previous_section_id,
 							section.next_section_id,
 							section.section_speaker,
 							section.section_content,
+							filename,
 							section.section_id
 						)
-						.run();
+					);
 				} else {
-					await c.env.DB.prepare(
-						'INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-					)
-						.bind(
+					batchStatements.push(
+						c.env.DB.prepare(
+							'INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+						).bind(
 							filename,
 							null,
 							null,
@@ -851,17 +848,20 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							section.section_speaker,
 							section.section_content
 						)
-						.run();
+					);
 				}
 			}
 
 			for (const oldSection of oldSections) {
 				if (!finalSectionIds.has(oldSection.section_id)) {
-					await c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ? AND section_id = ?')
-						.bind(filename, oldSection.section_id)
-						.run();
+					batchStatements.push(
+						c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ? AND section_id = ?')
+							.bind(filename, oldSection.section_id)
+					);
 				}
 			}
+
+			await c.env.DB.batch(batchStatements);
 
 			await rebuildSpeechSpeakerRelations(c, filename, newSpeakerRoutePathnames);
 			const impactedSpeakers = Array.from(new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames]));
