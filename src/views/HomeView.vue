@@ -20,9 +20,9 @@
 			<div class="homepage-stats">
 			<div class="full-page__row">
 				<div class="full-page__unit">
-				<a href="/speeches"><strong>400,841</strong></a> speeches;
-				<a href="/speakers"><strong>8,037</strong></a> speakers;
-				<a href="/speeches"><strong>2,193</strong></a> sections
+				<a href="/speeches"><strong>{{ speechesCount }}</strong></a> speeches;
+				<a href="/speakers"><strong>{{ speakersCount }}</strong></a> speakers;
+				<a href="/speeches"><strong>{{ sectionsCount }}</strong></a> sections
 				</div>
 			</div>
 			<div class="full-page__row">
@@ -33,6 +33,17 @@
 		<Footer />
 	</div>
 </template>
+
+<script setup lang="ts">
+const props = withDefaults(
+	defineProps<{
+		speechesCount?: string;
+		speakersCount?: string;
+		sectionsCount?: string;
+	}>(),
+	{ speechesCount: '0', speakersCount: '0', sectionsCount: '0' }
+);
+</script>
 
 <style scoped>
 a {
