@@ -34,6 +34,7 @@ import {
 	headForSpeakers,
 	headForHome
 } from './ssr/heads';
+import { formatNumberWithCommas } from './utils/formatNumber';
 import { buildPaginationPages } from './utils/pagination';
 import { normalizeSections } from './utils/sectionUtils';
 
@@ -224,6 +225,27 @@ async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
 	}));
 }
 
+type HomepageStats = { speechesCount: string; speakersCount: string; sectionsCount: string };
+
+async function loadHomepageStats(c: any): Promise<HomepageStats> {
+	const db = c.env.DB;
+	const [speechContentRes, speakersRes, speechIndexRes] = await Promise.all([
+		db.prepare('SELECT COUNT(*) AS count FROM speech_content').first(),
+		db.prepare('SELECT COUNT(*) AS count FROM speakers').first(),
+		db.prepare('SELECT COUNT(*) AS count FROM speech_index').first()
+	]);
+	const toNum = (row: unknown): number => {
+		const n = (row as { count?: number | string })?.count;
+		if (typeof n === 'number') return n;
+		if (typeof n === 'string') return parseInt(n, 10) || 0;
+		return 0;
+	};
+	return {
+		speechesCount: formatNumberWithCommas(toNum(speechContentRes)),
+		speakersCount: formatNumberWithCommas(toNum(speakersRes)),
+		sectionsCount: formatNumberWithCommas(toNum(speechIndexRes))
+	};
+}
 
 // /、/speeches、/speakers 由 SSR 路由提供，其餘靜態資源由 staticFirstMiddleware 嘗試從 ASSETS 提供
 
@@ -329,12 +351,21 @@ async function renderHomePage(c: any) {
 	const edgeCached = await readEdgeCache(cacheKey);
 	if (edgeCached) return edgeCached;
 
+	let stats: HomepageStats;
+	try {
+		stats = await loadHomepageStats(c);
+	} catch (err) {
+		console.error('[home SSR] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+
 	const styles = [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForHome();
 	const html = await renderHtml(HomeView, {
 		head,
 		styles,
-		components: { Navbar, Footer }
+		components: { Navbar, Footer },
+		props: stats
 	});
 
 	let response = c.html(html);
