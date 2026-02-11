@@ -54,3 +54,13 @@ curl -X POST "http://localhost:8787/api/upload_markdown" \
   -H "Content-Type: application/json" \
   -d "$(jq -Rs '{filename: "2025-11-10-柏林自由會議-AI-的角色.md", markdown: .}' raw_input_data/2025-11-10-柏林自由會議-AI-的角色.md)"
 ```
+
+
+### PATCH 新增指定 filename 記錄
+
+```bash
+curl -X PATCH "http://localhost:8787/api/upload_markdown" \
+  -H "Authorization: Bearer {{TOKEN}}" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -Rs '{filename: "test_upload.md", markdown: .}' raw_input_data/test_upload.md)"
+```
