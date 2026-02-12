@@ -12,7 +12,7 @@
 					<a href="/speakers"><span lang="zh">講者</span><span lang="en">Speakers</span></a>
 				</li>
 				<li>
-					<a href="/speeches"><span lang="zh">演講</span><span lang="en">Speeches</span></a>
+					<a href="/speeches"><span lang="zh">對話</span><span lang="en">Speeches</span></a>
 				</li>
 			</ul>
 			<ul class="unstyled-list right"></ul>
