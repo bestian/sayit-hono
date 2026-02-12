@@ -59,7 +59,7 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
       var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
       root.classList.remove('no-touch');
       root.classList.add(hasTouch ? 'touch' : 'no-touch');
-      var zh = /^zh\b/i.test(navigator.language);
+      var zh = /^zh\\b/i.test(navigator.language);
       root.classList.add(zh ? 'lang-zh' : 'lang-en');
     })();
   </script>
