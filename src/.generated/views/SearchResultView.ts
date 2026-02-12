@@ -184,7 +184,7 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
   })
   _push(`<!--]-->`)
   if (__props.sections.length === 0) {
-    _push(`<li class="speech speech--search-result speech--with-portrait speech--speech speech--border"><div class="speech-wrapper"><div class="speech__content">沒有找到相關段落</div></div></li>`)
+    _push(`<li class="speech speech--search-result speech--with-portrait speech--speech speech--border"><div class="speech-wrapper"><div class="speech__content"><span lang="zh">沒有找到相關段落</span><span lang="en">No matching sections found.</span></div></div></li>`)
   } else {
     _push(`<!---->`)
   }
@@ -194,9 +194,9 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     _ssrRenderAttr("aria-disabled", !hasPrev.value)
   }>`)
   if (hasPrev.value) {
-    _push(`<a${_ssrRenderAttr("href", pageHref(safePage.value - 1))}>← Previous</a>`)
+    _push(`<a${_ssrRenderAttr("href", pageHref(safePage.value - 1))}>← <span lang="zh">上一頁</span><span lang="en">Previous</span></a>`)
   } else {
-    _push(`<!--[-->← Previous<!--]-->`)
+    _push(`<!--[-->← <span lang="zh">上一頁</span><span lang="en">Previous</span><!--]-->`)
   }
   _push(`</span><!--[-->`)
   _ssrRenderList(resolvedPaginationPages.value, (pageNum) => {
@@ -220,9 +220,9 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     _ssrRenderAttr("aria-disabled", !hasNext.value)
   }>`)
   if (hasNext.value) {
-    _push(`<a${_ssrRenderAttr("href", pageHref(safePage.value + 1))}>Next →</a>`)
+    _push(`<a${_ssrRenderAttr("href", pageHref(safePage.value + 1))}><span lang="zh">下一頁</span><span lang="en">Next</span> →</a>`)
   } else {
-    _push(`<!--[-->Next →<!--]-->`)
+    _push(`<!--[--><span lang="zh">下一頁</span><span lang="en">Next</span> →<!--]-->`)
   }
   _push(`</span></div></div></div></div></div></div>`)
   _push(_ssrRenderComponent(_component_Footer, null, null, _parent))

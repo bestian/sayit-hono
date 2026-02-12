@@ -72,7 +72,7 @@
 								</li>
 								<li v-if="sections.length === 0" class="speech speech--search-result speech--with-portrait speech--speech speech--border">
 									<div class="speech-wrapper">
-										<div class="speech__content">沒有找到相關段落</div>
+										<div class="speech__content"><span lang="zh">沒有找到相關段落</span><span lang="en">No matching sections found.</span></div>
 									</div>
 								</li>
 							</ul>
@@ -82,9 +82,9 @@
 									:aria-disabled="!hasPrev"
 								>
 									<template v-if="hasPrev">
-										<a :href="pageHref(safePage - 1)">&larr; Previous</a>
+										<a :href="pageHref(safePage - 1)">&larr; <span lang="zh">上一頁</span><span lang="en">Previous</span></a>
 									</template>
-									<template v-else>&larr; Previous</template>
+									<template v-else>&larr; <span lang="zh">上一頁</span><span lang="en">Previous</span></template>
 								</span>
 								<template v-for="pageNum in resolvedPaginationPages" :key="pageNum === 'ellipsis' ? 'ellipsis' : pageNum">
 									<span
@@ -106,9 +106,9 @@
 									:aria-disabled="!hasNext"
 								>
 									<template v-if="hasNext">
-										<a :href="pageHref(safePage + 1)">Next &rarr;</a>
+										<a :href="pageHref(safePage + 1)"><span lang="zh">下一頁</span><span lang="en">Next</span> &rarr;</a>
 									</template>
-									<template v-else>Next &rarr;</template>
+									<template v-else><span lang="zh">下一頁</span><span lang="en">Next</span> &rarr;</template>
 								</span>
 							</div>
 						</div>
