@@ -157,10 +157,10 @@
 											</div>
 											<div class="speech__links">
 												<a :href="getLinkInContextUrl(section)" title="Link in context">
-													<i class="speech-icon icon-link-in-context"></i>Link in context
+													<i class="speech-icon icon-link-in-context"></i><span lang="zh">前後文</span><span lang="en">Link in context</span>
 												</a>
 												<a :href="getSpeechPageUrl(section.section_id)" title="Link">
-													<i class="speech-icon icon-link"></i>Link
+													<i class="speech-icon icon-link"></i><span lang="zh">連結</span><span lang="en">Link</span>
 												</a>
 											</div>
 										</div>
@@ -188,10 +188,10 @@
 									</a>
 								</div>
 								<div class="ui-instructions cleared">
-									<h2>Keyboard shortcuts</h2>
+									<h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2>
 									<p>
-										<span class="key-descriptor">j</span> previous section
-										<span class="key-descriptor">k</span> next section
+										<span class="key-descriptor">j</span> <span lang="zh">下一段</span><span lang="en">next section</span>
+										<span class="key-descriptor">k</span> <span lang="zh">上一段</span><span lang="en">previous section</span>
 									</p>
 								</div>
 							</div>
