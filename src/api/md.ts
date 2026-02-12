@@ -1,35 +1,120 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
-import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 import { getAnContentAsString } from './an';
 import { isNumericAnKey } from './an';
 
 const MD_FILE_EXTENSION = '.md';
 
-/** 需完整保留的 HTML 標籤（含內容） */
-const PRESERVE_TAGS = ['iframe', 'video', 'audio', 'object', 'svg', 'img', 'a', 'br'];
+/** 需完整保留「成對標籤 + 內容」 */
+const PRESERVE_PAIRED_TAGS = ['iframe', 'video', 'audio', 'object', 'svg', 'a'];
+/** 需保留「單一標籤」 */
+const PRESERVE_VOID_TAGS = ['img', 'br'];
+
+function hasMeaningfulSpeechContent(fragment: string): boolean {
+	const trimmed = fragment.trim();
+	if (!trimmed) return false;
+
+	// 即使沒有純文字，只要是需要保留的 HTML 區塊（如 svg）也視為有效段落
+	if (/<(?:svg|iframe|video|audio|object|a|img|br)\b/i.test(trimmed)) {
+		return true;
+	}
+
+	const plainText = trimmed
+		.replace(/<!--[\s\S]*?-->/g, '')
+		.replace(/<[^>]+>/g, '')
+		.replace(/&nbsp;|&#160;/gi, ' ')
+		.replace(/\s+/g, '')
+		.trim();
+	return plainText.length > 0;
+}
+
+function extractSpeechParagraphs(inner: string): string[] {
+	const paragraphs: string[] = [];
+	const pBlockRegex = /<p\b[^>]*>[\s\S]*?<\/p\s*>/gi;
+	let lastIndex = 0;
+	let match: RegExpExecArray | null;
+
+	while ((match = pBlockRegex.exec(inner)) !== null) {
+		const before = inner.slice(lastIndex, match.index).trim();
+		if (hasMeaningfulSpeechContent(before)) {
+			paragraphs.push(before);
+		}
+
+		const pContent = match[0]
+			.replace(/^<p\b[^>]*>/i, '')
+			.replace(/<\/p\s*>$/i, '')
+			.trim();
+		if (hasMeaningfulSpeechContent(pContent)) {
+			paragraphs.push(pContent);
+		}
+
+		lastIndex = pBlockRegex.lastIndex;
+	}
+
+	const tail = inner.slice(lastIndex).trim();
+	if (hasMeaningfulSpeechContent(tail)) {
+		paragraphs.push(tail);
+	}
+
+	// 若完全沒有匹配到 <p>，仍保留整段（例如純 <svg>...</svg>）
+	if (paragraphs.length === 0 && hasMeaningfulSpeechContent(inner)) {
+		paragraphs.push(inner.trim());
+	}
+
+	return paragraphs;
+}
+
+function preserveSvgBlocks(html: string, restores: Map<string, string>, counterRef: { value: number }): string {
+	let result = html;
+	while (true) {
+		const openMatch = /<svg\b[^>]*>/i.exec(result);
+		if (!openMatch || openMatch.index === undefined) break;
+
+		const start = openMatch.index;
+		const openEnd = start + openMatch[0].length;
+		const closeMatch = /<\/svg\s*>/i.exec(result.slice(openEnd));
+
+		let end = result.length;
+		if (closeMatch && closeMatch.index !== undefined) {
+			end = openEnd + closeMatch.index + closeMatch[0].length;
+		}
+
+		const block = result.slice(start, end);
+		const key = `\u0000MD_PRESERVE_${counterRef.value++}\u0000`;
+		restores.set(key, block);
+		result = `${result.slice(0, start)}${key}${result.slice(end)}`;
+	}
+	return result;
+}
 
 function preserveSpecialTags(html: string): { result: string; restores: Map<string, string> } {
 	const restores = new Map<string, string>();
-	let counter = 0;
-	let result = html;
-	for (const tag of PRESERVE_TAGS) {
-		// 有內容的標籤，如 <iframe>...</iframe>
+	const counterRef = { value: 0 };
+	let result = preserveSvgBlocks(html, restores, counterRef);
+
+	for (const tag of PRESERVE_PAIRED_TAGS) {
+		if (tag === 'svg') continue;
+
+		// 成對標籤：如 <svg>...</svg>、<a>...</a>
 		const withContent = new RegExp(`<${tag}[^>]*>[\\s\\S]*?<\\/${tag}>`, 'gi');
 		result = result.replace(withContent, (match) => {
-			const key = `\u0000MD_PRESERVE_${counter++}\u0000`;
-			restores.set(key, match);
-			return key;
-		});
-		// 自閉合標籤（僅匹配 .../>，避免誤吃一般開頭標籤如 <svg ...>）
-		const selfClose = new RegExp(`<${tag}[^>]*\\/>`, 'gi');
-		result = result.replace(selfClose, (match) => {
-			const key = `\u0000MD_PRESERVE_${counter++}\u0000`;
+			const key = `\u0000MD_PRESERVE_${counterRef.value++}\u0000`;
 			restores.set(key, match);
 			return key;
 		});
 	}
+
+	for (const tag of PRESERVE_VOID_TAGS) {
+		// void/self-closing：同時支援 <br> / <br/>、<img ...> / <img .../>
+		const voidTag = new RegExp(`<${tag}\\b[^>]*\\/?>`, 'gi');
+		result = result.replace(voidTag, (match) => {
+			const key = `\u0000MD_PRESERVE_${counterRef.value++}\u0000`;
+			restores.set(key, match);
+			return key;
+		});
+	}
+
 	return { result, restores };
 }
 
@@ -78,10 +163,7 @@ function an2md(anXml: string): string {
 		const speakerId = sm[1];
 		const inner = sm[2];
 		const showAs = tlcPersons.get(speakerId) ?? speakerId;
-		const paragraphs = inner
-			.split(/<p[^>]*>/i)
-			.map((s) => s.replace(/<\/p>/gi, '').trim())
-			.filter(Boolean);
+		const paragraphs = extractSpeechParagraphs(inner);
 		const content = paragraphs
 			.map((p) => {
 				const { result: preserved, restores } = preserveSpecialTags(p);
@@ -136,29 +218,6 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 	}
 
 	const anKey = objectKey.slice(0, -MD_FILE_EXTENSION.length) + '.an';
-	const baseKey = objectKey.slice(0, -MD_FILE_EXTENSION.length);
-
-	// 單一演講才快取，段落不快取
-	if (!isNumericAnKey(anKey)) {
-		const cacheKey = `md/${baseKey}`;
-		const edgeCached = await readEdgeCache(cacheKey);
-		if (edgeCached) {
-			console.log('[md cache] hit edge', cacheKey);
-			const headers = new Headers(edgeCached.headers);
-			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-			return new Response(await edgeCached.text(), { status: 200, headers });
-		}
-		const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/markdown; charset=utf-8');
-		if (cached) {
-			console.log('[md cache] hit r2', cacheKey);
-			const headers = new Headers(cached.headers);
-			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-			const body = await cached.text();
-			const response = new Response(body, { status: 200, headers });
-			await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
-			return response;
-		}
-	}
 
 	const anContent = await getAnContentAsString(c, anKey);
 	if (!anContent) {
@@ -169,15 +228,9 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	const headers = new Headers(corsHeaders);
 	headers.set('Content-Type', 'text/markdown; charset=utf-8');
-	headers.set('Cache-Control', 'public, max-age=3600');
-
-	if (!isNumericAnKey(anKey)) {
-		const cacheKey = `md/${baseKey}`;
-		const response = new Response(mdContent, { status: 200, headers });
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response, 'text/markdown; charset=utf-8');
-		await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
-		return response;
-	}
+	headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+	headers.set('Pragma', 'no-cache');
+	headers.set('Expires', '0');
 
 	return new Response(mdContent, { status: 200, headers });
 }
