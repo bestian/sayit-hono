@@ -146,7 +146,7 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
       _ssrRenderAttr("data-prev-url", __props.section.previous_section_id ? getParagraphUrl(__props.section.previous_section_id) : '')
     }${
       _ssrRenderAttr("data-next-url", __props.section.next_section_id ? getParagraphUrl(__props.section.next_section_id) : '')
-    }><h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2><p><span class="key-descriptor">j</span> <span lang="zh">上一段</span><span lang="en">previous speech</span><span class="key-descriptor">k</span> <span lang="zh">下一段</span><span lang="en">next speech</span></p></div></div></div></div></div></div></div></div>`)
+    }><h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2><p><span class="key-descriptor">j</span> <span lang="zh">下一段</span><span lang="en">next speech</span><span class="key-descriptor">k</span> <span lang="zh">上一段</span><span lang="en">previous speech</span></p></div></div></div></div></div></div></div></div>`)
   } else {
     _push(`<!---->`)
   }
