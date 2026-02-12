@@ -61,6 +61,13 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
       root.classList.add(hasTouch ? 'touch' : 'no-touch');
       var zh = /^zh\\b/i.test(navigator.language);
       root.classList.add(zh ? 'lang-zh' : 'lang-en');
+      if (zh) document.addEventListener('DOMContentLoaded', function() {
+        var map = {'Search': '搜尋', "Search this person's speeches": '搜尋此人的發言'};
+        document.querySelectorAll('[placeholder]').forEach(function(el) {
+          var zh_text = map[el.getAttribute('placeholder')];
+          if (zh_text) el.setAttribute('placeholder', zh_text);
+        });
+      });
     })();
   </script>
   <style>
