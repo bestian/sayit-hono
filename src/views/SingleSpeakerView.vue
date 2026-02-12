@@ -346,9 +346,9 @@ const formatLongestSectionSummary = (summary: string) => {
 								:aria-disabled="!hasPrev"
 							>
 								<template v-if="hasPrev">
-									<a :href="getPageUrl(page - 1)">← Previous</a>
+									<a :href="getPageUrl(page - 1)">← <span lang="zh">上一頁</span><span lang="en">Previous</span></a>
 								</template>
-								<template v-else>← Previous</template>
+								<template v-else>← <span lang="zh">上一頁</span><span lang="en">Previous</span></template>
 							</span>
 							<template v-for="pageNum in paginationPages" :key="pageNum === 'ellipsis' ? 'ellipsis' : pageNum">
 								<span
@@ -370,9 +370,9 @@ const formatLongestSectionSummary = (summary: string) => {
 								:aria-disabled="!hasNext"
 							>
 								<template v-if="hasNext">
-									<a :href="getPageUrl(page + 1)">Next →</a>
+									<a :href="getPageUrl(page + 1)"><span lang="zh">下一頁</span><span lang="en">Next</span> →</a>
 								</template>
-								<template v-else>Next →</template>
+								<template v-else><span lang="zh">下一頁</span><span lang="en">Next</span> →</template>
 							</span>
 						</div>
 					</div>
