@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
+import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 import { getAnContentAsString } from './an';
 import { isNumericAnKey } from './an';
@@ -218,6 +219,28 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 	}
 
 	const anKey = objectKey.slice(0, -MD_FILE_EXTENSION.length) + '.an';
+	const baseKey = objectKey.slice(0, -MD_FILE_EXTENSION.length);
+
+	// 單一演講才快取，段落不快取
+	if (!isNumericAnKey(anKey)) {
+		const cacheKey = `md/${baseKey}`;
+		const edgeCached = await readEdgeCache(cacheKey);
+		if (edgeCached) {
+			const headers = new Headers(edgeCached.headers);
+			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+			return new Response(await edgeCached.text(), { status: 200, headers });
+		}
+
+		const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/markdown; charset=utf-8');
+		if (cached) {
+			const headers = new Headers(cached.headers);
+			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+			const body = await cached.text();
+			const response = new Response(body, { status: 200, headers });
+			await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
+			return response;
+		}
+	}
 
 	const anContent = await getAnContentAsString(c, anKey);
 	if (!anContent) {
@@ -228,9 +251,15 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	const headers = new Headers(corsHeaders);
 	headers.set('Content-Type', 'text/markdown; charset=utf-8');
-	headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-	headers.set('Pragma', 'no-cache');
-	headers.set('Expires', '0');
+	headers.set('Cache-Control', 'public, max-age=3600');
+
+	if (!isNumericAnKey(anKey)) {
+		const cacheKey = `md/${baseKey}`;
+		const response = new Response(mdContent, { status: 200, headers });
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response, 'text/markdown; charset=utf-8');
+		await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
+		return response;
+	}
 
 	return new Response(mdContent, { status: 200, headers });
 }
