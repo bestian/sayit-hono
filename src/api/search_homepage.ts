@@ -151,14 +151,17 @@ function highlightTerm(value: string, query: string): string {
 	return highlighted;
 }
 
-function buildFtsQuery(raw: string): string {
-	return raw
+function buildFtsQuery(raw: string, column?: string): string {
+	const expr = raw
 		.trim()
 		.split(/\s+/)
 		.map((token) => token.replace(/["'()*^~]/g, '').trim())
 		.filter((token) => token.length > 0)
 		.map((token) => `${token}*`)
 		.join(' AND ');
+	if (!expr) return '';
+	if (column) return `{${column}} : (${expr})`;
+	return expr;
 }
 
 export async function runSearchHomepage(
@@ -197,7 +200,8 @@ export async function runSearchHomepage(
 	}
 
 	const ftsQuery = buildFtsQuery(query);
-	if (!ftsQuery) {
+	const sectionFtsQuery = buildFtsQuery(query, 'content');
+	if (!ftsQuery || !sectionFtsQuery) {
 		return {
 			query,
 			speakers: [],
@@ -227,7 +231,7 @@ export async function runSearchHomepage(
 
 	// 建立講者篩選條件
 	const speakerFilter = speakerRoutePathname ? 'AND route_pathname = ?' : '';
-	const totalSectionsBindings = speakerRoutePathname ? [ftsQuery, speakerRoutePathname] : [ftsQuery];
+	const totalSectionsBindings = speakerRoutePathname ? [sectionFtsQuery, speakerRoutePathname] : [sectionFtsQuery];
 
 	const totalSectionsPromise = env.DB.prepare(
 		`SELECT COUNT(*) AS total
@@ -249,8 +253,8 @@ export async function runSearchHomepage(
 	const offset = (page - 1) * sectionLimit;
 
 	const sectionBindings = speakerRoutePathname
-		? [ftsQuery, speakerRoutePathname, sectionLimit, offset]
-		: [ftsQuery, sectionLimit, offset];
+		? [sectionFtsQuery, speakerRoutePathname, sectionLimit, offset]
+		: [sectionFtsQuery, sectionLimit, offset];
 
 	const sectionResult = await env.DB.prepare(
 		`SELECT
