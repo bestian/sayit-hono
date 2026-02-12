@@ -8,7 +8,7 @@ import { isNumericAnKey } from './an';
 const MD_FILE_EXTENSION = '.md';
 
 /** 需完整保留的 HTML 標籤（含內容） */
-const PRESERVE_TAGS = ['iframe', 'video', 'audio', 'object'];
+const PRESERVE_TAGS = ['iframe', 'video', 'audio', 'object', 'svg', 'img', 'a', 'br'];
 
 function preserveSpecialTags(html: string): { result: string; restores: Map<string, string> } {
 	const restores = new Map<string, string>();
@@ -22,8 +22,8 @@ function preserveSpecialTags(html: string): { result: string; restores: Map<stri
 			restores.set(key, match);
 			return key;
 		});
-		// 自閉合標籤，如 <iframe ... />
-		const selfClose = new RegExp(`<${tag}[^>]*\\/?>`, 'gi');
+		// 自閉合標籤（僅匹配 .../>，避免誤吃一般開頭標籤如 <svg ...>）
+		const selfClose = new RegExp(`<${tag}[^>]*\\/>`, 'gi');
 		result = result.replace(selfClose, (match) => {
 			const key = `\u0000MD_PRESERVE_${counter++}\u0000`;
 			restores.set(key, match);
