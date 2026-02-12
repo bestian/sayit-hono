@@ -398,74 +398,6 @@ function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[]
 	}));
 }
 
-/** 確保所有出現的講者 route_pathname 在 speakers 表都有紀錄（INSERT ON CONFLICT DO NOTHING） */
-async function ensureSpeakersExist(c: Context<ApiEnv>, speakerMarks: SpeakerMark[]) {
-	const uniqueRoutePathnames = getUniqueSpeakerRoutePathnames(speakerMarks);
-
-	for (const routePathname of uniqueRoutePathnames) {
-		let speakerName = routePathname;
-		try {
-			speakerName = decodeURIComponent(routePathname);
-		} catch {
-			// route_pathname 非合法 URI 編碼時，退回原字串，避免整批中斷
-			speakerName = routePathname;
-		}
-
-		await c.env.DB.prepare(
-			'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
-		)
-			.bind(routePathname, speakerName)
-			.run();
-	}
-}
-
-/** POST 用：建立此演講與講者的關聯（speech_speakers），INSERT OR IGNORE 逐筆寫入 */
-async function ensureSpeechSpeakerRelations(c: Context<ApiEnv>, filename: string, speakerMarks: SpeakerMark[]) {
-	const uniqueRoutePathnames = getUniqueSpeakerRoutePathnames(speakerMarks);
-
-	console.log('[upload_markdown][relation] target filename:', filename);
-	console.log('[upload_markdown][relation] parsed speakers:', uniqueRoutePathnames);
-
-	const beforeCountRow = await c.env.DB.prepare(
-		'SELECT COUNT(*) AS count FROM speech_speakers WHERE speech_filename = ?'
-	)
-		.bind(filename)
-		.first<{ count: number | string }>();
-	const beforeCount = Number(beforeCountRow?.count ?? 0);
-	console.log('[upload_markdown][relation] before count:', beforeCount);
-
-	let inserted = 0;
-	let ignored = 0;
-	for (const routePathname of uniqueRoutePathnames) {
-		const relationInsertResult = await c.env.DB.prepare(
-			'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
-		)
-			.bind(filename, routePathname)
-			.run();
-		const changes = relationInsertResult.meta?.changes ?? 0;
-		if (changes > 0) inserted += changes;
-		else ignored += 1;
-		console.log('[upload_markdown][relation] upsert', {
-			filename,
-			routePathname,
-			changes
-		});
-	}
-
-	const afterCountRow = await c.env.DB.prepare(
-		'SELECT COUNT(*) AS count FROM speech_speakers WHERE speech_filename = ?'
-	)
-		.bind(filename)
-		.first<{ count: number | string }>();
-	const afterCount = Number(afterCountRow?.count ?? 0);
-	console.log('[upload_markdown][relation] summary', {
-		beforeCount,
-		parsedCount: uniqueRoutePathnames.length,
-		inserted,
-		ignored,
-		afterCount
-	});
-}
 
 /** PATCH 用：先刪除此演講所有關聯，再依新解析出的講者列表重建 speech_speakers */
 async function rebuildSpeechSpeakerRelations(c: Context<ApiEnv>, filename: string, routePathnames: string[]) {
@@ -737,17 +669,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const firstLine = body.markdown.split('\n')[0]?.trim() ?? '';
 			const display_name = firstLine.replace(/^#\s*/, '') || filename;
 
-			// 不存在則新增一筆 speech_index
-			await c.env.DB.prepare(
-				'INSERT INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES (?, ?, 0, ?, ?)'
-			)
-				.bind(filename, display_name, '', '')
-				.run();
-
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const speakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
-			await ensureSpeakersExist(c, speakers);
-			await ensureSpeechSpeakerRelations(c, filename, speakers);
 			const baseSectionId = await findMaxSectionId(c);
 
 			// 為每個段落分配連續的 section_id 與 prev/next 鏈結
@@ -765,21 +688,67 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				};
 			});
 
-			for (const section of normalized) {
-				await c.env.DB.prepare(
-					'INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-				)
-					.bind(
-						filename,
-						null,
-						null,
-						section.section_id,
-						section.previous_section_id,
-						section.next_section_id,
-						section.section_speaker,
-						section.section_content
-					)
-					.run();
+			// 1. 寫入 speech_index + speakers + relations
+			const metaBatch: Parameters<typeof c.env.DB.batch>[0] = [];
+
+			metaBatch.push(
+				c.env.DB.prepare(
+					'INSERT INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES (?, ?, 0, ?, ?)'
+				).bind(filename, display_name, '', '')
+			);
+
+			for (const routePathname of speakerRoutePathnames) {
+				let speakerName = routePathname;
+				try {
+					speakerName = decodeURIComponent(routePathname);
+				} catch {
+					speakerName = routePathname;
+				}
+				metaBatch.push(
+					c.env.DB.prepare(
+						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
+					).bind(routePathname, speakerName)
+				);
+				metaBatch.push(
+					c.env.DB.prepare(
+						'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
+					).bind(filename, routePathname)
+				);
+			}
+
+			await c.env.DB.batch(metaBatch);
+
+			// 2. 段落分批寫入（每批約 50 筆，使用多行 VALUES 減少語句數）
+			const ROWS_PER_INSERT = 10;
+			const INSERTS_PER_BATCH = 5; // 5 statements × 10 rows = 50 rows per batch
+			const ROWS_PER_BATCH = ROWS_PER_INSERT * INSERTS_PER_BATCH;
+			const cols = 'filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content';
+
+			for (let batchStart = 0; batchStart < normalized.length; batchStart += ROWS_PER_BATCH) {
+				const batchSlice = normalized.slice(batchStart, batchStart + ROWS_PER_BATCH);
+				const sectionBatch: Parameters<typeof c.env.DB.batch>[0] = [];
+
+				for (let i = 0; i < batchSlice.length; i += ROWS_PER_INSERT) {
+					const chunk = batchSlice.slice(i, i + ROWS_PER_INSERT);
+					const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+					const sql = `INSERT INTO speech_content (${cols}) VALUES ${placeholders}`;
+					const binds: (string | number | null)[] = [];
+					for (const section of chunk) {
+						binds.push(
+							filename,
+							null,
+							null,
+							section.section_id,
+							section.previous_section_id,
+							section.next_section_id,
+							section.section_speaker,
+							section.section_content
+						);
+					}
+					sectionBatch.push(c.env.DB.prepare(sql).bind(...binds));
+				}
+
+				await c.env.DB.batch(sectionBatch);
 			}
 
 			await invalidateSpeechCaches(c, filename);
