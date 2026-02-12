@@ -45,7 +45,7 @@ const sortedSpeeches = computed(() => {
 			<div class="full-page__row">
 				<div class="full-page__unit">
 					<div class="page-header">
-						<h1>Speeches</h1>
+						<h1><span lang="zh">對話</span><span lang="en">Speeches</span></h1>
 					</div>
 					<ul class="unstyled">
 						<li v-for="speech in sortedSpeeches" :key="speech.filename">

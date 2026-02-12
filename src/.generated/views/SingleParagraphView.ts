@@ -94,9 +94,9 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     } else {
       _push(`<!---->`)
     }
-    _push(`<div class="speech__meta-data"><span class="speech__meta-data__speech-type">Speech</span>`)
+    _push(`<div class="speech__meta-data"><span class="speech__meta-data__speech-type"><span lang="zh">發言</span><span lang="en">Speech</span></span>`)
     if (__props.section.section_speaker && __props.section.name) {
-      _push(`<span> by <span class="speech__meta-data__speaker-name"><a${
+      _push(`<span><span lang="en">by</span><span class="speech__meta-data__speaker-name"><a${
         _ssrRenderAttr("href", getSpeakerUrl(__props.section.section_speaker))
       }>${
         _ssrInterpolate(__props.section.name)
@@ -115,7 +115,7 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
       _push(`<!---->`)
     }
     if (__props.section.filename && __props.section.section_id) {
-      _push(`<div class="speech__links"><a${_ssrRenderAttr("href", getContextUrl(__props.section.filename, __props.section.section_id))}><i class="speech-icon icon-link-in-context"></i>Show context </a></div>`)
+      _push(`<div class="speech__links"><a${_ssrRenderAttr("href", getContextUrl(__props.section.filename, __props.section.section_id))}><i class="speech-icon icon-link-in-context"></i><span lang="zh">顯示前後文</span><span lang="en">Show context</span></a></div>`)
     } else {
       _push(`<!---->`)
     }
@@ -146,7 +146,7 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
       _ssrRenderAttr("data-prev-url", __props.section.previous_section_id ? getParagraphUrl(__props.section.previous_section_id) : '')
     }${
       _ssrRenderAttr("data-next-url", __props.section.next_section_id ? getParagraphUrl(__props.section.next_section_id) : '')
-    }><h2>Keyboard shortcuts</h2><p><span class="key-descriptor">j</span> previous speech <span class="key-descriptor">k</span> next speech </p></div></div></div></div></div></div></div></div>`)
+    }><h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2><p><span class="key-descriptor">j</span> <span lang="zh">上一段</span><span lang="en">previous speech</span><span class="key-descriptor">k</span> <span lang="zh">下一段</span><span lang="en">next speech</span></p></div></div></div></div></div></div></div></div>`)
   } else {
     _push(`<!---->`)
   }

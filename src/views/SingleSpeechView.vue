@@ -105,10 +105,10 @@ const loading = false
 										</div>
 										<div class="speech__links">
 											<a :href="getLinkInContextUrl(section)" title="Link in context">
-												<i class="speech-icon icon-link-in-context"></i>Link in context
+												<i class="speech-icon icon-link-in-context"></i><span lang="zh">前後文</span><span lang="en">Link in context</span>
 											</a>
 											<a :href="getSpeechPageUrl(section.section_id)" title="Link">
-												<i class="speech-icon icon-link"></i>Link
+												<i class="speech-icon icon-link"></i><span lang="zh">連結</span><span lang="en">Link</span>
 											</a>
 										</div>
 									</div>

@@ -83,9 +83,9 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 									/>
 								</a>
 								<div class="speech__meta-data">
-									<span class="speech__meta-data__speech-type">Speech</span>
+									<span class="speech__meta-data__speech-type"><span lang="zh">發言</span><span lang="en">Speech</span></span>
 									<span v-if="section.section_speaker && section.name">
-										by
+										<span lang="en">by</span>
 										<span class="speech__meta-data__speaker-name">
 											<a :href="getSpeakerUrl(section.section_speaker)">{{ section.name }}</a>
 										</span>
@@ -101,7 +101,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 								</ul>
 								<div class="speech__links" v-if="section.filename && section.section_id">
 									<a :href="getContextUrl(section.filename, section.section_id)">
-										<i class="speech-icon icon-link-in-context"></i>Show context
+										<i class="speech-icon icon-link-in-context"></i><span lang="zh">顯示前後文</span><span lang="en">Show context</span>
 									</a>
 								</div>
 							</div>
@@ -139,10 +139,10 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 										:data-prev-url="section.previous_section_id ? getParagraphUrl(section.previous_section_id) : ''"
 										:data-next-url="section.next_section_id ? getParagraphUrl(section.next_section_id) : ''"
 									>
-										<h2>Keyboard shortcuts</h2>
+										<h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2>
 										<p>
-											<span class="key-descriptor">j</span> previous speech
-											<span class="key-descriptor">k</span> next speech
+											<span class="key-descriptor">j</span> <span lang="zh">上一段</span><span lang="en">previous speech</span>
+											<span class="key-descriptor">k</span> <span lang="zh">下一段</span><span lang="en">next speech</span>
 										</p>
 									</div>
 								</div>

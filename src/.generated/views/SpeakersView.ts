@@ -38,7 +38,7 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
 
   _push(`<div${_ssrRenderAttrs(_mergeProps({ class: "page" }, _attrs))}>`)
   _push(_ssrRenderComponent(_component_Navbar, null, null, _parent))
-  _push(`<div class="full-page"><div class="full-page__row"><div class="full-page__unit"><div class="page-header"><h1>All Speakers</h1></div><form class="site-search site-search--on-results-page" action="/search/" method="get"><div class="search-wrapper"><input type="search" class="site-search__input" placeholder="Search" name="q"><input type="submit" class="icon-search" value="Search"></div></form><ul class="speaker-list"><!--[-->`)
+  _push(`<div class="full-page"><div class="full-page__row"><div class="full-page__unit"><div class="page-header"><h1><span lang="zh">所有講者</span><span lang="en">All Speakers</span></h1></div><form class="site-search site-search--on-results-page" action="/search/" method="get"><div class="search-wrapper"><input type="search" class="site-search__input" placeholder="Search" name="q"><input type="submit" class="icon-search" value="Search"></div></form><ul class="speaker-list"><!--[-->`)
   _ssrRenderList(speakers.value, (speaker) => {
     _push(`<li><a${
       _ssrRenderAttr("href", '/speaker/' + speaker.route_pathname)

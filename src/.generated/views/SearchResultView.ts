@@ -118,7 +118,7 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
 
   _push(`<div${_ssrRenderAttrs(_mergeProps({ class: "page" }, _attrs))}>`)
   _push(_ssrRenderComponent(_component_Navbar, null, null, _parent))
-  _push(`<div class="full-page"><div class="full-page__row"><div class="full-page__unit"><h1 class="search-title-with-result">Search / <strong>${
+  _push(`<div class="full-page"><div class="full-page__row"><div class="full-page__unit"><h1 class="search-title-with-result"><span lang="zh">搜尋</span><span lang="en">Search</span> / <strong>${
     _ssrInterpolate(__props.query)
   }</strong></h1><form class="site-search site-search--on-results-page" action="/search/" method="get"><div class="search-wrapper"><input type="search" class="site-search__input" placeholder="Search" name="q"${
     _ssrRenderAttr("value", __props.query)
@@ -126,11 +126,13 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
   if (__props.filteredSpeakerId && __props.filteredSpeakerName) {
     _push(`<label><input type="checkbox" name="p"${
       _ssrRenderAttr("value", __props.filteredSpeakerId)
-    } checked> Search only speeches by ${
+    } checked><span lang="zh">僅搜尋 ${
       _ssrInterpolate(__props.filteredSpeakerName)
-    }</label>`)
+    } 的發言</span><span lang="en">Search only speeches by ${
+      _ssrInterpolate(__props.filteredSpeakerName)
+    }</span></label>`)
   } else {
-    _push(`<!--[--><!-- 沒有講者篩選時，顯示原本的 Speakers 區塊 --><h2>Speakers</h2><ul class="unstyled-list search-results-speakers"><!--[-->`)
+    _push(`<!--[--><!-- 沒有講者篩選時，顯示原本的 Speakers 區塊 --><h2><span lang="zh">講者</span><span lang="en">Speakers</span></h2><ul class="unstyled-list search-results-speakers"><!--[-->`)
     _ssrRenderList(__props.speakers, (speaker) => {
       _push(`<li class="search"><a${
         _ssrRenderAttr("href", `/speaker/${speaker.route_pathname}`)
@@ -140,13 +142,17 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     })
     _push(`<!--]-->`)
     if (__props.speakers.length === 0) {
-      _push(`<li class="search">There are no speakers that match your search.</li>`)
+      _push(`<li class="search"><span lang="zh">沒有符合的講者。</span><span lang="en">There are no speakers that match your search.</span></li>`)
     } else {
       _push(`<!---->`)
     }
     _push(`</ul><!--]-->`)
   }
-  _push(`<h2>Mentions of <strong>“${_ssrInterpolate(__props.query)}”</strong> in speeches</h2><ul class="unstyled-list search-results-list"><!--[-->`)
+  _push(`<h2><span lang="zh">在對話中提及 <strong>“${
+    _ssrInterpolate(__props.query)
+  }”</strong></span><span lang="en">Mentions of <strong>“${
+    _ssrInterpolate(__props.query)
+  }”</strong> in speeches</span></h2><ul class="unstyled-list search-results-list"><!--[-->`)
   _ssrRenderList(__props.sections, (section) => {
     _push(`<li class="speech speech--search-result speech--with-portrait speech--speech speech--border" style="${
       _ssrRenderStyle(sectionBorderStyle(section))
