@@ -192,8 +192,35 @@ function stripMarkdownTitleLine(markdown: string): string {
 }
 
 /** 段落比對鍵：用於 LCS 判斷「同一段」是否相同（講者 + 內容） */
+function normalizeSectionComparableContent(input: string): string {
+	return input
+		// 先把常見換行型標記轉成空白，再移除其餘 HTML 標記
+		.replace(/<br\s*\/?>/gi, ' ')
+		.replace(/<\/?p\b[^>]*>/gi, ' ')
+		.replace(/<[^>]+>/g, ' ')
+		// Markdown link/image：保留可讀文字，移除 URL
+		.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+		// Markdown inline code
+		.replace(/`([^`]+)`/g, '$1')
+		// 行首 markdown 記號（標題、引用、清單）
+		.replace(/^\s{0,3}#{1,6}\s+/gm, '')
+		.replace(/^\s{0,3}>\s?/gm, '')
+		.replace(/^\s{0,3}[-*+]\s+/gm, '')
+		// decode 常見 HTML entity（避免同內容不同編碼）
+		.replace(/&nbsp;/gi, ' ')
+		.replace(/&amp;/gi, '&')
+		.replace(/&lt;/gi, '<')
+		.replace(/&gt;/gi, '>')
+		.replace(/&quot;/gi, '"')
+		.replace(/&apos;/gi, "'")
+		// 斷行與多空白差異一律視為同值
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
 function sectionMatchKey(section: { markdown: string; speaker: string | null }) {
-	return `${section.speaker ?? ''}\u0000${section.markdown}`;
+	return `${section.speaker ?? ''}\u0000${normalizeSectionComparableContent(section.markdown)}`;
 }
 
 /** 是否為「子段落 ID」（插入時用 base*100+1 等規則產生的長數字） */
