@@ -141,8 +141,8 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 									>
 										<h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2>
 										<p>
-											<span class="key-descriptor">j</span> <span lang="zh">上一段</span><span lang="en">previous speech</span>
-											<span class="key-descriptor">k</span> <span lang="zh">下一段</span><span lang="en">next speech</span>
+											<span class="key-descriptor">j</span> <span lang="zh">下一段</span><span lang="en">next speech</span>
+											<span class="key-descriptor">k</span> <span lang="zh">上一段</span><span lang="en">previous speech</span>
 										</p>
 									</div>
 								</div>
