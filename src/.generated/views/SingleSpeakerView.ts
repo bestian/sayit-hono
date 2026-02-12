@@ -310,9 +310,9 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
       _ssrRenderAttr("aria-disabled", !hasPrev.value)
     } data-v-SingleSpeakerView-ssr>`)
     if (hasPrev.value) {
-      _push(`<a${_ssrRenderAttr("href", getPageUrl(page.value - 1))} data-v-SingleSpeakerView-ssr>← Previous</a>`)
+      _push(`<a${_ssrRenderAttr("href", getPageUrl(page.value - 1))} data-v-SingleSpeakerView-ssr>← <span lang="zh" data-v-SingleSpeakerView-ssr>上一頁</span><span lang="en" data-v-SingleSpeakerView-ssr>Previous</span></a>`)
     } else {
-      _push(`<!--[-->← Previous<!--]-->`)
+      _push(`<!--[-->← <span lang="zh" data-v-SingleSpeakerView-ssr>上一頁</span><span lang="en" data-v-SingleSpeakerView-ssr>Previous</span><!--]-->`)
     }
     _push(`</span><!--[-->`)
     _ssrRenderList(paginationPages.value, (pageNum) => {
@@ -336,9 +336,9 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
       _ssrRenderAttr("aria-disabled", !hasNext.value)
     } data-v-SingleSpeakerView-ssr>`)
     if (hasNext.value) {
-      _push(`<a${_ssrRenderAttr("href", getPageUrl(page.value + 1))} data-v-SingleSpeakerView-ssr>Next →</a>`)
+      _push(`<a${_ssrRenderAttr("href", getPageUrl(page.value + 1))} data-v-SingleSpeakerView-ssr><span lang="zh" data-v-SingleSpeakerView-ssr>下一頁</span><span lang="en" data-v-SingleSpeakerView-ssr>Next</span> →</a>`)
     } else {
-      _push(`<!--[-->Next →<!--]-->`)
+      _push(`<!--[--><span lang="zh" data-v-SingleSpeakerView-ssr>下一頁</span><span lang="en" data-v-SingleSpeakerView-ssr>Next</span> →<!--]-->`)
     }
     _push(`</span></div></div></div></div></div>`)
   } else {
