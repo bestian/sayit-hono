@@ -271,6 +271,13 @@ app.patch('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.delete('/api/upload_markdown', (c) => uploadMarkdown(c));
 
 app.post('/api/purge_cache', async (c) => {
+	const authHeader = c.req.header('Authorization');
+	if (!authHeader?.startsWith('Bearer ')) return c.text('Forbidden', 403);
+	const token = authHeader.slice(7);
+	if (!token || (token !== c.env.AUDREYT_TRANSCRIPT_TOKEN && token !== c.env.BESTIAN_TRANSCRIPT_TOKEN)) {
+		return c.text('Forbidden', 403);
+	}
+
 	const bucket = c.env.SPEECH_CACHE;
 	let deleted = 0;
 	let cursor: string | undefined;
