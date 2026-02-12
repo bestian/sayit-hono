@@ -177,3 +177,4 @@ dist
 .env*
 !.env.example
 .wrangler/
+.claude/
