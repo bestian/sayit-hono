@@ -27,7 +27,7 @@ const colorStyle = (route: string, name?: string) => {
 			<div class="full-page__row">
 				<div class="full-page__unit">
 					<div class="page-header">
-						<h1>All Speakers</h1>
+						<h1><span lang="zh">所有講者</span><span lang="en">All Speakers</span></h1>
 					</div>
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">

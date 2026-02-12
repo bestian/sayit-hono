@@ -245,11 +245,11 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
       _ssrInterpolate(displayName.value)
     }</h1></div><div class="speaker-page__stats" data-v-SingleSpeakerView-ssr>`)
     if (hasSections.value) {
-      _push(`<div class="stat" data-v-SingleSpeakerView-ssr><div class="stat__figure" data-v-SingleSpeakerView-ssr>${_ssrInterpolate(speaker.value.appearances_count)}</div><div class="stat__descriptor" data-v-SingleSpeakerView-ssr> Appearances </div></div>`)
+      _push(`<div class="stat" data-v-SingleSpeakerView-ssr><div class="stat__figure" data-v-SingleSpeakerView-ssr>${_ssrInterpolate(speaker.value.appearances_count)}</div><div class="stat__descriptor" data-v-SingleSpeakerView-ssr><span lang="zh" data-v-SingleSpeakerView-ssr>出現次數</span><span lang="en" data-v-SingleSpeakerView-ssr>Appearances</span></div></div>`)
     } else {
       _push(`<!---->`)
     }
-    _push(`<div class="stat" data-v-SingleSpeakerView-ssr><div class="stat__figure" data-v-SingleSpeakerView-ssr>${_ssrInterpolate(hasSections.value ? speaker.value.sections_count : 0)}</div><div class="stat__descriptor" data-v-SingleSpeakerView-ssr> Speeches </div></div><!--
+    _push(`<div class="stat" data-v-SingleSpeakerView-ssr><div class="stat__figure" data-v-SingleSpeakerView-ssr>${_ssrInterpolate(hasSections.value ? speaker.value.sections_count : 0)}</div><div class="stat__descriptor" data-v-SingleSpeakerView-ssr><span lang="zh" data-v-SingleSpeakerView-ssr>發言數</span><span lang="en" data-v-SingleSpeakerView-ssr>Speeches</span></div></div><!--
 									<div class="stat">
 										<div class="stat__figure">
 											4<sup>th</sup>
@@ -264,13 +264,17 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
         _ssrRenderAttr("href", getSpeechUrl(speaker.value.longest_section.section_filename, speaker.value.longest_section.section_id))
       } data-v-SingleSpeakerView-ssr>${
         _ssrInterpolate(formatLongestSectionSummary(speaker.value.longest_section.summary))
-      }</a></div><div class="stat__descriptor" data-v-SingleSpeakerView-ssr> Longest speech </div></div>`)
+      }</a></div><div class="stat__descriptor" data-v-SingleSpeakerView-ssr><span lang="zh" data-v-SingleSpeakerView-ssr>最長發言</span><span lang="en" data-v-SingleSpeakerView-ssr>Longest speech</span></div></div>`)
     } else {
       _push(`<!---->`)
     }
-    _push(`</div></div></div></div><div class="speaker-page__speeches-collection" data-v-SingleSpeakerView-ssr><div class="full-page__row nested-row" data-v-SingleSpeakerView-ssr><div class="speaker-page__speeches-title" data-v-SingleSpeakerView-ssr><h2 data-v-SingleSpeakerView-ssr>Speeches</h2></div><div class="speaker-page__add-speech" data-v-SingleSpeakerView-ssr></div><div class="speaker-page__search" data-v-SingleSpeakerView-ssr><form class="site-search site-search" action="/search/" method="get" data-v-SingleSpeakerView-ssr><input type="hidden" name="p"${_ssrRenderAttr("value", speaker.value.id)} data-v-SingleSpeakerView-ssr><div class="search-wrapper" data-v-SingleSpeakerView-ssr><input type="search" class="site-search__input" placeholder="Search this person&#39;s speeches" name="q" data-v-SingleSpeakerView-ssr><input type="submit" class="icon-search icon-search" value="Search" data-v-SingleSpeakerView-ssr></div></form></div></div><ul class="unstyled js-masonry" data-masonry-options="{&quot;columnWidth&quot;:&quot;.speech&quot;,&quot;itemSelector&quot;:&quot;.speech&quot;,&quot;gutter&quot;:&quot;.gutter-sizer&quot;}" data-v-SingleSpeakerView-ssr><li class="gutter-sizer" data-v-SingleSpeakerView-ssr></li>`)
+    _push(`</div></div></div></div><div class="speaker-page__speeches-collection" data-v-SingleSpeakerView-ssr><div class="full-page__row nested-row" data-v-SingleSpeakerView-ssr><div class="speaker-page__speeches-title" data-v-SingleSpeakerView-ssr><h2 data-v-SingleSpeakerView-ssr><span lang="zh" data-v-SingleSpeakerView-ssr>發言</span><span lang="en" data-v-SingleSpeakerView-ssr>Speeches</span></h2></div><div class="speaker-page__add-speech" data-v-SingleSpeakerView-ssr></div><div class="speaker-page__search" data-v-SingleSpeakerView-ssr><form class="site-search site-search" action="/search/" method="get" data-v-SingleSpeakerView-ssr><input type="hidden" name="p"${_ssrRenderAttr("value", speaker.value.id)} data-v-SingleSpeakerView-ssr><div class="search-wrapper" data-v-SingleSpeakerView-ssr><input type="search" class="site-search__input" placeholder="Search this person&#39;s speeches" name="q" data-v-SingleSpeakerView-ssr><input type="submit" class="icon-search icon-search" value="Search" data-v-SingleSpeakerView-ssr></div></form></div></div><ul class="unstyled js-masonry" data-masonry-options="{&quot;columnWidth&quot;:&quot;.speech&quot;,&quot;itemSelector&quot;:&quot;.speech&quot;,&quot;gutter&quot;:&quot;.gutter-sizer&quot;}" data-v-SingleSpeakerView-ssr><li class="gutter-sizer" data-v-SingleSpeakerView-ssr></li>`)
     if (!hasSections.value) {
-      _push(`<li class="speech" data-v-SingleSpeakerView-ssr>${_ssrInterpolate(displayName.value)} has no recorded speeches yet. </li>`)
+      _push(`<li class="speech" data-v-SingleSpeakerView-ssr><span lang="zh" data-v-SingleSpeakerView-ssr>${
+        _ssrInterpolate(displayName.value)
+      } 尚無紀錄的發言。</span><span lang="en" data-v-SingleSpeakerView-ssr>${
+        _ssrInterpolate(displayName.value)
+      } has no recorded speeches yet.</span></li>`)
     } else {
       _push(`<!---->`)
     }
@@ -294,11 +298,11 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
         _ssrRenderAttr("title", `Link in context`)
       }${
         _ssrRenderAttr("href", getSpeechUrl(section.filename, section.section_id))
-      } data-v-SingleSpeakerView-ssr><i class="speech-icon icon-link-in-context" data-v-SingleSpeakerView-ssr></i>Link in context </a><a${
+      } data-v-SingleSpeakerView-ssr><i class="speech-icon icon-link-in-context" data-v-SingleSpeakerView-ssr></i><span lang="zh" data-v-SingleSpeakerView-ssr>前後文</span><span lang="en" data-v-SingleSpeakerView-ssr>Link in context</span></a><a${
         _ssrRenderAttr("title", `Link`)
       }${
         _ssrRenderAttr("href", getSpeechPageUrl(section.section_id))
-      } data-v-SingleSpeakerView-ssr><i class="speech-icon icon-link" data-v-SingleSpeakerView-ssr></i>Link </a></div></div></li>`)
+      } data-v-SingleSpeakerView-ssr><i class="speech-icon icon-link" data-v-SingleSpeakerView-ssr></i><span lang="zh" data-v-SingleSpeakerView-ssr>連結</span><span lang="en" data-v-SingleSpeakerView-ssr>Link</span></a></div></div></li>`)
     })
     _push(`<!--]--></ul><div class="pagination" data-v-SingleSpeakerView-ssr><span class="${
       _ssrRenderClass(['button search-pagination-button', hasPrev.value ? '' : 'button--disabled'])

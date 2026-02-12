@@ -4,7 +4,7 @@
 		<div class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit">
-					<h1 class="search-title-with-result">Search / <strong>{{ query }}</strong></h1>
+					<h1 class="search-title-with-result"><span lang="zh">搜尋</span><span lang="en">Search</span> / <strong>{{ query }}</strong></h1>
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">
 							<input type="search" class="site-search__input" placeholder="Search" name="q" :value="query" />
@@ -17,22 +17,22 @@
 							<template v-if="filteredSpeakerId && filteredSpeakerName">
 								<label>
 									<input type="checkbox" name="p" :value="filteredSpeakerId" checked>
-									Search only speeches by {{ filteredSpeakerName }}
+									<span lang="zh">僅搜尋 {{ filteredSpeakerName }} 的發言</span><span lang="en">Search only speeches by {{ filteredSpeakerName }}</span>
 								</label>
 							</template>
 							<!-- 沒有講者篩選時，顯示原本的 Speakers 區塊 -->
 							<template v-else>
-								<h2>Speakers</h2>
+								<h2><span lang="zh">講者</span><span lang="en">Speakers</span></h2>
 								<ul class="unstyled-list search-results-speakers">
 									<li v-for="speaker in speakers" :key="speaker.route_pathname" class="search">
 										<a :href="`/speaker/${speaker.route_pathname}`">
 											<span v-html="speaker.snippet || speaker.name"></span>
 										</a>
 									</li>
-									<li v-if="speakers.length === 0" class="search">There are no speakers that match your search.</li>
+									<li v-if="speakers.length === 0" class="search"><span lang="zh">沒有符合的講者。</span><span lang="en">There are no speakers that match your search.</span></li>
 								</ul>
 							</template>
-							<h2>Mentions of <strong>&ldquo;{{ query }}&rdquo;</strong> in speeches</h2>
+							<h2><span lang="zh">在對話中提及 <strong>&ldquo;{{ query }}&rdquo;</strong></span><span lang="en">Mentions of <strong>&ldquo;{{ query }}&rdquo;</strong> in speeches</span></h2>
 							<ul class="unstyled-list search-results-list">
 								<li
 									v-for="section in sections"
