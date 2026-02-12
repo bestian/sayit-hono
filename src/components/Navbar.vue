@@ -6,13 +6,13 @@
 			</h1>
 			<ul class="inline-list left">
 				<li>
-					<a href="/">Home</a>
+					<a href="/"><span lang="zh">首頁</span><span lang="en">Home</span></a>
 				</li>
 				<li>
-					<a href="/speakers">Speakers</a>
+					<a href="/speakers"><span lang="zh">講者</span><span lang="en">Speakers</span></a>
 				</li>
 				<li>
-					<a href="/speeches">Speeches</a>
+					<a href="/speeches"><span lang="zh">演講</span><span lang="en">Speeches</span></a>
 				</li>
 			</ul>
 			<ul class="unstyled-list right"></ul>
