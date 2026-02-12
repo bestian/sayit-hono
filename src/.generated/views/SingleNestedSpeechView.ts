@@ -171,9 +171,9 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
         (sanitizeHtmlContent(section.section_content)) ?? ''
       }</div><div class="speech__links" data-v-SingleNestedSpeechView-ssr><a${
         _ssrRenderAttr("href", getLinkInContextUrl(section))
-      } title="Link in context" data-v-SingleNestedSpeechView-ssr><i class="speech-icon icon-link-in-context" data-v-SingleNestedSpeechView-ssr></i>Link in context </a><a${
+      } title="Link in context" data-v-SingleNestedSpeechView-ssr><i class="speech-icon icon-link-in-context" data-v-SingleNestedSpeechView-ssr></i><span lang="zh" data-v-SingleNestedSpeechView-ssr>前後文</span><span lang="en" data-v-SingleNestedSpeechView-ssr>Link in context</span></a><a${
         _ssrRenderAttr("href", getSpeechPageUrl(section.section_id))
-      } title="Link" data-v-SingleNestedSpeechView-ssr><i class="speech-icon icon-link" data-v-SingleNestedSpeechView-ssr></i>Link </a></div></div></li>`)
+      } title="Link" data-v-SingleNestedSpeechView-ssr><i class="speech-icon icon-link" data-v-SingleNestedSpeechView-ssr></i><span lang="zh" data-v-SingleNestedSpeechView-ssr>連結</span><span lang="en" data-v-SingleNestedSpeechView-ssr>Link</span></a></div></div></li>`)
     })
     _push(`<!--]--></ul></div><!-- close primary-content__unit --><div class="sidebar__unit section-detail-sidebar" data-v-SingleNestedSpeechView-ssr><div class="section-navigation" data-v-SingleNestedSpeechView-ssr>`)
     if (previousSibling.value) {
@@ -194,7 +194,7 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     } else {
       _push(`<!---->`)
     }
-    _push(`</div><div class="ui-instructions cleared" data-v-SingleNestedSpeechView-ssr><h2 data-v-SingleNestedSpeechView-ssr>Keyboard shortcuts</h2><p data-v-SingleNestedSpeechView-ssr><span class="key-descriptor" data-v-SingleNestedSpeechView-ssr>j</span> previous section <span class="key-descriptor" data-v-SingleNestedSpeechView-ssr>k</span> next section </p></div></div></div>`)
+    _push(`</div><div class="ui-instructions cleared" data-v-SingleNestedSpeechView-ssr><h2 data-v-SingleNestedSpeechView-ssr><span lang="zh" data-v-SingleNestedSpeechView-ssr>鍵盤快捷鍵</span><span lang="en" data-v-SingleNestedSpeechView-ssr>Keyboard shortcuts</span></h2><p data-v-SingleNestedSpeechView-ssr><span class="key-descriptor" data-v-SingleNestedSpeechView-ssr>j</span> <span lang="zh" data-v-SingleNestedSpeechView-ssr>下一段</span><span lang="en" data-v-SingleNestedSpeechView-ssr>next section</span><span class="key-descriptor" data-v-SingleNestedSpeechView-ssr>k</span> <span lang="zh" data-v-SingleNestedSpeechView-ssr>上一段</span><span lang="en" data-v-SingleNestedSpeechView-ssr>previous section</span></p></div></div></div>`)
   } else {
     _push(`<!---->`)
   }
