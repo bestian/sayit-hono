@@ -128,9 +128,9 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
         (sanitizeHtmlContent(section.section_content)) ?? ''
       }</div><div class="speech__links"><a${
         _ssrRenderAttr("href", getLinkInContextUrl(section))
-      } title="Link in context"><i class="speech-icon icon-link-in-context"></i>Link in context </a><a${
+      } title="Link in context"><i class="speech-icon icon-link-in-context"></i><span lang="zh">前後文</span><span lang="en">Link in context</span></a><a${
         _ssrRenderAttr("href", getSpeechPageUrl(section.section_id))
-      } title="Link"><i class="speech-icon icon-link"></i>Link </a></div></div></li>`)
+      } title="Link"><i class="speech-icon icon-link"></i><span lang="zh">連結</span><span lang="en">Link</span></a></div></div></li>`)
     })
     _push(`<!--]--></ul></div><!-- close primary-content__unit --><div class="sidebar__unit section-detail-sidebar"></div><!-- close sidebar__unit --></div>`)
   } else {

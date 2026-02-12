@@ -246,7 +246,7 @@ const formatLongestSectionSummary = (summary: string) => {
 											{{ speaker.appearances_count }}
 										</div>
 										<div class="stat__descriptor">
-											Appearances
+											<span lang="zh">出現次數</span><span lang="en">Appearances</span>
 										</div>
 									</div>
 									<div class="stat">
@@ -254,7 +254,7 @@ const formatLongestSectionSummary = (summary: string) => {
 											{{ hasSections ? speaker.sections_count : 0 }}
 										</div>
 										<div class="stat__descriptor">
-											Speeches
+											<span lang="zh">發言數</span><span lang="en">Speeches</span>
 										</div>
 									</div>
 									<!--
@@ -275,7 +275,7 @@ const formatLongestSectionSummary = (summary: string) => {
 											</a>
 										</div>
 										<div class="stat__descriptor">
-											Longest speech
+											<span lang="zh">最長發言</span><span lang="en">Longest speech</span>
 										</div>
 									</div>
 								</div>
@@ -285,7 +285,7 @@ const formatLongestSectionSummary = (summary: string) => {
 					<div class="speaker-page__speeches-collection">
 						<div class="full-page__row nested-row">
 							<div class="speaker-page__speeches-title">
-								<h2>Speeches</h2>
+								<h2><span lang="zh">發言</span><span lang="en">Speeches</span></h2>
 							</div>
 							<div class="speaker-page__add-speech">
 							</div>
@@ -303,7 +303,7 @@ const formatLongestSectionSummary = (summary: string) => {
 							data-masonry-options='{"columnWidth":".speech","itemSelector":".speech","gutter":".gutter-sizer"}'>
 							<li class="gutter-sizer"></li>
 							<li v-if="!hasSections" class="speech">
-								{{ displayName }} has no recorded speeches yet.
+								<span lang="zh">{{ displayName }} 尚無紀錄的發言。</span><span lang="en">{{ displayName }} has no recorded speeches yet.</span>
 							</li>
 							<li v-for="section in speaker.sections" :key="section.section_id" :id="`s${section.section_id}`"
 								class="speech speech--speech speech--border" :style="{ borderLeftColor: speakerColor }">
@@ -331,10 +331,10 @@ const formatLongestSectionSummary = (summary: string) => {
 									</a>
 									<div class="speech__links">
 										<a :title="`Link in context`" :href="getSpeechUrl(section.filename, section.section_id)">
-											<i class="speech-icon icon-link-in-context"></i>Link in context
+											<i class="speech-icon icon-link-in-context"></i><span lang="zh">前後文</span><span lang="en">Link in context</span>
 										</a>
 										<a :title="`Link`" :href="getSpeechPageUrl(section.section_id)">
-											<i class="speech-icon icon-link"></i>Link
+											<i class="speech-icon icon-link"></i><span lang="zh">連結</span><span lang="en">Link</span>
 										</a>
 									</div>
 								</div>
