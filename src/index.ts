@@ -270,6 +270,22 @@ app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.patch('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.delete('/api/upload_markdown', (c) => uploadMarkdown(c));
 
+app.post('/api/purge_cache', async (c) => {
+	const bucket = c.env.SPEECH_CACHE;
+	let deleted = 0;
+	let cursor: string | undefined;
+	do {
+		const list = await bucket.list({ cursor, limit: 500 });
+		const keys = list.objects.map((o: { key: string }) => o.key);
+		if (keys.length > 0) {
+			await bucket.delete(keys);
+			deleted += keys.length;
+		}
+		cursor = list.truncated ? list.cursor : undefined;
+	} while (cursor);
+	return c.json({ deleted });
+});
+
 // SSR 搜尋結果頁
 async function renderSearchPage(c: any) {
 	const url = new URL(c.req.url);
