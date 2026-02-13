@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
-import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
+import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache, deleteEdgeCache, deleteR2Cache } from './cache';
 import type { ApiEnv } from './types';
 
 const SPEECH_API_PREFIX = '/api/an/';
@@ -312,28 +312,35 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	// 完整演講：先查 Edge cache，再查 SPEECH_CACHE（an/filename）
 	const cacheKey = `an/${baseKey}`;
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) {
-		console.log('[an cache] hit edge', cacheKey);
-		const headers = new Headers(edgeCached.headers);
-		Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-		if (c.req.method === 'HEAD') {
-			return new Response(null, { status: 200, headers });
+	const purge = c.req.url.includes('?');
+
+	if (purge) {
+		await deleteEdgeCache(cacheKey);
+		await deleteR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	} else {
+		const edgeCached = await readEdgeCache(cacheKey);
+		if (edgeCached) {
+			console.log('[an cache] hit edge', cacheKey);
+			const headers = new Headers(edgeCached.headers);
+			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+			if (c.req.method === 'HEAD') {
+				return new Response(null, { status: 200, headers });
+			}
+			return new Response(await edgeCached.text(), { status: 200, headers });
 		}
-		return new Response(await edgeCached.text(), { status: 200, headers });
-	}
-	const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/plain; charset=utf-8');
-	if (cached) {
-		console.log('[an cache] hit r2', cacheKey);
-		const headers = new Headers(cached.headers);
-		Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-		if (c.req.method === 'HEAD') {
-			return new Response(null, { status: 200, headers });
+		const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/plain; charset=utf-8');
+		if (cached) {
+			console.log('[an cache] hit r2', cacheKey);
+			const headers = new Headers(cached.headers);
+			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+			if (c.req.method === 'HEAD') {
+				return new Response(null, { status: 200, headers });
+			}
+			const body = await cached.text();
+			const response = new Response(body, { status: 200, headers });
+			await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
+			return response;
 		}
-		const body = await cached.text();
-		const response = new Response(body, { status: 200, headers });
-		await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
-		return response;
 	}
 
 	// 從 DB 查 speech_content 即時生成 .an
