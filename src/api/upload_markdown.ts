@@ -543,29 +543,27 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 		const method = c.req.method;
 
 		if (method === 'DELETE') {
-			// DELETE：從 body 讀取 filename，刪除 speech_content、speech_speakers、孤兒講者、speech_index
+			// DELETE：filename は query param で受け取る（CF が DELETE body を剥ぎ取るため）
 
 			console.log('[upload_markdown] DELETE');
-			let body: { filename?: string };
 
-			try {
-				body = await c.req.json();
-				console.log('[upload_markdown] DELETE body:', body);
+			const queryFilename = c.req.query('filename');
+			console.log('[upload_markdown] DELETE query filename:', queryFilename);
 
-				if (!body.filename || typeof body.filename !== 'string') {
-					return c.json({ error: 'Missing or invalid filename field' }, 400, corsHeadersWithMethods);
-				}
+			if (!queryFilename || typeof queryFilename !== 'string') {
+				return c.json({ error: 'Missing or invalid filename query parameter' }, 400, corsHeadersWithMethods);
+			}
 
-				const inputFilename = body.filename.trim();
+			const inputFilename = queryFilename.trim();
 
-				if (!inputFilename) {
-					return c.json({ error: 'Filename cannot be empty' }, 400, corsHeadersWithMethods);
-				}
+			if (!inputFilename) {
+				return c.json({ error: 'Filename cannot be empty' }, 400, corsHeadersWithMethods);
+			}
 
-				const filename = transformFilename(inputFilename);
-				console.log('[upload_markdown] filename transform:', { input: inputFilename, output: filename });
+			const filename = transformFilename(inputFilename);
+			console.log('[upload_markdown] filename transform:', { input: inputFilename, output: filename });
 
-				// Delete from D1: speech_content (sections)
+			// Delete from D1: speech_content (sections)
 				console.log('[upload_markdown] DELETE sections from D1:', filename);
 				const deleteSectionsResult = await c.env.DB.prepare(
 					'DELETE FROM speech_content WHERE filename = ?'
@@ -651,10 +649,6 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					200,
 					corsHeadersWithMethods
 				);
-			} catch (err) {
-				console.error('[upload_markdown] DELETE JSON parse error', err);
-				return c.json({ error: 'Invalid JSON body' }, 400, corsHeadersWithMethods);
-			}
 		} else if (method === 'POST') {
 			// POST：新增一筆演講。寫入 speech_index、speakers、speech_speakers、speech_content（段落）
 			let body: { filename?: string; markdown?: string };
