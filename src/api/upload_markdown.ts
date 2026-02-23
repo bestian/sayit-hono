@@ -8,10 +8,10 @@ const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
 /** 辨識「講者標題行」：開頭 1～6 個 #、結尾為 : 或 ： */
 const speakerLineRegExp = /^#{1,6}\s*(.+?)\s*[:：]\s*$/;
 
-/** 將使用者輸入的檔名正規化（小寫、去 .md、最多 50 字） */
+/** 將使用者輸入的檔名正規化（小寫、去 .md、全形冒號→連字號、最多 50 字） */
 function transformFilename(input: string): string {
 	const lower = input.toLowerCase();
-	const replaced = lower.replace(/\.md$/, '');
+	const replaced = lower.replace(/\.md$/, '').replace(/：/g, '-');
 	return replaced.slice(0, 50);
 }
 
