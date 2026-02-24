@@ -1,9 +1,6 @@
 <template>
 	<header class="full-page__row navbar">
 		<div class="full-page__unit">
-			<h1>
-				<a href="/">SayIt</a>
-			</h1>
 			<ul class="inline-list left">
 				<li>
 					<a href="/"><span lang="zh">首頁</span><span lang="en">Home</span></a>
