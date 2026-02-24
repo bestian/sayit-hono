@@ -44,25 +44,24 @@ const sortedSpeeches = computed(() => {
 		<div class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit">
-					<div class="page-header">
+					<div class="page-header sayit-search-header">
 						<h1><span lang="zh">對話</span><span lang="en">Speeches</span></h1>
+						<!-- Pagefind search widget -->
+						<div id="sayit-search" class="sayit-search" role="search">
+							<div class="sayit-search__input-wrap">
+								<input
+									id="sayit-search-input"
+									type="search"
+									class="sayit-search__input"
+									autocomplete="off"
+									spellcheck="false"
+									aria-label="Search speeches"
+								>
+								<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+							</div>
+						</div>
 					</div>
-
-					<!-- Pagefind search widget -->
-					<div id="sayit-search" class="sayit-search" role="search">
-						<div class="sayit-search__input-wrap">
-							<input
-								id="sayit-search-input"
-								type="search"
-								class="sayit-search__input"
-								autocomplete="off"
-								spellcheck="false"
-								aria-label="Search speeches"
-							>
-							<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
-						</div>
-						<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden>
-						</div>
+					<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden>
 					</div>
 
 					<ul class="unstyled" id="sayit-speech-list">
@@ -83,8 +82,30 @@ const sortedSpeeches = computed(() => {
 
 <style>
 /* Non-scoped: search results are rendered by client-side JS */
+.sayit-search-header {
+	display: flex;
+	align-items: center;
+	gap: 1em;
+	flex-wrap: wrap;
+}
+
+.sayit-search-header h1 {
+	margin: 0;
+	flex-shrink: 0;
+}
+
 .sayit-search {
-	margin: 0.25em 0 1.8em;
+	flex: 1 1 200px;
+	min-width: 0;
+	max-width: 400px;
+	margin: 0;
+}
+
+@media (max-width: 480px) {
+	.sayit-search {
+		flex-basis: 100%;
+		max-width: 100%;
+	}
 }
 
 .sayit-search__input-wrap {
@@ -95,10 +116,10 @@ const sortedSpeeches = computed(() => {
 .sayit-search__input {
 	display: block;
 	width: 100%;
-	padding: 0.7em 1em;
-	padding-right: 2.8em;
+	padding: 0.45em 0.8em;
+	padding-right: 2.4em;
 	font-family: 'Noto Sans TC', sans-serif;
-	font-size: 1.05em;
+	font-size: 0.9em;
 	font-weight: 400;
 	line-height: 1.5;
 	color: #2c2c2c;
