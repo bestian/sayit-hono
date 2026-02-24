@@ -1,5 +1,8 @@
 # Generated Vue SSR artifacts
 src/.generated/
+
+# Pagefind search index (built from transcript .md files)
+www/pagefind/
 # Logs
 
 logs
