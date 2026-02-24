@@ -47,6 +47,7 @@ app.use('*', staticFirstMiddleware);
 
 const EDGE_TTL_SECONDS = 60;
 const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=${EDGE_TTL_SECONDS}, s-maxage=${EDGE_TTL_SECONDS}`;
+const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></script>';
 
 function buildCacheKey(url: string): string {
 	try {
@@ -426,7 +427,7 @@ async function renderSpeechesPage(c: any) {
 		styles,
 		components: { Navbar, Footer },
 		props: { speeches },
-		scripts: '<script src="/static/speeches/js/pagefind-search.js"></script>'
+		scripts: PAGEFIND_SCRIPT
 	});
 
 	let response = c.html(html);
@@ -524,7 +525,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 		styles,
 		components: { Navbar, Footer },
 		props: { section },
-		scripts: navigationScript
+		scripts: [navigationScript, PAGEFIND_SCRIPT].filter(Boolean).join('\n')
 	});
 
 	return c.html(html);
@@ -801,7 +802,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 			speechDisplayName,
 			siblings
 		},
-		scripts: navigationScript
+		scripts: [navigationScript, PAGEFIND_SCRIPT].filter(Boolean).join('\n')
 	});
 
 	let response = c.html(html);
@@ -945,7 +946,8 @@ app.get('/:filename', async (c) => {
 				nests,
 				speechName: filename,
 				displayName: speechMeta.display_name ?? filename
-			}
+			},
+			scripts: PAGEFIND_SCRIPT
 		});
 
 		return c.html(html);
@@ -1008,7 +1010,8 @@ app.get('/:filename', async (c) => {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: { sections, speechName: filename, displayName }
+		props: { sections, speechName: filename, displayName },
+		scripts: PAGEFIND_SCRIPT
 	});
 
 	let response = c.html(html);
