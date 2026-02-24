@@ -15,7 +15,7 @@
 					<a href="/speeches"><span lang="zh">對話</span><span lang="en">Speeches</span></a>
 				</li>
 			</ul>
-			<ul class="unstyled-list right"></ul>
+			<div class="navbar__right"><slot /></div>
 		</div>
 	</header>
 </template>

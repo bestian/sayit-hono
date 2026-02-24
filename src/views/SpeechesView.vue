@@ -40,26 +40,27 @@ const sortedSpeeches = computed(() => {
 
 <template>
 	<div class="page">
-		<Navbar />
+		<Navbar>
+			<!-- Pagefind search widget in navbar -->
+			<div id="sayit-search" class="sayit-search" role="search">
+				<div class="sayit-search__input-wrap">
+					<input
+						id="sayit-search-input"
+						type="search"
+						class="sayit-search__input"
+						autocomplete="off"
+						spellcheck="false"
+						aria-label="Search speeches"
+					>
+					<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+				</div>
+			</div>
+		</Navbar>
 		<div class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit">
-					<div class="page-header sayit-search-header">
+					<div class="page-header">
 						<h1><span lang="zh">對話</span><span lang="en">Speeches</span></h1>
-						<!-- Pagefind search widget -->
-						<div id="sayit-search" class="sayit-search" role="search">
-							<div class="sayit-search__input-wrap">
-								<input
-									id="sayit-search-input"
-									type="search"
-									class="sayit-search__input"
-									autocomplete="off"
-									spellcheck="false"
-									aria-label="Search speeches"
-								>
-								<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
-							</div>
-						</div>
 					</div>
 					<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden>
 					</div>
@@ -82,29 +83,27 @@ const sortedSpeeches = computed(() => {
 
 <style>
 /* Non-scoped: search results are rendered by client-side JS */
-.sayit-search-header {
+.navbar__right {
+	margin-left: auto;
+	flex-shrink: 1;
+	min-width: 0;
+}
+
+.navbar .full-page__unit {
 	display: flex;
 	align-items: center;
-	gap: 1em;
 	flex-wrap: wrap;
 }
 
-.sayit-search-header h1 {
-	margin: 0;
-	flex-shrink: 0;
-}
-
 .sayit-search {
-	flex: 1 1 200px;
-	min-width: 0;
-	max-width: 400px;
+	width: 220px;
 	margin: 0;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 580px) {
 	.sayit-search {
-		flex-basis: 100%;
-		max-width: 100%;
+		width: 100%;
+		margin-top: 0.4em;
 	}
 }
 
