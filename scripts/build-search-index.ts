@@ -66,15 +66,33 @@ async function buildSearchIndex() {
 
 	const transcriptDir = process.argv[2] || path.resolve('..', 'transcript');
 	const outputDir = path.resolve('www', 'pagefind');
+	const apiUrl = process.env.SAYIT_API_URL || 'https://sayit.archive.tw/api/speech_index.json';
 
 	console.log(`[build-search] Reading .md files from: ${transcriptDir}`);
 	console.log(`[build-search] Output: ${outputDir}`);
 
-	// Read all .md files from transcript directory
+	// Build maps from transformFilename(mdFile) → mdFile for reverse lookup
 	const entries = await readdir(transcriptDir);
 	const mdFiles = entries.filter((f) => f.endsWith('.md') && !f.startsWith('.'));
+	const mdByTransformed = new Map<string, string>();
+	// Also build a normalized map that strips hyphens between ASCII and CJK
+	// to handle cases where DB filename differs from transform output
+	const stripMixedHyphens = (s: string) => s.replace(/([a-z0-9])-(?=[^\x00-\x7f])/g, '$1').replace(/(?<=[^\x00-\x7f])-([a-z0-9])/g, '$1');
+	const mdByNormalized = new Map<string, string>();
+	for (const file of mdFiles) {
+		const transformed = transformFilename(file);
+		mdByTransformed.set(transformed, file);
+		mdByNormalized.set(stripMixedHyphens(transformed), file);
+	}
 
 	console.log(`[build-search] Found ${mdFiles.length} markdown files`);
+
+	// Fetch canonical filenames from production DB
+	console.log(`[build-search] Fetching canonical filenames from ${apiUrl}`);
+	const resp = await fetch(apiUrl);
+	if (!resp.ok) throw new Error(`Failed to fetch speech index: HTTP ${resp.status}`);
+	const dbEntries = (await resp.json()) as Array<{ filename: string; display_name: string }>;
+	console.log(`[build-search] Got ${dbEntries.length} entries from DB`);
 
 	// Create Pagefind index
 	const { index } = await pagefind.createIndex({
@@ -87,18 +105,24 @@ async function buildSearchIndex() {
 
 	let indexed = 0;
 	let skipped = 0;
+	let noFile = 0;
 
-	for (const file of mdFiles) {
-		const filePath = path.join(transcriptDir, file);
-		const markdown = await readFile(filePath, 'utf-8');
+	for (const dbEntry of dbEntries) {
+		const canonicalFilename = dbEntry.filename;
 
-		const title = extractTitle(markdown);
-		if (!title) {
-			skipped++;
+		// Find corresponding .md file: try exact match, then fuzzy (strip mixed hyphens)
+		let mdFile = mdByTransformed.get(canonicalFilename)
+			|| mdByNormalized.get(stripMixedHyphens(canonicalFilename));
+
+		if (!mdFile) {
+			noFile++;
 			continue;
 		}
 
-		const filename = transformFilename(file);
+		const filePath = path.join(transcriptDir, mdFile);
+		const markdown = await readFile(filePath, 'utf-8');
+
+		const title = extractTitle(markdown) || dbEntry.display_name;
 		const date = extractDate(title);
 		const speakers = extractSpeakers(markdown);
 		const content = stripMarkdown(markdown);
@@ -108,7 +132,8 @@ async function buildSearchIndex() {
 			continue;
 		}
 
-		const url = `/${encodeURIComponent(filename)}`;
+		// Use the canonical DB filename for the URL
+		const url = `/${encodeURIComponent(canonicalFilename)}`;
 
 		await index.addCustomRecord({
 			url,
@@ -130,7 +155,35 @@ async function buildSearchIndex() {
 		indexed++;
 	}
 
-	console.log(`[build-search] Indexed: ${indexed}, Skipped: ${skipped}`);
+	// Also index .md files that aren't in the DB yet (new files not yet uploaded)
+	const dbFilenames = new Set(dbEntries.map((e) => e.filename));
+	const dbNormalized = new Set(dbEntries.map((e) => stripMixedHyphens(e.filename)));
+	for (const file of mdFiles) {
+		const derived = transformFilename(file);
+		// Skip if already indexed via DB entry (exact or fuzzy match)
+		if (dbFilenames.has(derived) || dbNormalized.has(stripMixedHyphens(derived))) continue;
+
+		const filePath = path.join(transcriptDir, file);
+		const markdown = await readFile(filePath, 'utf-8');
+		const title = extractTitle(markdown);
+		if (!title) { skipped++; continue; }
+		const content = stripMarkdown(markdown);
+		if (!content.trim()) { skipped++; continue; }
+
+		const date = extractDate(title);
+		const speakers = extractSpeakers(markdown);
+		const url = `/${encodeURIComponent(derived)}`;
+
+		await index.addCustomRecord({
+			url, content, language: 'zh-tw',
+			meta: { title, ...(date ? { date } : {}), ...(speakers.length > 0 ? { speaker: speakers.join(', ') } : {}) },
+			filters: { ...(speakers.length > 0 ? { speaker: speakers } : {}) },
+			sort: { ...(date ? { date } : {}) },
+		});
+		indexed++;
+	}
+
+	console.log(`[build-search] Indexed: ${indexed}, Skipped: ${skipped}, No .md file: ${noFile}`);
 
 	// Write the index
 	const { errors } = await index.writeFiles({
