@@ -425,7 +425,8 @@ async function renderSpeechesPage(c: any) {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: { speeches }
+		props: { speeches },
+		scripts: '<script src="/static/speeches/js/pagefind-search.js"></script>'
 	});
 
 	let response = c.html(html);
