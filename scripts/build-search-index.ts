@@ -205,45 +205,54 @@ async function buildSearchIndex() {
 		const sections = sectionsDump[canonicalFilename];
 
 		if (sections && sections.length > 0) {
-			// Section-level indexing from dump/API data
+			// Document-level indexing with content from all sections, URL deep-links to first section
 			const title = sections[0].display_name || dbEntry.display_name;
 			const date = extractDate(title);
+			const speakers: string[] = [];
+			const contentParts: string[] = [];
 
 			for (const section of sections) {
-				const content = stripHtml(section.section_content || '');
-				if (!content.trim()) { skipped++; continue; }
-
+				const text = stripHtml(section.section_content || '');
+				if (text.trim()) contentParts.push(text);
 				const speakerName = section.name || null;
-				if (speakerName) allSpeakers.add(speakerName);
-
-				// Build URL with section anchor
-				let url: string;
-				if (section.nest_filename) {
-					url = `/${encodeURIComponent(canonicalFilename)}/${encodeURIComponent(section.nest_filename)}#s${section.section_id}`;
-				} else {
-					url = `/${encodeURIComponent(canonicalFilename)}#s${section.section_id}`;
+				if (speakerName && !speakers.includes(speakerName)) {
+					speakers.push(speakerName);
+					allSpeakers.add(speakerName);
 				}
-
-				await index.addCustomRecord({
-					url,
-					content,
-					language: 'zh-tw',
-					meta: {
-						title,
-						...(date ? { date } : {}),
-						...(speakerName ? { speaker: speakerName } : {}),
-					},
-					filters: {
-						...(speakerName ? { speaker: [speakerName] } : {}),
-					},
-					sort: {
-						...(date ? { date } : {}),
-					},
-				});
-
-				indexed++;
-				sectionCount++;
 			}
+
+			const content = contentParts.join('\n');
+			if (!content.trim()) { skipped++; continue; }
+
+			sectionCount += sections.length;
+
+			// URL points to first section anchor
+			const firstSection = sections[0];
+			let url: string;
+			if (firstSection.nest_filename) {
+				url = `/${encodeURIComponent(canonicalFilename)}/${encodeURIComponent(firstSection.nest_filename)}#s${firstSection.section_id}`;
+			} else {
+				url = `/${encodeURIComponent(canonicalFilename)}#s${firstSection.section_id}`;
+			}
+
+			await index.addCustomRecord({
+				url,
+				content,
+				language: 'zh-tw',
+				meta: {
+					title,
+					...(date ? { date } : {}),
+					...(speakers.length > 0 ? { speaker: speakers.join(', ') } : {}),
+				},
+				filters: {
+					...(speakers.length > 0 ? { speaker: speakers } : {}),
+				},
+				sort: {
+					...(date ? { date } : {}),
+				},
+			});
+
+			indexed++;
 			continue;
 		}
 
