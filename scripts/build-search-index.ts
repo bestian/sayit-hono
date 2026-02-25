@@ -200,59 +200,77 @@ async function buildSearchIndex() {
 	let docLevelFallback = 0;
 	const allSpeakers = new Set<string>();
 
+	// Chunk size: group sections into small chunks so each record deep-links
+	// close to the match, while keeping total fragment count under Cloudflare's 100K asset limit.
+	// ~3.4K non-fragment files + fragments must be < 100K → max ~96K fragments.
+	const CHUNK_SIZE = 5;
+
 	for (const dbEntry of dbEntries) {
 		const canonicalFilename = dbEntry.filename;
 		const sections = sectionsDump[canonicalFilename];
 
 		if (sections && sections.length > 0) {
-			// Document-level indexing with content from all sections, URL deep-links to first section
 			const title = sections[0].display_name || dbEntry.display_name;
 			const date = extractDate(title);
-			const speakers: string[] = [];
-			const contentParts: string[] = [];
-
-			for (const section of sections) {
-				const text = stripHtml(section.section_content || '');
-				if (text.trim()) contentParts.push(text);
-				const speakerName = section.name || null;
-				if (speakerName && !speakers.includes(speakerName)) {
-					speakers.push(speakerName);
-					allSpeakers.add(speakerName);
-				}
-			}
-
-			const content = contentParts.join('\n');
-			if (!content.trim()) { skipped++; continue; }
-
 			sectionCount += sections.length;
 
-			// URL points to first section anchor
-			const firstSection = sections[0];
-			let url: string;
-			if (firstSection.nest_filename) {
-				url = `/${encodeURIComponent(canonicalFilename)}/${encodeURIComponent(firstSection.nest_filename)}#s${firstSection.section_id}`;
-			} else {
-				url = `/${encodeURIComponent(canonicalFilename)}#s${firstSection.section_id}`;
+			// Group sections by nest_filename, then chunk within each group
+			const groups = new Map<string, ApiSection[]>();
+			for (const section of sections) {
+				const key = section.nest_filename || '';
+				const arr = groups.get(key) || [];
+				arr.push(section);
+				groups.set(key, arr);
 			}
 
-			await index.addCustomRecord({
-				url,
-				content,
-				language: 'zh-tw',
-				meta: {
-					title,
-					...(date ? { date } : {}),
-					...(speakers.length > 0 ? { speaker: speakers.join(', ') } : {}),
-				},
-				filters: {
-					...(speakers.length > 0 ? { speaker: speakers } : {}),
-				},
-				sort: {
-					...(date ? { date } : {}),
-				},
-			});
+			for (const [nestFilename, groupSections] of groups) {
+				for (let i = 0; i < groupSections.length; i += CHUNK_SIZE) {
+					const chunk = groupSections.slice(i, i + CHUNK_SIZE);
+					const contentParts: string[] = [];
+					const speakers: string[] = [];
 
-			indexed++;
+					for (const section of chunk) {
+						const text = stripHtml(section.section_content || '');
+						if (text.trim()) contentParts.push(text);
+						const speakerName = section.name || null;
+						if (speakerName && !speakers.includes(speakerName)) {
+							speakers.push(speakerName);
+							allSpeakers.add(speakerName);
+						}
+					}
+
+					const content = contentParts.join('\n');
+					if (!content.trim()) { skipped++; continue; }
+
+					// URL deep-links to first section in chunk
+					const first = chunk[0];
+					let url: string;
+					if (nestFilename) {
+						url = `/${encodeURIComponent(canonicalFilename)}/${encodeURIComponent(nestFilename)}#s${first.section_id}`;
+					} else {
+						url = `/${encodeURIComponent(canonicalFilename)}#s${first.section_id}`;
+					}
+
+					await index.addCustomRecord({
+						url,
+						content,
+						language: 'zh-tw',
+						meta: {
+							title,
+							...(date ? { date } : {}),
+							...(speakers.length > 0 ? { speaker: speakers.join(', ') } : {}),
+						},
+						filters: {
+							...(speakers.length > 0 ? { speaker: speakers } : {}),
+						},
+						sort: {
+							...(date ? { date } : {}),
+						},
+					});
+
+					indexed++;
+				}
+			}
 			continue;
 		}
 
