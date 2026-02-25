@@ -43,18 +43,36 @@
 </script>
 
 <style scoped>
+.homepage-search {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
 .sayit-search--homepage {
 	width: 100%;
-	max-width: 480px;
+	max-width: 520px;
 }
 
 .sayit-search--homepage .sayit-search__input {
-	font-size: 1.05em;
-	padding: 0.55em 1em;
-	padding-right: 2.6em;
+	font-size: 1.1em;
+	padding: 0.6em 1.1em;
+	padding-right: 2.8em;
+	border-radius: 8px;
 }
 
-a {
-	cursor: pointer !important;
+.homepage-stats a {
+	color: #6b6357;
+	text-decoration: none;
+	transition: color 0.2s ease;
+}
+
+.homepage-stats a:hover {
+	color: #3a7d5c;
+}
+
+.homepage-stats strong {
+	font-weight: 500;
+	color: #2c2c2c;
 }
 </style>

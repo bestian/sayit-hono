@@ -212,19 +212,38 @@
 	animation: sayit-spin 0.6s linear infinite;
 }
 
-.sayit-search__more {
+button.sayit-search__more {
+	/* Reset Foundation button styles */
 	display: block;
-	padding: 0.75em 0 0.25em;
+	width: 100%;
+	margin: 1em 0 0.25em;
+	padding: 0.7em 1.5em;
+	font-family: 'Noto Sans TC', sans-serif;
 	font-size: 0.85em;
-	color: #8b7e6a;
-	text-decoration: none;
+	font-weight: 400;
+	letter-spacing: 0.02em;
+	color: #6b6357;
+	background: transparent;
+	border: 1.5px solid #d4d0c8;
+	border-radius: 6px;
+	cursor: pointer;
 	text-align: center;
-	transition: color 0.15s ease;
+	text-decoration: none;
+	transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+	-webkit-appearance: none;
+	appearance: none;
 }
 
-.sayit-search__more:hover {
+button.sayit-search__more:hover,
+button.sayit-search__more:focus {
 	color: #3a7d5c;
-	text-decoration: underline;
+	border-color: #3a7d5c;
+	background: rgba(58, 125, 92, 0.04);
+	text-decoration: none;
+}
+
+button.sayit-search__more:active {
+	background: rgba(58, 125, 92, 0.08);
 }
 
 @keyframes sayit-spin {
