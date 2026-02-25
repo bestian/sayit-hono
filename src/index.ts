@@ -315,7 +315,8 @@ async function renderSearchPage(c: any) {
 	const scripts = [
 		'<script type="text/javascript" src="/static/speeches/js/foundation/foundation.js" charset="utf-8"></script>',
 		'<script type="text/javascript" src="/static/speeches/js/foundation/foundation.dropdown.js" charset="utf-8"></script>',
-		'<script type="text/javascript" src="/static/speeches/js/speeches.js" charset="utf-8"></script>'
+		'<script type="text/javascript" src="/static/speeches/js/speeches.js" charset="utf-8"></script>',
+		PAGEFIND_SCRIPT
 	].join('\n');
 
 	const html = await renderHtml(SearchResultView, {
@@ -604,7 +605,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 		styles,
 		components: { Navbar, Footer },
 		props: { initialSpeaker: speaker, routePathname: speaker.route_pathname },
-		scripts: '<script src="/static/speeches/js/masonry.pkgd.min.js"></script>'
+		scripts: ['<script src="/static/speeches/js/masonry.pkgd.min.js"></script>', PAGEFIND_SCRIPT].join('\n')
 	});
 
 	let response = c.html(html);

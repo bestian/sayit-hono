@@ -1,6 +1,14 @@
 <template>
 	<div class="page">
-		<Navbar />
+		<Navbar>
+			<div id="sayit-search" class="sayit-search" role="search">
+				<div class="sayit-search__input-wrap">
+					<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
+					<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+				</div>
+			</div>
+		</Navbar>
+		<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
 		<div class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit">
