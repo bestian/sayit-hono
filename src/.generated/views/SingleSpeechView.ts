@@ -1,6 +1,6 @@
 // 由 scripts/build-views.ts 自動產生，請勿手動編輯
 import { defineComponent as _defineComponent } from 'vue'
-import { resolveComponent as _resolveComponent, mergeProps as _mergeProps } from "vue"
+import { resolveComponent as _resolveComponent, withCtx as _withCtx, createVNode as _createVNode, mergeProps as _mergeProps } from "vue"
 import { ssrRenderComponent as _ssrRenderComponent, ssrRenderAttr as _ssrRenderAttr, ssrRenderStyle as _ssrRenderStyle, ssrRenderClass as _ssrRenderClass, ssrRenderAttrs as _ssrRenderAttrs, ssrInterpolate as _ssrInterpolate, ssrRenderList as _ssrRenderList } from "vue/server-renderer"
 
 import { computed } from 'vue'
@@ -80,8 +80,47 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
   const _component_Footer = _resolveComponent("Footer")!
 
   _push(`<div${_ssrRenderAttrs(_mergeProps({ class: "page" }, _attrs))}>`)
-  _push(_ssrRenderComponent(_component_Navbar, null, null, _parent))
-  _push(`<div class="full-page"><div class="full-page__row"><div class="full-page__unit"><div class="page-header page-header--speech"><ul class="breadcrumbs"></ul>`)
+  _push(_ssrRenderComponent(_component_Navbar, null, {
+    default: _withCtx((_, _push, _parent, _scopeId) => {
+      if (_push) {
+        _push(`<div id="sayit-search" class="sayit-search" role="search"${
+          _scopeId
+        }><div class="sayit-search__input-wrap"${
+          _scopeId
+        }><input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches"${
+          _scopeId
+        }><span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true"${
+          _scopeId
+        }>/</span></div></div>`)
+      } else {
+        return [
+          _createVNode("div", {
+            id: "sayit-search",
+            class: "sayit-search",
+            role: "search"
+          }, [
+            _createVNode("div", { class: "sayit-search__input-wrap" }, [
+              _createVNode("input", {
+                id: "sayit-search-input",
+                type: "search",
+                class: "sayit-search__input",
+                autocomplete: "off",
+                spellcheck: "false",
+                "aria-label": "Search speeches"
+              }),
+              _createVNode("span", {
+                class: "sayit-search__shortcut",
+                id: "sayit-search-shortcut",
+                "aria-hidden": "true"
+              }, "/")
+            ])
+          ])
+        ]
+      }
+    }),
+    _: 1 /* STABLE */
+  }, _parent))
+  _push(`<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div><div class="full-page"><div class="full-page__row"><div class="full-page__unit"><div class="page-header page-header--speech"><ul class="breadcrumbs"></ul>`)
   if (!loading && displaySections.value.length > 0 && displaySections.value[0]) {
     _push(`<h1>${_ssrInterpolate(displaySections.value[0].display_name)}</h1>`)
   } else {
