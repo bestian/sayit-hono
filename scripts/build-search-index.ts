@@ -147,14 +147,14 @@ async function buildSearchIndex() {
 	const entries = await readdir(transcriptDir);
 	const mdFiles = entries.filter((f) => f.endsWith('.md') && !f.startsWith('.'));
 	const mdByTransformed = new Map<string, string>();
-	// Also build a normalized map that strips hyphens between ASCII and CJK
-	// to handle cases where DB filename differs from transform output
+	// Normalize for fuzzy matching: strip hyphens between ASCII/CJK and CJK punctuation
 	const stripMixedHyphens = (s: string) => s.replace(/([a-z0-9])-(?=[^\x00-\x7f])/g, '$1').replace(/(?<=[^\x00-\x7f])-([a-z0-9])/g, '$1');
+	const normalize = (s: string) => stripMixedHyphens(s).replace(/[、，。；：！？]/g, '');
 	const mdByNormalized = new Map<string, string>();
 	for (const file of mdFiles) {
 		const transformed = transformFilename(file);
 		mdByTransformed.set(transformed, file);
-		mdByNormalized.set(stripMixedHyphens(transformed), file);
+		mdByNormalized.set(normalize(transformed), file);
 	}
 
 	console.log(`[build-search] Found ${mdFiles.length} markdown files`);
@@ -249,7 +249,7 @@ async function buildSearchIndex() {
 
 		// Fallback: no section data, try document-level from markdown
 		const mdFile = mdByTransformed.get(canonicalFilename)
-			|| mdByNormalized.get(stripMixedHyphens(canonicalFilename));
+			|| mdByNormalized.get(normalize(canonicalFilename));
 
 		if (!mdFile) {
 			noFile++;
@@ -295,11 +295,11 @@ async function buildSearchIndex() {
 
 	// Also index .md files that aren't in the DB yet (new files not yet uploaded)
 	const dbFilenames = new Set(dbEntries.map((e) => e.filename));
-	const dbNormalized = new Set(dbEntries.map((e) => stripMixedHyphens(e.filename)));
+	const dbNormalized = new Set(dbEntries.map((e) => normalize(e.filename)));
 	for (const file of mdFiles) {
 		const derived = transformFilename(file);
 		// Skip if already indexed via DB entry (exact or fuzzy match)
-		if (dbFilenames.has(derived) || dbNormalized.has(stripMixedHyphens(derived))) continue;
+		if (dbFilenames.has(derived) || dbNormalized.has(normalize(derived))) continue;
 
 		const filePath = path.join(transcriptDir, file);
 		const markdown = await readFile(filePath, 'utf-8');
