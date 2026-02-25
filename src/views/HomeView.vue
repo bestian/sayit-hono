@@ -29,8 +29,9 @@
 			<div class="homepage-stats" id="sayit-stats">
 			<div class="full-page__row">
 				<div class="full-page__unit">
-				<a href="/speeches"><strong id="sayit-stat-speeches"></strong> <span lang="zh">篇對話</span><span lang="en">speeches</span></a>;
-				<a href="/speakers"><strong id="sayit-stat-speakers"></strong> <span lang="zh">位講者</span><span lang="en">speakers</span></a>
+				<a href="/speeches"><strong id="sayit-stat-speeches"></strong></a> <span lang="zh">篇發言</span><span lang="en">speeches</span>;
+				<a href="/speakers"><strong id="sayit-stat-speakers"></strong></a> <span lang="zh">位講者</span><span lang="en">speakers</span>;
+				<a href="/speeches"><strong id="sayit-stat-sections"></strong></a> <span lang="zh">場會議</span><span lang="en">sections</span>
 				</div>
 			</div>
 			</div>
@@ -61,18 +62,21 @@
 	border-radius: 8px;
 }
 
-.homepage-stats a {
+.homepage-stats .full-page__unit {
+	font-size: 1.15em;
 	color: #6b6357;
-	text-decoration: none;
-	transition: color 0.2s ease;
 }
 
-.homepage-stats a:hover {
-	color: #3a7d5c;
+.homepage-stats a {
+	text-decoration: none;
 }
 
 .homepage-stats strong {
-	font-weight: 500;
-	color: #2c2c2c;
+	font-weight: 700;
+	color: #c9564b;
+}
+
+.homepage-stats a:hover strong {
+	color: #a8443b;
 }
 </style>

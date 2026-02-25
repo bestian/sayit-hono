@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /** Regex to detect speaker heading lines: 1-6 # followed by name ending in : or ： */
@@ -94,6 +94,20 @@ async function buildSearchIndex() {
 	const dbEntries = (await resp.json()) as Array<{ filename: string; display_name: string }>;
 	console.log(`[build-search] Got ${dbEntries.length} entries from DB`);
 
+	// Fetch speakers count from production API
+	const speakersApiUrl = apiUrl.replace('speech_index.json', 'speakers_index.json');
+	console.log(`[build-search] Fetching speakers from ${speakersApiUrl}`);
+	let speakersCount = 0;
+	try {
+		const speakersResp = await fetch(speakersApiUrl);
+		if (speakersResp.ok) {
+			const speakersData = (await speakersResp.json()) as Array<unknown>;
+			speakersCount = speakersData.length;
+		}
+	} catch (err) {
+		console.warn('[build-search] Failed to fetch speakers, will count from markdown', err);
+	}
+
 	// Create Pagefind index
 	const { index } = await pagefind.createIndex({
 		forceLanguage: 'zh-tw',
@@ -106,6 +120,7 @@ async function buildSearchIndex() {
 	let indexed = 0;
 	let skipped = 0;
 	let noFile = 0;
+	const allSpeakers = new Set<string>();
 
 	for (const dbEntry of dbEntries) {
 		const canonicalFilename = dbEntry.filename;
@@ -125,6 +140,7 @@ async function buildSearchIndex() {
 		const title = extractTitle(markdown) || dbEntry.display_name;
 		const date = extractDate(title);
 		const speakers = extractSpeakers(markdown);
+		for (const s of speakers) allSpeakers.add(s);
 		const content = stripMarkdown(markdown);
 
 		if (!content.trim()) {
@@ -172,6 +188,7 @@ async function buildSearchIndex() {
 
 		const date = extractDate(title);
 		const speakers = extractSpeakers(markdown);
+		for (const s of speakers) allSpeakers.add(s);
 		const url = `/${encodeURIComponent(derived)}`;
 
 		await index.addCustomRecord({
@@ -196,6 +213,28 @@ async function buildSearchIndex() {
 	}
 
 	console.log(`[build-search] Index written to ${outputDir}`);
+
+	// Count total speech sections (speaker lines) across all markdown files
+	let totalSpeechSections = 0;
+	for (const file of mdFiles) {
+		const filePath = path.join(transcriptDir, file);
+		const markdown = await readFile(filePath, 'utf-8');
+		for (const line of markdown.split('\n')) {
+			if (speakerLineRegExp.test(line.trim())) {
+				totalSpeechSections++;
+			}
+		}
+	}
+
+	// Write stats.json for the homepage
+	const stats = {
+		speeches: totalSpeechSections,
+		speakers: speakersCount || allSpeakers.size,
+		sections: dbEntries.length,
+	};
+	const statsPath = path.resolve('www', 'stats.json');
+	await writeFile(statsPath, JSON.stringify(stats));
+	console.log(`[build-search] Stats written to ${statsPath}:`, stats);
 
 	await pagefind.close();
 }
