@@ -151,7 +151,7 @@
 
 		var search;
 		try {
-			search = await pf.search(query);
+			search = await pf.search(query, { sort: { date: 'desc' } });
 		} catch (err) {
 			console.error('[sayit-search] Search error:', err);
 			renderNoResults(query);
