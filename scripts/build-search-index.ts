@@ -17,6 +17,11 @@ function extractDate(displayName: string): string {
 	return match ? match[1] : '';
 }
 
+/** Convert YYYY-MM-DD to YYYYMMDD numeric string for pagefind sort (requires numbers) */
+function dateToSortKey(date: string): string {
+	return date.replace(/-/g, '');
+}
+
 /** Transform filename: lowercase, strip .md, replace full-width colon, max 50 chars */
 function transformFilename(input: string): string {
 	return input.toLowerCase().replace(/\.md$/, '').replace(/：/g, '-').slice(0, 50);
@@ -219,7 +224,7 @@ async function buildSearchIndex() {
 			'<html lang="zh-tw"><body>',
 			`<article data-pagefind-body`,
 			speakerFilters ? ` data-pagefind-filter="${escapeAttr(speakerFilters)}"` : '',
-			date ? ` data-pagefind-sort="date:${escapeAttr(date)}"` : '',
+			date ? ` data-pagefind-sort="date:${escapeAttr(dateToSortKey(date))}"` : '',
 			'>',
 			metaElements.join(''),
 			`<h1 data-pagefind-meta="title">${escapeHtml(title)}</h1>`,
@@ -325,7 +330,7 @@ async function buildSearchIndex() {
 				...(speakers.length > 0 ? { speaker: speakers } : {}),
 			},
 			sort: {
-				...(date ? { date } : {}),
+				...(date ? { date: dateToSortKey(date) } : {}),
 			},
 		});
 
