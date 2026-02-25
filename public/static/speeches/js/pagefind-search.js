@@ -15,7 +15,9 @@
 	var pagefindInstance = null;
 	var debounceTimer = null;
 	var currentQuery = '';
-	var MAX_RESULTS = 12;
+	var PAGE_SIZE = 12;
+	var currentSearchResults = null;
+	var displayedCount = 0;
 
 	// Lazy-load Pagefind on first interaction
 	function ensurePagefind() {
@@ -46,6 +48,8 @@
 		results.hidden = true;
 		results.innerHTML = '';
 		if (speechList) speechList.style.display = '';
+		currentSearchResults = null;
+		displayedCount = 0;
 	}
 
 	function renderLoading() {
@@ -82,22 +86,82 @@
 		var date = data.meta && data.meta.date ? data.meta.date : '';
 		var speaker = data.meta && data.meta.speaker ? data.meta.speaker : '';
 		var excerpt = data.excerpt || '';
+		var subs = data.sub_results || [];
+
+		// Strip date prefix from title since date is shown separately in meta
+		var displayTitle = date ? title.replace(new RegExp('^' + date + '\\s*'), '') : title;
 
 		var metaParts = [];
 		if (date) metaParts.push('<span>' + escapeHtml(date) + '</span>');
 		if (speaker) metaParts.push('<span>' + escapeHtml(speaker) + '</span>');
 
-		return (
-			'<a href="' + escapeHtml(data.url) + '" class="sayit-search__result">' +
-			'<div class="sayit-search__result-title">' + escapeHtml(title) + '</div>' +
+		var html =
+			'<div class="sayit-search__result">' +
+			'<a href="' + escapeHtml(data.url) + '" class="sayit-search__result-title">' + escapeHtml(displayTitle) + '</a>' +
 			(metaParts.length > 0
 				? '<div class="sayit-search__result-meta">' + metaParts.join('<span aria-hidden="true"> \u00b7 </span>') + '</div>'
-				: '') +
-			(excerpt
-				? '<div class="sayit-search__result-excerpt">' + excerpt + '</div>'
-				: '') +
-			'</a>'
-		);
+				: '');
+
+		if (subs.length > 0) {
+			html += '<div class="sayit-search__sub-results">';
+			for (var i = 0; i < subs.length; i++) {
+				var sub = subs[i];
+				var subExcerpt = sub.excerpt || '';
+				if (subExcerpt) {
+					html +=
+						'<a href="' + escapeHtml(sub.url) + '" class="sayit-search__sub-result">' +
+						'<span class="sayit-search__sub-result-excerpt">' + subExcerpt + '</span>' +
+						'</a>';
+				}
+			}
+			html += '</div>';
+		} else if (excerpt) {
+			html += '<div class="sayit-search__result-excerpt">' + excerpt + '</div>';
+		}
+
+		html += '</div>';
+		return html;
+	}
+
+	function moreButtonText(remaining) {
+		return isZh
+			? '顯示更多結果（剩餘 ' + remaining + ' 筆）'
+			: 'Show more (' + remaining + ' remaining)';
+	}
+
+	async function loadMore() {
+		if (!currentSearchResults || displayedCount >= currentSearchResults.length) return;
+		var btn = document.getElementById('sayit-search-more');
+		if (btn) {
+			btn.textContent = isZh ? '載入中…' : 'Loading…';
+			btn.style.pointerEvents = 'none';
+		}
+		var nextSlice = currentSearchResults.slice(displayedCount, displayedCount + PAGE_SIZE);
+		try {
+			var items = await Promise.all(nextSlice.map(function (r) { return r.data(); }));
+			if (!currentSearchResults) return;
+			var container = document.getElementById('sayit-search-items');
+			if (container) {
+				for (var i = 0; i < items.length; i++) {
+					container.insertAdjacentHTML('beforeend', renderResultItem(items[i]));
+				}
+			}
+			displayedCount += items.length;
+			if (btn) {
+				if (displayedCount >= currentSearchResults.length) {
+					btn.remove();
+				} else {
+					btn.textContent = moreButtonText(currentSearchResults.length - displayedCount);
+					btn.style.pointerEvents = '';
+				}
+			}
+		} catch (err) {
+			console.error('[sayit-search] Load more error:', err);
+			if (btn) {
+				btn.textContent = isZh ? '載入失敗，點擊重試' : 'Failed, click to retry';
+				btn.style.pointerEvents = '';
+			}
+		}
 	}
 
 	function renderResults(items, query, totalCount) {
@@ -112,23 +176,27 @@
 			: totalCount + ' result' + (totalCount !== 1 ? 's' : '') + ' found';
 		var html =
 			'<div class="sayit-search__results-inner">' +
-			'<div class="sayit-search__status">' + escapeHtml(countText) + '</div>';
+			'<div class="sayit-search__status">' + escapeHtml(countText) + '</div>' +
+			'<div id="sayit-search-items">';
 
 		for (var i = 0; i < items.length; i++) {
 			html += renderResultItem(items[i]);
 		}
 
-		if (totalCount > MAX_RESULTS) {
+		html += '</div>';
+
+		if (totalCount > displayedCount) {
 			html +=
-				'<a href="/search/?q=' + encodeURIComponent(query) + '" class="sayit-search__more">' +
-				(isZh
-					? '查看全部 ' + totalCount + ' 筆結果 \u2192'
-					: 'View all ' + totalCount + ' results \u2192') +
-				'</a>';
+				'<button type="button" id="sayit-search-more" class="sayit-search__more">' +
+				moreButtonText(totalCount - displayedCount) +
+				'</button>';
 		}
 
 		html += '</div>';
 		results.innerHTML = html;
+
+		var moreBtn = document.getElementById('sayit-search-more');
+		if (moreBtn) moreBtn.addEventListener('click', loadMore);
 	}
 
 	async function doSearch(query) {
@@ -138,6 +206,8 @@
 		}
 
 		currentQuery = query;
+		currentSearchResults = null;
+		displayedCount = 0;
 		renderLoading();
 
 		var pf = await ensurePagefind();
@@ -165,14 +235,15 @@
 			return;
 		}
 
+		currentSearchResults = search.results;
 		var totalCount = search.results.length;
-		var slice = search.results.slice(0, MAX_RESULTS);
+		var slice = search.results.slice(0, PAGE_SIZE);
 
 		try {
-			var dataPromises = slice.map(function (r) { return r.data(); });
-			var items = await Promise.all(dataPromises);
+			var items = await Promise.all(slice.map(function (r) { return r.data(); }));
 
 			if (query !== currentQuery) return;
+			displayedCount = items.length;
 			renderResults(items, query, totalCount);
 		} catch (err) {
 			console.error('[sayit-search] Data fetch error:', err);
