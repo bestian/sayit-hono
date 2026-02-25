@@ -1,4 +1,5 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 /** Regex to detect speaker heading lines: 1-6 # followed by name ending in : or ： */
@@ -60,6 +61,72 @@ function stripMarkdown(markdown: string): string {
 	);
 }
 
+/** Strip HTML tags and collapse whitespace */
+function stripHtml(html: string): string {
+	return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Section shape from /api/speech/{filename} or sections dump */
+type ApiSection = {
+	filename: string;
+	nest_filename: string | null;
+	section_id: number;
+	section_speaker: string | null;
+	section_content: string;
+	display_name: string;
+	name: string | null;
+};
+
+/** Sections dump: { [filename]: ApiSection[] } */
+type SectionsDump = Record<string, ApiSection[]>;
+
+/** Load sections dump from file, or fetch from API */
+async function loadSectionsDump(dumpPath: string | null, apiBase: string, dbEntries: Array<{ filename: string }>): Promise<SectionsDump> {
+	if (dumpPath && existsSync(dumpPath)) {
+		console.log(`[build-search] Loading sections from dump: ${dumpPath}`);
+		const raw = await readFile(dumpPath, 'utf-8');
+		return JSON.parse(raw) as SectionsDump;
+	}
+
+	// Fallback: fetch from API (slow, ~2s per speech)
+	console.log(`[build-search] No sections dump found, fetching from API (${dbEntries.length} speeches, 10 concurrent)...`);
+	const dump: SectionsDump = {};
+	let done = 0;
+
+	async function fetchOne(filename: string): Promise<void> {
+		const url = `${apiBase}/api/speech/${encodeURIComponent(filename)}`;
+		for (let attempt = 0; attempt < 3; attempt++) {
+			try {
+				const resp = await fetch(url);
+				if (resp.status === 404) break;
+				if (!resp.ok) {
+					if (attempt < 2) { await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); continue; }
+					break;
+				}
+				const data = (await resp.json()) as ApiSection[];
+				if (Array.isArray(data) && data.length > 0) dump[filename] = data;
+				break;
+			} catch {
+				if (attempt < 2) { await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); continue; }
+			}
+		}
+		done++;
+		if (done % 200 === 0) console.log(`[build-search]   ${done}/${dbEntries.length} fetched...`);
+	}
+
+	// 10 concurrent
+	const queue = [...dbEntries];
+	const workers = Array.from({ length: Math.min(10, queue.length) }, async () => {
+		while (queue.length > 0) {
+			const entry = queue.shift()!;
+			await fetchOne(entry.filename);
+		}
+	});
+	await Promise.all(workers);
+
+	return dump;
+}
+
 async function buildSearchIndex() {
 	// pagefind is ESM-only; use dynamic import
 	const pagefind = await import('pagefind');
@@ -67,6 +134,11 @@ async function buildSearchIndex() {
 	const transcriptDir = process.argv[2] || path.resolve('..', 'transcript');
 	const outputDir = path.resolve('www', 'pagefind');
 	const apiUrl = process.env.SAYIT_API_URL || 'https://sayit.archive.tw/api/speech_index.json';
+	const apiBase = apiUrl.replace(/\/api\/speech_index\.json$/, '');
+
+	// Sections dump: env var, or default path in scripts/
+	const sectionsDumpPath = process.env.SECTIONS_DUMP
+		|| path.resolve(__dirname, 'sections-dump.json');
 
 	console.log(`[build-search] Reading .md files from: ${transcriptDir}`);
 	console.log(`[build-search] Output: ${outputDir}`);
@@ -108,6 +180,10 @@ async function buildSearchIndex() {
 		console.warn('[build-search] Failed to fetch speakers, will count from markdown', err);
 	}
 
+	// Load section data from dump file or API
+	const sectionsDump = await loadSectionsDump(sectionsDumpPath, apiBase, dbEntries);
+	console.log(`[build-search] Sections data available for ${Object.keys(sectionsDump).length} speeches`);
+
 	// Create Pagefind index
 	const { index } = await pagefind.createIndex({
 		forceLanguage: 'zh-tw',
@@ -120,13 +196,59 @@ async function buildSearchIndex() {
 	let indexed = 0;
 	let skipped = 0;
 	let noFile = 0;
+	let sectionCount = 0;
+	let docLevelFallback = 0;
 	const allSpeakers = new Set<string>();
 
 	for (const dbEntry of dbEntries) {
 		const canonicalFilename = dbEntry.filename;
+		const sections = sectionsDump[canonicalFilename];
 
-		// Find corresponding .md file: try exact match, then fuzzy (strip mixed hyphens)
-		let mdFile = mdByTransformed.get(canonicalFilename)
+		if (sections && sections.length > 0) {
+			// Section-level indexing from dump/API data
+			const title = sections[0].display_name || dbEntry.display_name;
+			const date = extractDate(title);
+
+			for (const section of sections) {
+				const content = stripHtml(section.section_content || '');
+				if (!content.trim()) { skipped++; continue; }
+
+				const speakerName = section.name || null;
+				if (speakerName) allSpeakers.add(speakerName);
+
+				// Build URL with section anchor
+				let url: string;
+				if (section.nest_filename) {
+					url = `/${encodeURIComponent(canonicalFilename)}/${encodeURIComponent(section.nest_filename)}#s${section.section_id}`;
+				} else {
+					url = `/${encodeURIComponent(canonicalFilename)}#s${section.section_id}`;
+				}
+
+				await index.addCustomRecord({
+					url,
+					content,
+					language: 'zh-tw',
+					meta: {
+						title,
+						...(date ? { date } : {}),
+						...(speakerName ? { speaker: speakerName } : {}),
+					},
+					filters: {
+						...(speakerName ? { speaker: [speakerName] } : {}),
+					},
+					sort: {
+						...(date ? { date } : {}),
+					},
+				});
+
+				indexed++;
+				sectionCount++;
+			}
+			continue;
+		}
+
+		// Fallback: no section data, try document-level from markdown
+		const mdFile = mdByTransformed.get(canonicalFilename)
 			|| mdByNormalized.get(stripMixedHyphens(canonicalFilename));
 
 		if (!mdFile) {
@@ -148,7 +270,6 @@ async function buildSearchIndex() {
 			continue;
 		}
 
-		// Use the canonical DB filename for the URL
 		const url = `/${encodeURIComponent(canonicalFilename)}`;
 
 		await index.addCustomRecord({
@@ -169,6 +290,7 @@ async function buildSearchIndex() {
 		});
 
 		indexed++;
+		docLevelFallback++;
 	}
 
 	// Also index .md files that aren't in the DB yet (new files not yet uploaded)
@@ -198,9 +320,10 @@ async function buildSearchIndex() {
 			sort: { ...(date ? { date } : {}) },
 		});
 		indexed++;
+		docLevelFallback++;
 	}
 
-	console.log(`[build-search] Indexed: ${indexed}, Skipped: ${skipped}, No .md file: ${noFile}`);
+	console.log(`[build-search] Indexed: ${indexed} (${sectionCount} sections, ${docLevelFallback} doc-level fallback), Skipped: ${skipped}, No .md file: ${noFile}`);
 
 	// Write the index
 	const { errors } = await index.writeFiles({
@@ -214,21 +337,9 @@ async function buildSearchIndex() {
 
 	console.log(`[build-search] Index written to ${outputDir}`);
 
-	// Count total speech sections (speaker lines) across all markdown files
-	let totalSpeechSections = 0;
-	for (const file of mdFiles) {
-		const filePath = path.join(transcriptDir, file);
-		const markdown = await readFile(filePath, 'utf-8');
-		for (const line of markdown.split('\n')) {
-			if (speakerLineRegExp.test(line.trim())) {
-				totalSpeechSections++;
-			}
-		}
-	}
-
 	// Write stats.json for the homepage
 	const stats = {
-		speeches: totalSpeechSections,
+		speeches: sectionCount,
 		speakers: speakersCount || allSpeakers.size,
 		sections: dbEntries.length,
 	};

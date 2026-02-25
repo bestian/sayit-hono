@@ -3,6 +3,9 @@ src/.generated/
 
 # Pagefind search index (built from transcript .md files)
 www/pagefind/
+
+# Sections dump (generated from API, used by build:search)
+scripts/sections-dump.json
 # Logs
 
 logs
