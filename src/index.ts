@@ -34,7 +34,6 @@ import {
 	headForSpeakers,
 	headForHome
 } from './ssr/heads';
-import { formatNumberWithCommas } from './utils/formatNumber';
 import { buildPaginationPages } from './utils/pagination';
 import { normalizeSections } from './utils/sectionUtils';
 
@@ -48,6 +47,7 @@ app.use('*', staticFirstMiddleware);
 const EDGE_TTL_SECONDS = 60;
 const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=${EDGE_TTL_SECONDS}, s-maxage=${EDGE_TTL_SECONDS}`;
 const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></script>';
+const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers)}).catch(function(){})})()</script>`;
 
 function buildCacheKey(url: string): string {
 	try {
@@ -226,27 +226,6 @@ async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
 	}));
 }
 
-type HomepageStats = { speechesCount: string; speakersCount: string; sectionsCount: string };
-
-async function loadHomepageStats(c: any): Promise<HomepageStats> {
-	const db = c.env.DB;
-	const [speechContentRes, speakersRes, speechIndexRes] = await Promise.all([
-		db.prepare('SELECT COUNT(*) AS count FROM speech_content').first(),
-		db.prepare('SELECT COUNT(*) AS count FROM speakers').first(),
-		db.prepare('SELECT COUNT(*) AS count FROM speech_index').first()
-	]);
-	const toNum = (row: unknown): number => {
-		const n = (row as { count?: number | string })?.count;
-		if (typeof n === 'number') return n;
-		if (typeof n === 'string') return parseInt(n, 10) || 0;
-		return 0;
-	};
-	return {
-		speechesCount: formatNumberWithCommas(toNum(speechContentRes)),
-		speakersCount: formatNumberWithCommas(toNum(speakersRes)),
-		sectionsCount: formatNumberWithCommas(toNum(speechIndexRes))
-	};
-}
 
 // /、/speeches、/speakers 由 SSR 路由提供，其餘靜態資源由 staticFirstMiddleware 嘗試從 ASSETS 提供
 
@@ -365,40 +344,17 @@ app.get('/search', (c) => renderSearchPage(c));
 app.get('/search/', (c) => renderSearchPage(c));
 
 async function renderHomePage(c: any) {
-	const cacheKey = buildCacheKey(c.req.url);
-	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
-
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
-
-	let stats: HomepageStats;
-	try {
-		stats = await loadHomepageStats(c);
-	} catch (err) {
-		console.error('[home SSR] DB error', err);
-		return c.text('Internal Server Error', 500);
-	}
-
 	const styles = [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForHome();
 	const html = await renderHtml(HomeView, {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: stats
+		props: {},
+		scripts: [PAGEFIND_SCRIPT, STATS_SCRIPT].join('\n')
 	});
 
-	let response = c.html(html);
-	response = withCacheHeaders(response);
-	if (response.ok && response.status < 400) {
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
-	}
-	return response;
+	return withCacheHeaders(c.html(html));
 }
 
 async function renderSpeechesPage(c: any) {
