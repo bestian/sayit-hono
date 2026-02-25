@@ -193,6 +193,44 @@
 	font-weight: 500;
 }
 
+.sayit-search__sub-results {
+	margin-top: 0.35em;
+	display: flex;
+	flex-direction: column;
+	gap: 0.3em;
+}
+
+.sayit-search__sub-result {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+	padding: 0.3em 0.5em;
+	border-left: 2px solid #e0ddd6;
+	border-radius: 0 3px 3px 0;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.sayit-search__sub-result:hover {
+	border-left-color: #8b7e6a;
+	background: #faf9f6;
+}
+
+.sayit-search__sub-result-excerpt {
+	font-size: 0.85em;
+	line-height: 1.6;
+	color: #5a5650;
+	word-break: break-word;
+	overflow-wrap: break-word;
+}
+
+.sayit-search__sub-result-excerpt mark {
+	background: rgba(201, 180, 120, 0.3);
+	color: inherit;
+	padding: 0.05em 0.15em;
+	border-radius: 2px;
+	font-weight: 500;
+}
+
 .sayit-search__loading {
 	display: flex;
 	align-items: center;
