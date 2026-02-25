@@ -86,38 +86,60 @@
 		var date = data.meta && data.meta.date ? data.meta.date : '';
 		var speaker = data.meta && data.meta.speaker ? data.meta.speaker : '';
 		var excerpt = data.excerpt || '';
+		var subs = data.sub_results || [];
+
+		// Strip date prefix from title since date is shown separately in meta
+		var displayTitle = date ? title.replace(new RegExp('^' + date + '\\s*'), '') : title;
 
 		var metaParts = [];
 		if (date) metaParts.push('<span>' + escapeHtml(date) + '</span>');
 		if (speaker) metaParts.push('<span>' + escapeHtml(speaker) + '</span>');
 
-		return (
-			'<a href="' + escapeHtml(data.url) + '" class="sayit-search__result">' +
-			'<div class="sayit-search__result-title">' + escapeHtml(title) + '</div>' +
+		var html =
+			'<div class="sayit-search__result">' +
+			'<a href="' + escapeHtml(data.url) + '" class="sayit-search__result-title">' + escapeHtml(displayTitle) + '</a>' +
 			(metaParts.length > 0
 				? '<div class="sayit-search__result-meta">' + metaParts.join('<span aria-hidden="true"> \u00b7 </span>') + '</div>'
-				: '') +
-			(excerpt
-				? '<div class="sayit-search__result-excerpt">' + excerpt + '</div>'
-				: '') +
-			'</a>'
-		);
+				: '');
+
+		if (subs.length > 0) {
+			html += '<div class="sayit-search__sub-results">';
+			for (var i = 0; i < subs.length; i++) {
+				var sub = subs[i];
+				var subExcerpt = sub.excerpt || '';
+				if (subExcerpt) {
+					html +=
+						'<a href="' + escapeHtml(sub.url) + '" class="sayit-search__sub-result">' +
+						'<span class="sayit-search__sub-result-excerpt">' + subExcerpt + '</span>' +
+						'</a>';
+				}
+			}
+			html += '</div>';
+		} else if (excerpt) {
+			html += '<div class="sayit-search__result-excerpt">' + excerpt + '</div>';
+		}
+
+		html += '</div>';
+		return html;
+	}
+
+	function moreButtonText(remaining) {
+		return isZh
+			? '顯示更多結果（剩餘 ' + remaining + ' 筆）'
+			: 'Show more (' + remaining + ' remaining)';
 	}
 
 	async function loadMore() {
 		if (!currentSearchResults || displayedCount >= currentSearchResults.length) return;
-
 		var btn = document.getElementById('sayit-search-more');
 		if (btn) {
 			btn.textContent = isZh ? '載入中…' : 'Loading…';
 			btn.style.pointerEvents = 'none';
 		}
-
 		var nextSlice = currentSearchResults.slice(displayedCount, displayedCount + PAGE_SIZE);
 		try {
 			var items = await Promise.all(nextSlice.map(function (r) { return r.data(); }));
-			if (!currentSearchResults) return; // search was cleared
-
+			if (!currentSearchResults) return;
 			var container = document.getElementById('sayit-search-items');
 			if (container) {
 				for (var i = 0; i < items.length; i++) {
@@ -125,16 +147,11 @@
 				}
 			}
 			displayedCount += items.length;
-
-			// Update or remove the "show more" button
 			if (btn) {
 				if (displayedCount >= currentSearchResults.length) {
 					btn.remove();
 				} else {
-					var remaining = currentSearchResults.length - displayedCount;
-					btn.textContent = isZh
-						? '顯示更多結果（剩餘 ' + remaining + ' 筆）'
-						: 'Show more (' + remaining + ' remaining)';
+					btn.textContent = moreButtonText(currentSearchResults.length - displayedCount);
 					btn.style.pointerEvents = '';
 				}
 			}
@@ -169,12 +186,9 @@
 		html += '</div>';
 
 		if (totalCount > displayedCount) {
-			var remaining = totalCount - displayedCount;
 			html +=
 				'<button type="button" id="sayit-search-more" class="sayit-search__more">' +
-				(isZh
-					? '顯示更多結果（剩餘 ' + remaining + ' 筆）'
-					: 'Show more (' + remaining + ' remaining)') +
+				moreButtonText(totalCount - displayedCount) +
 				'</button>';
 		}
 
@@ -182,9 +196,7 @@
 		results.innerHTML = html;
 
 		var moreBtn = document.getElementById('sayit-search-more');
-		if (moreBtn) {
-			moreBtn.addEventListener('click', loadMore);
-		}
+		if (moreBtn) moreBtn.addEventListener('click', loadMore);
 	}
 
 	async function doSearch(query) {
@@ -228,8 +240,7 @@
 		var slice = search.results.slice(0, PAGE_SIZE);
 
 		try {
-			var dataPromises = slice.map(function (r) { return r.data(); });
-			var items = await Promise.all(dataPromises);
+			var items = await Promise.all(slice.map(function (r) { return r.data(); }));
 
 			if (query !== currentQuery) return;
 			displayedCount = items.length;

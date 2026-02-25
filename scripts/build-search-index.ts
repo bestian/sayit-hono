@@ -200,10 +200,41 @@ async function buildSearchIndex() {
 	let docLevelFallback = 0;
 	const allSpeakers = new Set<string>();
 
-	// Chunk size: group sections into small chunks so each record deep-links
-	// close to the match, while keeping total fragment count under Cloudflare's 100K asset limit.
-	// ~3.4K non-fragment files + fragments must be < 100K → max ~96K fragments.
-	const CHUNK_SIZE = 5;
+	/** Build an HTML page for Pagefind to index natively (heading-based sub_results) */
+	function buildSpeechHtml(
+		url: string,
+		title: string,
+		date: string,
+		speakers: string[],
+		sectionsHtml: string
+	): string {
+		const speakerFilters = speakers.map(s => `speaker:${s}`).join(', ');
+
+		// Use separate elements for each meta field to avoid comma-parsing issues
+		const metaElements: string[] = [];
+		if (date) metaElements.push(`<meta data-pagefind-meta="date:${escapeAttr(date)}">`);
+		if (speakers.length > 0) metaElements.push(`<meta data-pagefind-meta="speaker:${escapeAttr(speakers.join(', '))}">`);
+
+		return [
+			'<html lang="zh-tw"><body>',
+			`<article data-pagefind-body`,
+			speakerFilters ? ` data-pagefind-filter="${escapeAttr(speakerFilters)}"` : '',
+			date ? ` data-pagefind-sort="date:${escapeAttr(date)}"` : '',
+			'>',
+			metaElements.join(''),
+			`<h1 data-pagefind-meta="title">${escapeHtml(title)}</h1>`,
+			sectionsHtml,
+			'</article></body></html>',
+		].join('');
+	}
+
+	function escapeHtml(s: string): string {
+		return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+	}
+
+	function escapeAttr(s: string): string {
+		return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+	}
 
 	for (const dbEntry of dbEntries) {
 		const canonicalFilename = dbEntry.filename;
@@ -214,7 +245,7 @@ async function buildSearchIndex() {
 			const date = extractDate(title);
 			sectionCount += sections.length;
 
-			// Group sections by nest_filename, then chunk within each group
+			// Group sections by nest_filename for separate HTML pages
 			const groups = new Map<string, ApiSection[]>();
 			for (const section of sections) {
 				const key = section.nest_filename || '';
@@ -224,52 +255,34 @@ async function buildSearchIndex() {
 			}
 
 			for (const [nestFilename, groupSections] of groups) {
-				for (let i = 0; i < groupSections.length; i += CHUNK_SIZE) {
-					const chunk = groupSections.slice(i, i + CHUNK_SIZE);
-					const contentParts: string[] = [];
-					const speakers: string[] = [];
+				const speakers = new Set<string>();
+				const bodyParts: string[] = [];
 
-					for (const section of chunk) {
-						const text = stripHtml(section.section_content || '');
-						if (text.trim()) contentParts.push(text);
-						const speakerName = section.name || null;
-						if (speakerName && !speakers.includes(speakerName)) {
-							speakers.push(speakerName);
-							allSpeakers.add(speakerName);
-						}
+				for (const section of groupSections) {
+					const content = section.section_content || '';
+					if (!stripHtml(content).trim()) { skipped++; continue; }
+
+					const speakerName = section.name || null;
+					if (speakerName) {
+						speakers.add(speakerName);
+						allSpeakers.add(speakerName);
 					}
 
-					const content = contentParts.join('\n');
-					if (!content.trim()) { skipped++; continue; }
-
-					// URL deep-links to first section in chunk
-					const first = chunk[0];
-					let url: string;
-					if (nestFilename) {
-						url = `/${encodeURIComponent(canonicalFilename)}/${encodeURIComponent(nestFilename)}#s${first.section_id}`;
-					} else {
-						url = `/${encodeURIComponent(canonicalFilename)}#s${first.section_id}`;
-					}
-
-					await index.addCustomRecord({
-						url,
-						content,
-						language: 'zh-tw',
-						meta: {
-							title,
-							...(date ? { date } : {}),
-							...(speakers.length > 0 ? { speaker: speakers.join(', ') } : {}),
-						},
-						filters: {
-							...(speakers.length > 0 ? { speaker: speakers } : {}),
-						},
-						sort: {
-							...(date ? { date } : {}),
-						},
-					});
-
-					indexed++;
+					// h2 with section anchor — Pagefind splits sub_results on headings
+					const heading = speakerName ? escapeHtml(speakerName) : `#${section.section_id}`;
+					bodyParts.push(`<h2 id="s${section.section_id}">${heading}</h2>\n${content}`);
 				}
+
+				if (bodyParts.length === 0) continue;
+
+				const url = nestFilename
+					? `/${encodeURIComponent(canonicalFilename)}/${encodeURIComponent(nestFilename)}`
+					: `/${encodeURIComponent(canonicalFilename)}`;
+
+				const html = buildSpeechHtml(url, title, date, Array.from(speakers), bodyParts.join('\n'));
+
+				await index.addHTMLFile({ url, content: html });
+				indexed++;
 			}
 			continue;
 		}
