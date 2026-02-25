@@ -1,6 +1,6 @@
 // 由 scripts/build-views.ts 自動產生，請勿手動編輯
 import { defineComponent as _defineComponent } from 'vue'
-import { resolveComponent as _resolveComponent, mergeProps as _mergeProps } from "vue"
+import { resolveComponent as _resolveComponent, withCtx as _withCtx, createVNode as _createVNode, mergeProps as _mergeProps } from "vue"
 import { ssrRenderComponent as _ssrRenderComponent, ssrRenderAttr as _ssrRenderAttr, ssrRenderStyle as _ssrRenderStyle, ssrRenderClass as _ssrRenderClass, ssrRenderAttrs as _ssrRenderAttrs, ssrInterpolate as _ssrInterpolate, ssrRenderList as _ssrRenderList } from "vue/server-renderer"
 
 import { computed } from 'vue';
@@ -123,8 +123,47 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
   const _component_Footer = _resolveComponent("Footer")!
 
   _push(`<div${_ssrRenderAttrs(_mergeProps({ class: "page" }, _attrs))} data-v-SingleNestedSpeechView-ssr>`)
-  _push(_ssrRenderComponent(_component_Navbar, null, null, _parent))
-  _push(`<div class="full-page" data-v-SingleNestedSpeechView-ssr><div class="full-page__row" data-v-SingleNestedSpeechView-ssr><div class="full-page__unit" data-v-SingleNestedSpeechView-ssr><div class="page-header page-header--speech" data-v-SingleNestedSpeechView-ssr><ul class="breadcrumbs" data-v-SingleNestedSpeechView-ssr><li data-v-SingleNestedSpeechView-ssr><a${
+  _push(_ssrRenderComponent(_component_Navbar, null, {
+    default: _withCtx((_, _push, _parent, _scopeId) => {
+      if (_push) {
+        _push(`<div id="sayit-search" class="sayit-search" role="search" data-v-SingleNestedSpeechView-ssr${
+          _scopeId
+        }><div class="sayit-search__input-wrap" data-v-SingleNestedSpeechView-ssr${
+          _scopeId
+        }><input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches" data-v-SingleNestedSpeechView-ssr${
+          _scopeId
+        }><span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true" data-v-SingleNestedSpeechView-ssr${
+          _scopeId
+        }>/</span></div></div>`)
+      } else {
+        return [
+          _createVNode("div", {
+            id: "sayit-search",
+            class: "sayit-search",
+            role: "search"
+          }, [
+            _createVNode("div", { class: "sayit-search__input-wrap" }, [
+              _createVNode("input", {
+                id: "sayit-search-input",
+                type: "search",
+                class: "sayit-search__input",
+                autocomplete: "off",
+                spellcheck: "false",
+                "aria-label": "Search speeches"
+              }),
+              _createVNode("span", {
+                class: "sayit-search__shortcut",
+                id: "sayit-search-shortcut",
+                "aria-hidden": "true"
+              }, "/")
+            ])
+          ])
+        ]
+      }
+    }),
+    _: 1 /* STABLE */
+  }, _parent))
+  _push(`<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden data-v-SingleNestedSpeechView-ssr></div><div class="full-page" data-v-SingleNestedSpeechView-ssr><div class="full-page__row" data-v-SingleNestedSpeechView-ssr><div class="full-page__unit" data-v-SingleNestedSpeechView-ssr><div class="page-header page-header--speech" data-v-SingleNestedSpeechView-ssr><ul class="breadcrumbs" data-v-SingleNestedSpeechView-ssr><li data-v-SingleNestedSpeechView-ssr><a${
     _ssrRenderAttr("href", getNestListUrl())
   } data-v-SingleNestedSpeechView-ssr>${
     _ssrInterpolate(formattedParentTitle.value)
