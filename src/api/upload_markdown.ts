@@ -5,6 +5,23 @@ import { marked } from 'marked';
 import { deleteEdgeCache, deleteR2Cache } from './cache';
 
 const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
+
+/** Retry a D1 operation up to `maxAttempts` times with exponential backoff */
+async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3, baseDelayMs = 200): Promise<T> {
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			return await fn();
+		} catch (err) {
+			lastError = err;
+			console.warn(`[upload_markdown] DB operation failed (attempt ${attempt}/${maxAttempts})`, err);
+			if (attempt < maxAttempts) {
+				await new Promise((resolve) => setTimeout(resolve, baseDelayMs * 2 ** (attempt - 1)));
+			}
+		}
+	}
+	throw lastError;
+}
 /** 辨識「講者標題行」：開頭 1～6 個 #、結尾為 : 或 ： */
 const speakerLineRegExp = /^#{1,6}\s*(.+?)\s*[:：]\s*$/;
 
@@ -565,55 +582,55 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			// Delete from D1: speech_content (sections)
 				console.log('[upload_markdown] DELETE sections from D1:', filename);
-				const deleteSectionsResult = await c.env.DB.prepare(
+				const deleteSectionsResult = await withRetry(() => c.env.DB.prepare(
 					'DELETE FROM speech_content WHERE filename = ?'
 				)
 					.bind(filename)
-					.run();
+					.run());
 
 				// 先找出此演講關聯到的講者，供後續孤兒講者清理
-				const linkedSpeakers = await c.env.DB.prepare(
+				const linkedSpeakers = await withRetry(() => c.env.DB.prepare(
 					'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
 				)
 					.bind(filename)
-					.all<{ speaker_route_pathname: string }>();
+					.all<{ speaker_route_pathname: string }>());
 				const speakerRoutePathnames = Array.from(
 					new Set((linkedSpeakers.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
 				);
 
 				// Delete from D1: speech_speakers (speech-speaker relations)
 				console.log('[upload_markdown] DELETE speech_speakers from D1:', filename);
-				const deleteSpeechSpeakersResult = await c.env.DB.prepare(
+				const deleteSpeechSpeakersResult = await withRetry(() => c.env.DB.prepare(
 					'DELETE FROM speech_speakers WHERE speech_filename = ?'
 				)
 					.bind(filename)
-					.run();
+					.run());
 
 				// 刪除僅屬於此演講、且已無任何關聯的講者
 				let speakersDeleted = 0;
 				for (const routePathname of speakerRoutePathnames) {
-					const stillLinked = await c.env.DB.prepare(
+					const stillLinked = await withRetry(() => c.env.DB.prepare(
 						'SELECT 1 AS linked FROM speech_speakers WHERE speaker_route_pathname = ? LIMIT 1'
 					)
 						.bind(routePathname)
-						.first<{ linked: number }>();
+						.first<{ linked: number }>());
 					if (!stillLinked) {
-						const deleteSpeakerResult = await c.env.DB.prepare(
+						const deleteSpeakerResult = await withRetry(() => c.env.DB.prepare(
 							'DELETE FROM speakers WHERE route_pathname = ?'
 						)
 							.bind(routePathname)
-							.run();
+							.run());
 						speakersDeleted += deleteSpeakerResult.meta?.changes ?? 0;
 					}
 				}
 
 				// Delete from D1: speech_index (speech metadata)
 				console.log('[upload_markdown] DELETE speech_index from D1:', filename);
-				const deleteSpeechResult = await c.env.DB.prepare(
+				const deleteSpeechResult = await withRetry(() => c.env.DB.prepare(
 					'DELETE FROM speech_index WHERE filename = ?'
 				)
 					.bind(filename)
-					.run();
+					.run());
 
 				const sectionsDeleted = deleteSectionsResult.meta?.changes ?? 0;
 				const relationsDeleted = deleteSpeechSpeakersResult.meta?.changes ?? 0;
@@ -670,20 +687,20 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				return c.json({ error: 'Missing or invalid markdown field' }, 400, corsHeadersWithMethods);
 			}
 
-			// 不允許重複：若 speech_index 已有此 filename 則 409
-			const existing = await c.env.DB.prepare(
+			// 冪等：若 speech_index 已有此 filename 則先刪除舊資料再重新寫入
+			const existing = await withRetry(() => c.env.DB.prepare(
 				'SELECT filename FROM speech_index WHERE filename = ?'
 			)
 				.bind(filename)
-				.first<{ filename: string }>();
+				.first<{ filename: string }>());
 
 			if (existing) {
-				console.log('[upload_markdown] POST speech_index 已存在:', filename);
-				return c.json(
-					{ success: false, message: 'Filename already exists in speech index', filename },
-					409,
-					corsHeadersWithMethods
-				);
+				console.log('[upload_markdown] POST speech_index 已存在，先刪除舊資料:', filename);
+				await withRetry(() => c.env.DB.batch([
+					c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ?').bind(filename),
+					c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
+					c.env.DB.prepare('DELETE FROM speech_index WHERE filename = ?').bind(filename),
+				]));
 			}
 
 			// 從 markdown 第一行解析 display_name：去掉開頭 '# '
@@ -692,7 +709,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const speakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
-			const baseSectionId = await findMaxSectionId(c);
+			const baseSectionId = await withRetry(() => findMaxSectionId(c));
 
 			// 為每個段落分配連續的 section_id 與 prev/next 鏈結
 			const normalized: NormalizedSection[] = sectionPayloads.map((section, idx) => {
@@ -737,7 +754,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				);
 			}
 
-			await c.env.DB.batch(metaBatch);
+			await withRetry(() => c.env.DB.batch(metaBatch));
 
 			// 2. 段落分批寫入（每批約 50 筆，使用多行 VALUES 減少語句數）
 			const ROWS_PER_INSERT = 10;
@@ -769,7 +786,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					sectionBatch.push(c.env.DB.prepare(sql).bind(...binds));
 				}
 
-				await c.env.DB.batch(sectionBatch);
+				await withRetry(() => c.env.DB.batch(sectionBatch));
 			}
 
 			await invalidateSpeechCaches(c, filename);
@@ -801,11 +818,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const filename = transformFilename(rawFilename.trim());
 			const markdown = body.markdown;
-			const existingSpeech = await c.env.DB.prepare(
+			const existingSpeech = await withRetry(() => c.env.DB.prepare(
 				'SELECT filename FROM speech_index WHERE filename = ?'
 			)
 				.bind(filename)
-				.first<{ filename: string }>();
+				.first<{ filename: string }>());
 			if (!existingSpeech) {
 				return c.json(
 					{ success: false, message: 'Filename not found in speech index', filename },
@@ -816,14 +833,14 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const firstLine = markdown.split('\n')[0]?.trim() ?? '';
 			const displayName = firstLine.replace(/^#\s*/, '') || filename;
-			const oldSectionsRaw = await c.env.DB.prepare(
+			const oldSectionsRaw = await withRetry(() => c.env.DB.prepare(
 				`SELECT section_id, previous_section_id, next_section_id, section_speaker, section_content
 				 FROM speech_content
 				 WHERE filename = ?
 				 ORDER BY section_id ASC`
 			)
 				.bind(filename)
-				.all<ExistingSection>();
+				.all<ExistingSection>());
 			const oldSections = orderSectionsByLinks(
 				(oldSectionsRaw.results ?? []).map((row) => ({
 					section_id: Number(row.section_id),
@@ -833,11 +850,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					section_content: row.section_content ?? ''
 				}))
 			);
-			const oldSpeakerRows = await c.env.DB.prepare(
+			const oldSpeakerRows = await withRetry(() => c.env.DB.prepare(
 				'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
 			)
 				.bind(filename)
-				.all<{ speaker_route_pathname: string }>();
+				.all<{ speaker_route_pathname: string }>());
 			const oldSpeakerRoutePathnames = Array.from(
 				new Set((oldSpeakerRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
 			);
@@ -848,7 +865,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			let assignedPatched: PatchAssignedSection[];
 			if (oldSections.length === 0) {
 				// 安全補強：若舊資料沒有任何段落，改用 POST 式連號分配，避免 ID 無基準導致失敗
-				const baseSectionId = await findMaxSectionId(c);
+				const baseSectionId = await withRetry(() => findMaxSectionId(c));
 				assignedPatched = sectionPayloads.map((section, idx) => ({
 					...section,
 					section_id: baseSectionId + idx
@@ -963,19 +980,19 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				);
 			}
 
-			await c.env.DB.batch(batchStatements);
+			await withRetry(() => c.env.DB.batch(batchStatements));
 
 			// PATCH 完成後再對帳一次：僅保留「有實際段落」的演講-講者關聯
-			const relationRows = await c.env.DB.prepare(
+			const relationRows = await withRetry(() => c.env.DB.prepare(
 				'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
 			)
 				.bind(filename)
-				.all<{ speaker_route_pathname: string }>();
+				.all<{ speaker_route_pathname: string }>());
 			const relationRoutePathnames = Array.from(
 				new Set((relationRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
 			);
 
-			const usedSpeakerRows = await c.env.DB.prepare(
+			const usedSpeakerRows = await withRetry(() => c.env.DB.prepare(
 				`SELECT DISTINCT section_speaker
 				 FROM speech_content
 				 WHERE filename = ?
@@ -983,7 +1000,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				   AND section_speaker != ''`
 			)
 				.bind(filename)
-				.all<{ section_speaker: string }>();
+				.all<{ section_speaker: string }>());
 			const usedSpeakerRoutePathnames = new Set(
 				(usedSpeakerRows.results ?? []).map((row) => row.section_speaker).filter(Boolean)
 			);
@@ -1025,7 +1042,12 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			return c.json({ error: 'Method not supported' }, 400, corsHeadersWithMethods);
 		}
 	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
 		console.error('[upload_markdown] error', error);
-		return c.json({ error: 'Internal server error' }, 500, corsHeadersWithMethods);
+		return c.json(
+			{ error: 'Service temporarily unavailable', detail: message },
+			503,
+			{ ...corsHeadersWithMethods, 'Retry-After': '2' }
+		);
 	}
 }
