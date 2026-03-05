@@ -445,28 +445,31 @@ function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[]
 
 /** PATCH 用：先刪除此演講所有關聯，再依新解析出的講者列表重建 speech_speakers */
 async function rebuildSpeechSpeakerRelations(c: Context<ApiEnv>, filename: string, routePathnames: string[]) {
-	await c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename).run();
+	const batch: Parameters<typeof c.env.DB.batch>[0] = [
+		c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
+	];
 	for (const routePathname of routePathnames) {
-		await c.env.DB.prepare(
-			'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
-		)
-			.bind(filename, routePathname)
-			.run();
+		batch.push(
+			c.env.DB.prepare(
+				'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
+			).bind(filename, routePathname)
+		);
 	}
+	await c.env.DB.batch(batch);
 }
 
 /** 若某講者已無任何 speech_speakers 關聯，則從 speakers 表刪除（孤兒講者） */
 async function pruneOrphanSpeakers(c: Context<ApiEnv>, routePathnames: string[]) {
+	if (routePathnames.length === 0) return;
+	const batch: Parameters<typeof c.env.DB.batch>[0] = [];
 	for (const routePathname of routePathnames) {
-		const stillLinked = await c.env.DB.prepare(
-			'SELECT 1 AS linked FROM speech_speakers WHERE speaker_route_pathname = ? LIMIT 1'
-		)
-			.bind(routePathname)
-			.first<{ linked: number }>();
-		if (!stillLinked) {
-			await c.env.DB.prepare('DELETE FROM speakers WHERE route_pathname = ?').bind(routePathname).run();
-		}
+		batch.push(
+			c.env.DB.prepare(
+				'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
+			).bind(routePathname, routePathname)
+		);
 	}
+	await c.env.DB.batch(batch);
 }
 
 /** 演講內容或 .an/.md 更新後，刪除 R2 上對應的快取 key */
@@ -580,15 +583,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const filename = transformFilename(inputFilename);
 			console.log('[upload_markdown] filename transform:', { input: inputFilename, output: filename });
 
-			// Delete from D1: speech_content (sections)
-				console.log('[upload_markdown] DELETE sections from D1:', filename);
-				const deleteSectionsResult = await withRetry(() => c.env.DB.prepare(
-					'DELETE FROM speech_content WHERE filename = ?'
-				)
-					.bind(filename)
-					.run());
-
-				// 先找出此演講關聯到的講者，供後續孤兒講者清理
+			// 先查講者清單，再一次 batch 完成所有刪除 + 孤兒清理
 				const linkedSpeakers = await withRetry(() => c.env.DB.prepare(
 					'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
 				)
@@ -598,43 +593,31 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					new Set((linkedSpeakers.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
 				);
 
-				// Delete from D1: speech_speakers (speech-speaker relations)
-				console.log('[upload_markdown] DELETE speech_speakers from D1:', filename);
-				const deleteSpeechSpeakersResult = await withRetry(() => c.env.DB.prepare(
-					'DELETE FROM speech_speakers WHERE speech_filename = ?'
-				)
-					.bind(filename)
-					.run());
-
-				// 刪除僅屬於此演講、且已無任何關聯的講者
-				let speakersDeleted = 0;
+				// 單一 batch：刪段落 + 刪關聯 + 刪索引 + 清孤兒講者（減少 D1 round-trips）
+				console.log('[upload_markdown] DELETE batch for:', filename);
+				const deleteBatch: Parameters<typeof c.env.DB.batch>[0] = [
+					c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ?').bind(filename),
+					c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
+					c.env.DB.prepare('DELETE FROM speech_index WHERE filename = ?').bind(filename),
+				];
+				// 用 NOT EXISTS 子查詢一次刪除孤兒講者，不需逐一查再刪
 				for (const routePathname of speakerRoutePathnames) {
-					const stillLinked = await withRetry(() => c.env.DB.prepare(
-						'SELECT 1 AS linked FROM speech_speakers WHERE speaker_route_pathname = ? LIMIT 1'
-					)
-						.bind(routePathname)
-						.first<{ linked: number }>());
-					if (!stillLinked) {
-						const deleteSpeakerResult = await withRetry(() => c.env.DB.prepare(
-							'DELETE FROM speakers WHERE route_pathname = ?'
-						)
-							.bind(routePathname)
-							.run());
-						speakersDeleted += deleteSpeakerResult.meta?.changes ?? 0;
-					}
+					deleteBatch.push(
+						c.env.DB.prepare(
+							'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
+						).bind(routePathname, routePathname)
+					);
 				}
 
-				// Delete from D1: speech_index (speech metadata)
-				console.log('[upload_markdown] DELETE speech_index from D1:', filename);
-				const deleteSpeechResult = await withRetry(() => c.env.DB.prepare(
-					'DELETE FROM speech_index WHERE filename = ?'
-				)
-					.bind(filename)
-					.run());
+				const batchResults = await withRetry(() => c.env.DB.batch(deleteBatch));
 
-				const sectionsDeleted = deleteSectionsResult.meta?.changes ?? 0;
-				const relationsDeleted = deleteSpeechSpeakersResult.meta?.changes ?? 0;
-				const speechDeleted = deleteSpeechResult.meta?.changes ?? 0;
+				const sectionsDeleted = batchResults[0]?.meta?.changes ?? 0;
+				const relationsDeleted = batchResults[1]?.meta?.changes ?? 0;
+				const speechDeleted = batchResults[2]?.meta?.changes ?? 0;
+				let speakersDeleted = 0;
+				for (let i = 3; i < batchResults.length; i++) {
+					speakersDeleted += batchResults[i]?.meta?.changes ?? 0;
+				}
 
 				if (sectionsDeleted === 0 && relationsDeleted === 0 && speechDeleted === 0) {
 					return c.json(
@@ -1008,17 +991,26 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				(routePathname) => !usedSpeakerRoutePathnames.has(routePathname)
 			);
 
-			for (const routePathname of relationsToDelete) {
-				await c.env.DB.prepare(
-					'DELETE FROM speech_speakers WHERE speech_filename = ? AND speaker_route_pathname = ?'
-				)
-					.bind(filename, routePathname)
-					.run();
-			}
-
-			// 二次清理：移除這次 PATCH 影響到、且已無任何演講關聯的孤兒講者
+			// 一次 batch 刪除多餘關聯 + 孤兒講者
 			const finalImpactedSpeakers = Array.from(new Set([...impactedSpeakers, ...relationsToDelete]));
-			await pruneOrphanSpeakers(c, finalImpactedSpeakers);
+			if (relationsToDelete.length > 0 || finalImpactedSpeakers.length > 0) {
+				const cleanupBatch: Parameters<typeof c.env.DB.batch>[0] = [];
+				for (const routePathname of relationsToDelete) {
+					cleanupBatch.push(
+						c.env.DB.prepare(
+							'DELETE FROM speech_speakers WHERE speech_filename = ? AND speaker_route_pathname = ?'
+						).bind(filename, routePathname)
+					);
+				}
+				for (const routePathname of finalImpactedSpeakers) {
+					cleanupBatch.push(
+						c.env.DB.prepare(
+							'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
+						).bind(routePathname, routePathname)
+					);
+				}
+				await withRetry(() => c.env.DB.batch(cleanupBatch));
+			}
 
 			// 失效快取（R2，在 D1 交易之外）
 			await invalidateSpeechCaches(c, filename);
