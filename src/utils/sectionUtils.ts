@@ -66,7 +66,7 @@ export function reorderSections<T extends SectionLike>(sections: T[]): T[] {
 	let current: T | null = first;
 	while (current) {
 		ordered.push(current);
-		const nextId = current.next_section_id;
+		const nextId: number | null = current.next_section_id;
 		current = nextId != null && byId.has(nextId) ? (byId.get(nextId) as T) : null;
 	}
 	return ordered;

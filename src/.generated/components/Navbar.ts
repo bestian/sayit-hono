@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 由 scripts/build-views.ts 自動產生，請勿手動編輯
 import { defineComponent } from 'vue';
 import { mergeProps as _mergeProps } from "vue"

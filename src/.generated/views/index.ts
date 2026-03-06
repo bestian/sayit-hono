@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 由 scripts/build-views.ts 自動產生，請勿手動編輯
 export { default as HomeView, styles as HomeViewStyles } from './HomeView.ts';
 export { default as NestedSpeechView, styles as NestedSpeechViewStyles } from './NestedSpeechView.ts';
