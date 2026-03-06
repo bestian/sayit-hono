@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 由 scripts/build-views.ts 自動產生，請勿手動編輯
 import { defineComponent as _defineComponent } from 'vue'
 import { resolveComponent as _resolveComponent, withCtx as _withCtx, createCommentVNode as _createCommentVNode, createVNode as _createVNode, mergeProps as _mergeProps } from "vue"

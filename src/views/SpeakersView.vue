@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { getSpeakerColor } from '../utils/speakerColor'
-import { headForSpeakers } from '../ssr/heads'
 
 interface Speaker {
   id: number,

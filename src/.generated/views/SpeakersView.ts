@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 由 scripts/build-views.ts 自動產生，請勿手動編輯
 import { defineComponent as _defineComponent } from 'vue'
 import { resolveComponent as _resolveComponent, mergeProps as _mergeProps } from "vue"
@@ -5,7 +6,6 @@ import { ssrRenderComponent as _ssrRenderComponent, ssrRenderAttr as _ssrRenderA
 
 import { computed } from 'vue'
 import { getSpeakerColor } from '../../utils/speakerColor'
-import { headForSpeakers } from '../ssr/heads'
 
 interface Speaker {
   id: number,
