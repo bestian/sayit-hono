@@ -8,7 +8,8 @@ const COMPONENTS_DIR = path.resolve('src/components');
 const OUT_VIEWS_DIR = path.resolve('src/.generated/views');
 const OUT_COMPONENTS_DIR = path.resolve('src/.generated/components');
 
-const header = `// 由 scripts/build-views.ts 自動產生，請勿手動編輯
+const header = `// @ts-nocheck
+// 由 scripts/build-views.ts 自動產生，請勿手動編輯
 `;
 
 type CompileTarget = {
@@ -93,8 +94,9 @@ export default _sfc_main;
 	// 將 `.vue` 匯入改為無副檔名，讓編譯後的 `.ts` component 可以被解析
 	output = output.replace(/from\s+(['"])([^'"\n]+)\.vue\1/g, 'from $1$2$1');
 
-	// 修正 utils 相對路徑：生成檔位於 src/.generated/views/，需回到 src/utils/
+	// 修正 views 相對匯入路徑：生成檔位於 src/.generated/views/，需回到 src/*
 	output = output.replace(/from\s+(['"])..\/utils\//g, 'from $1../../utils/');
+	output = output.replace(/from\s+(['"])..\/ssr\//g, 'from $1../../ssr/');
 
 	await writeFile(path.join(target.outDir, `${name}.ts`), output, 'utf8');
 	return `export { default as ${name}, styles as ${name}Styles } from './${name}.ts';`;
@@ -139,4 +141,3 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 		process.exitCode = 1;
 	});
 }
-
