@@ -126,6 +126,7 @@ const THEME_STYLES = `<style>
 
     hr,
     blockquote,
+    .breadcrumbs,
     .page-header,
     .section-signpost,
     .speech__content,
@@ -133,6 +134,8 @@ const THEME_STYLES = `<style>
     .speaker-card,
     .stat,
     .key-descriptor,
+    #sayit-speech-list .section-title a,
+    .speech--section-signpost .section-title a,
     .section-page__speeches-collection h2 {
       border-color: var(--sayit-border);
     }
@@ -182,6 +185,41 @@ const THEME_STYLES = `<style>
 
     .homepage-stats a:hover strong {
       color: #d9fff0 !important;
+    }
+
+    .breadcrumbs {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      max-width: 100%;
+      padding: 0.4rem 0.8rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--sayit-border);
+      border-radius: 999px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .breadcrumbs > * {
+      float: none;
+      font-size: 0.82rem;
+    }
+
+    .breadcrumbs > * a,
+    .breadcrumbs > * span,
+    .breadcrumbs > *.current,
+    .breadcrumbs > *.current a {
+      color: var(--sayit-text-muted);
+    }
+
+    .breadcrumbs > *.current,
+    .breadcrumbs > *.current a {
+      color: var(--sayit-text);
+    }
+
+    .breadcrumbs > *:after {
+      color: var(--sayit-text-dim);
+      top: 0;
+      padding: 0 0.55em;
     }
 
     input[type="text"],
@@ -278,6 +316,48 @@ const THEME_STYLES = `<style>
 
     .speaker-card {
       transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    }
+
+    #sayit-speech-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      margin-top: 1.5rem;
+    }
+
+    #sayit-speech-list li {
+      margin: 0;
+    }
+
+    #sayit-speech-list .section-title,
+    .speech--section-signpost .section-title {
+      display: block;
+    }
+
+    #sayit-speech-list .section-title a,
+    .speech--section-signpost .section-title a {
+      display: block;
+      padding: 1rem 1.1rem;
+      border: 1px solid var(--sayit-border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(20, 29, 42, 0.96), rgba(13, 20, 31, 0.9));
+      color: var(--sayit-text);
+      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+      transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        color 0.2s ease;
+    }
+
+    #sayit-speech-list .section-title a:hover,
+    #sayit-speech-list .section-title a:focus,
+    .speech--section-signpost .section-title a:hover,
+    .speech--section-signpost .section-title a:focus {
+      color: var(--sayit-link-hover);
+      border-color: var(--sayit-border-strong);
+      background: linear-gradient(180deg, rgba(24, 35, 49, 0.98), rgba(16, 24, 36, 0.94));
+      transform: translateY(-1px);
     }
 
     .sayit-search__result {
@@ -434,6 +514,25 @@ const THEME_STYLES = `<style>
       box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
     }
 
+    .speech-single-speech .speech__meta-data,
+    .speech-single-speech__speaker-portrait,
+    .section-detail-sidebar,
+    .sidebar__unit,
+    .primary-content__unit {
+      color: var(--sayit-text-muted);
+    }
+
+    .speech-single-speech .breadcrumbs {
+      margin-top: 1rem;
+    }
+
+    .section-navigation {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      margin-bottom: 1rem;
+    }
+
     .speech--narrative {
       background: rgba(255, 255, 255, 0.04);
       border-top-color: var(--sayit-border);
@@ -505,6 +604,11 @@ const THEME_STYLES = `<style>
         border-color: var(--sayit-border-strong);
         box-shadow: 0 18px 32px rgba(0, 0, 0, 0.28);
         transform: translateY(-1px);
+      }
+
+      .section-navigation .speech-navigation__button {
+        width: 100%;
+        margin-right: 0;
       }
     }
   }
