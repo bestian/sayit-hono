@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
-import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
+import { deleteEdgeCache, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
 import { speakersIndex } from './api/speakers_index';
 import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
@@ -265,6 +265,7 @@ app.post('/api/purge_cache', async (c) => {
 		const list = await bucket.list({ cursor, limit: 500 });
 		const keys = list.objects.map((o: { key: string }) => o.key);
 		if (keys.length > 0) {
+			await Promise.all(keys.map((key) => deleteEdgeCache(key)));
 			await bucket.delete(keys);
 			deleted += keys.length;
 		}
