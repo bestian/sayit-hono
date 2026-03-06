@@ -23,6 +23,61 @@ const BASE_HEAD = `<meta charset="utf-8">
 const THEME_STYLES = `<style>
   :root {
     color-scheme: light;
+    --sayit-list-surface: linear-gradient(180deg, #ffffff 0%, #f7f2ec 100%);
+    --sayit-list-surface-hover: linear-gradient(180deg, #fffdfb 0%, #fdece8 100%);
+    --sayit-list-border: rgba(199, 194, 186, 0.95);
+    --sayit-list-border-strong: rgba(225, 74, 85, 0.28);
+    --sayit-list-text: #221d18;
+    --sayit-list-text-hover: #c63e4b;
+    --sayit-list-shadow: 0 12px 30px rgba(73, 54, 40, 0.08);
+    --sayit-list-shadow-hover: 0 16px 32px rgba(73, 54, 40, 0.12);
+  }
+
+  #sayit-speech-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin: 1.5rem 0 0;
+    list-style: none;
+  }
+
+  #sayit-speech-list li {
+    margin: 0;
+  }
+
+  #sayit-speech-list .section-title,
+  .speech--section-signpost .section-title {
+    display: block;
+  }
+
+  #sayit-speech-list .section-title a,
+  .speech--section-signpost .section-title a {
+    display: block;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--sayit-list-border);
+    border-radius: 16px;
+    background: var(--sayit-list-surface);
+    color: var(--sayit-list-text);
+    line-height: 1.35;
+    text-decoration: none;
+    box-shadow: var(--sayit-list-shadow);
+    transition:
+      transform 0.2s ease,
+      border-color 0.2s ease,
+      background 0.2s ease,
+      color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  #sayit-speech-list .section-title a:hover,
+  #sayit-speech-list .section-title a:focus,
+  .speech--section-signpost .section-title a:hover,
+  .speech--section-signpost .section-title a:focus {
+    color: var(--sayit-list-text-hover);
+    border-color: var(--sayit-list-border-strong);
+    background: var(--sayit-list-surface-hover);
+    box-shadow: var(--sayit-list-shadow-hover);
+    transform: translateY(-1px);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -46,6 +101,14 @@ const THEME_STYLES = `<style>
       --sayit-accent-strong: #a3efd0;
       --sayit-highlight: rgba(255, 211, 125, 0.2);
       --sayit-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+      --sayit-list-surface: linear-gradient(180deg, rgba(20, 29, 42, 0.96), rgba(13, 20, 31, 0.9));
+      --sayit-list-surface-hover: linear-gradient(180deg, rgba(24, 35, 49, 0.98), rgba(16, 24, 36, 0.94));
+      --sayit-list-border: var(--sayit-border);
+      --sayit-list-border-strong: var(--sayit-border-strong);
+      --sayit-list-text: var(--sayit-text);
+      --sayit-list-text-hover: var(--sayit-link-hover);
+      --sayit-list-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+      --sayit-list-shadow-hover: 0 18px 32px rgba(0, 0, 0, 0.24);
     }
 
     html {
@@ -316,48 +379,6 @@ const THEME_STYLES = `<style>
 
     .speaker-card {
       transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
-    }
-
-    #sayit-speech-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.85rem;
-      margin-top: 1.5rem;
-    }
-
-    #sayit-speech-list li {
-      margin: 0;
-    }
-
-    #sayit-speech-list .section-title,
-    .speech--section-signpost .section-title {
-      display: block;
-    }
-
-    #sayit-speech-list .section-title a,
-    .speech--section-signpost .section-title a {
-      display: block;
-      padding: 1rem 1.1rem;
-      border: 1px solid var(--sayit-border);
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(20, 29, 42, 0.96), rgba(13, 20, 31, 0.9));
-      color: var(--sayit-text);
-      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
-      transition:
-        transform 0.2s ease,
-        border-color 0.2s ease,
-        background 0.2s ease,
-        color 0.2s ease;
-    }
-
-    #sayit-speech-list .section-title a:hover,
-    #sayit-speech-list .section-title a:focus,
-    .speech--section-signpost .section-title a:hover,
-    .speech--section-signpost .section-title a:focus {
-      color: var(--sayit-link-hover);
-      border-color: var(--sayit-border-strong);
-      background: linear-gradient(180deg, rgba(24, 35, 49, 0.98), rgba(16, 24, 36, 0.94));
-      transform: translateY(-1px);
     }
 
     .sayit-search__result {
