@@ -31,6 +31,13 @@ const THEME_STYLES = `<style>
     --sayit-list-text-hover: #c63e4b;
     --sayit-list-shadow: 0 12px 30px rgba(73, 54, 40, 0.08);
     --sayit-list-shadow-hover: 0 16px 32px rgba(73, 54, 40, 0.12);
+    --sayit-share-bg: #f5f2eb;
+    --sayit-share-bg-hover: #ffffff;
+    --sayit-share-border: #d4d0c8;
+    --sayit-share-border-strong: #8b7e6a;
+    --sayit-share-text: #2c2c2c;
+    --sayit-share-toast-bg: rgba(34, 29, 24, 0.94);
+    --sayit-share-toast-text: #fffaf4;
   }
 
   #sayit-speech-list {
@@ -109,6 +116,13 @@ const THEME_STYLES = `<style>
       --sayit-list-text-hover: var(--sayit-link-hover);
       --sayit-list-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
       --sayit-list-shadow-hover: 0 18px 32px rgba(0, 0, 0, 0.24);
+      --sayit-share-bg: rgba(18, 26, 37, 0.92);
+      --sayit-share-bg-hover: rgba(24, 35, 49, 0.98);
+      --sayit-share-border: rgba(164, 184, 204, 0.22);
+      --sayit-share-border-strong: rgba(127, 214, 176, 0.56);
+      --sayit-share-text: var(--sayit-text);
+      --sayit-share-toast-bg: rgba(9, 14, 22, 0.94);
+      --sayit-share-toast-text: var(--sayit-text);
     }
 
     html {
@@ -635,6 +649,102 @@ const THEME_STYLES = `<style>
   }
 </style>`;
 
+const SHARE_SCRIPT = `<script>
+  (function() {
+    var toastTimer = 0;
+
+    function isZh() {
+      return document.documentElement.classList.contains('lang-zh') || /^zh\\b/i.test(navigator.language || '');
+    }
+
+    function getToast() {
+      return document.getElementById('sayit-share-feedback');
+    }
+
+    function showToast(message) {
+      var toast = getToast();
+      if (!toast) return;
+      toast.textContent = message;
+      toast.hidden = false;
+      toast.classList.add('is-visible');
+      if (toastTimer) {
+        window.clearTimeout(toastTimer);
+      }
+      toastTimer = window.setTimeout(function() {
+        toast.classList.remove('is-visible');
+        toast.hidden = true;
+      }, 2200);
+    }
+
+    function resolveUrl(button) {
+      var raw = button && button.getAttribute('data-share-url');
+      var value = raw || window.location.href;
+      try {
+        return new URL(value, window.location.href).toString();
+      } catch (error) {
+        return window.location.href;
+      }
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      var textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      try {
+        var copied = document.execCommand('copy');
+        if (!copied) {
+          throw new Error('Copy command failed');
+        }
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    }
+
+    async function share(button) {
+      var title = (button && button.getAttribute('data-share-title')) || document.title || 'SayIt';
+      var url = resolveUrl(button);
+
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: title, url: url });
+          return;
+        } catch (error) {
+          if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
+            return;
+          }
+        }
+      }
+
+      try {
+        await copyText(url);
+        showToast(isZh() ? '連結已複製' : 'Link copied');
+      } catch (error) {
+        window.prompt(isZh() ? '請複製這個連結' : 'Copy this link', url);
+      }
+    }
+
+    document.addEventListener('click', function(event) {
+      var target = event.target;
+      if (!(target instanceof Element)) return;
+      var button = target.closest('[data-sayit-share]');
+      if (!button) return;
+      event.preventDefault();
+      share(button);
+    });
+  })();
+</script>`;
+
 type RenderOptions = {
 	title?: string;
 	head?: HeadSpec;
@@ -664,7 +774,8 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
 	const headTitle = head?.title ?? (title ? `${title} :: SayIt` : 'SayIt');
 	const inlineStyles = styles?.trim() ? `<style>${styles}</style>` : '';
 	const metaTags = renderMeta(head);
-	const extraScripts = scripts?.trim() ? `  ${scripts}` : '';
+	const scriptParts = [SHARE_SCRIPT, scripts?.trim() ? scripts : ''].filter(Boolean);
+	const extraScripts = scriptParts.length > 0 ? `  ${scriptParts.join('\n  ')}` : '';
 
 	return `<!DOCTYPE html>
 <html class="no-touch" lang="zh-Hant">
