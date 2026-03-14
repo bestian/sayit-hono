@@ -12,9 +12,20 @@
 					<a href="/speeches"><span lang="zh">對話</span><span lang="en">Speeches</span></a>
 				</li>
 			</ul>
-			<div class="navbar__right"><slot /></div>
-		</div>
-	</header>
+				<div class="navbar__right">
+					<slot />
+					<button
+						type="button"
+						class="sayit-share-button"
+						data-sayit-share
+						aria-controls="sayit-share-feedback"
+					>
+						<span lang="zh">分享</span><span lang="en">Share</span>
+					</button>
+				</div>
+			</div>
+			<div id="sayit-share-feedback" class="sayit-share-toast" aria-live="polite" aria-atomic="true" hidden></div>
+		</header>
 </template>
 
 <style>
@@ -29,6 +40,11 @@
 	margin-left: auto;
 	flex-shrink: 1;
 	min-width: 0;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 0.6rem;
 }
 
 /* Search widget styles (shared across all pages with search) */
@@ -41,6 +57,14 @@
 	.sayit-search {
 		width: 100%;
 		margin-top: 0.4em;
+	}
+
+	.navbar__right {
+		width: 100%;
+	}
+
+	.sayit-share-button {
+		margin-left: auto;
 	}
 }
 
@@ -282,6 +306,67 @@ button.sayit-search__more:focus {
 
 button.sayit-search__more:active {
 	background: rgba(58, 125, 92, 0.08);
+}
+
+.sayit-share-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.45em 0.95em;
+	font-family: 'Noto Sans TC', sans-serif;
+	font-size: 0.9em;
+	font-weight: 500;
+	line-height: 1.5;
+	color: var(--sayit-share-text, #2c2c2c);
+	background: var(--sayit-share-bg, #f5f2eb);
+	border: 1.5px solid var(--sayit-share-border, #d4d0c8);
+	border-radius: 999px;
+	box-shadow: 0 1px 2px rgba(44, 44, 44, 0.06);
+	cursor: pointer;
+	transition:
+		border-color 0.2s ease,
+		box-shadow 0.2s ease,
+		background 0.2s ease,
+		color 0.2s ease,
+		transform 0.2s ease;
+	-webkit-appearance: none;
+}
+
+.sayit-share-button:hover,
+.sayit-share-button:focus-visible {
+	color: var(--sayit-share-text, #2c2c2c);
+	background: var(--sayit-share-bg-hover, #fff);
+	border-color: var(--sayit-share-border-strong, #8b7e6a);
+	box-shadow: 0 0 0 3px rgba(139, 126, 106, 0.1);
+	outline: none;
+}
+
+.sayit-share-button:active {
+	transform: translateY(1px);
+}
+
+.sayit-share-toast {
+	position: fixed;
+	left: 50%;
+	bottom: 1.25rem;
+	z-index: 1100;
+	padding: 0.75rem 1rem;
+	border-radius: 999px;
+	font-family: 'Noto Sans TC', sans-serif;
+	font-size: 0.9rem;
+	line-height: 1.4;
+	color: var(--sayit-share-toast-text, #fffaf4);
+	background: var(--sayit-share-toast-bg, rgba(34, 29, 24, 0.94));
+	box-shadow: 0 16px 32px rgba(34, 29, 24, 0.16);
+	transform: translate(-50%, 8px);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sayit-share-toast.is-visible {
+	opacity: 1;
+	transform: translate(-50%, 0);
 }
 
 @keyframes sayit-spin {
