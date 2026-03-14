@@ -8,8 +8,8 @@ import { speechContent } from './api/speech';
 import { sectionDetail } from './api/section';
 import { speechAn, serveAnByKey } from './api/an';
 import { serveMdByKey } from './api/md';
-import { runSearchHomepage, searchHomepage } from './api/search_homepage';
 import { uploadMarkdown } from './api/upload_markdown';
+import { rssFeed } from './api/rss';
 import type { ApiEnv } from './api/types';
 import HomeView, { styles as HomeViewStyles } from './.generated/views/HomeView';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
@@ -19,7 +19,6 @@ import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from '
 import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generated/views/SingleSpeakerView';
 import SpeechesView, { styles as SpeechesViewStyles } from './.generated/views/SpeechesView';
 import SpeakersView, { styles as SpeakersViewStyles } from './.generated/views/SpeakersView';
-import SearchResultView, { styles as SearchResultViewStyles } from './.generated/views/SearchResultView';
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
 import { renderHtml } from './ssr/render';
@@ -29,7 +28,6 @@ import {
 	headForSpeaker,
 	headForNestedSpeech,
 	headForNestedSpeechDetail,
-	headForSearch,
 	headForSpeeches,
 	headForSpeakers,
 	headForHome
@@ -194,6 +192,32 @@ async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow 
 	return result as SpeechIndexRow ?? null;
 }
 
+type AlternateInfo = { url: string; label: string; displayName: string; hreflang: string };
+
+async function loadAlternateInfo(c: any, filename: string): Promise<AlternateInfo | null> {
+	try {
+		const row = await c.env.DB.prepare(
+			`SELECT si.alternate_filename, alt.display_name AS alternate_display_name
+			 FROM speech_index si
+			 LEFT JOIN speech_index alt ON si.alternate_filename = alt.filename
+			 WHERE si.filename = ? AND si.alternate_filename IS NOT NULL`
+		)
+			.bind(filename)
+			.first();
+		if (!row?.alternate_filename) return null;
+		const displayName = row.alternate_display_name || row.alternate_filename;
+		const isCjk = /[\u4e00-\u9fff]/.test(displayName);
+		return {
+			url: `/${encodeURIComponent(row.alternate_filename)}`,
+			label: isCjk ? '中文' : 'English',
+			displayName,
+			hreflang: isCjk ? 'zh-Hant' : 'en'
+		};
+	} catch {
+		return null;
+	}
+}
+
 async function loadSpeeches(c: any): Promise<SpeechListItem[]> {
 	const result = await c.env.DB.prepare(
 		'SELECT filename, display_name FROM speech_index ORDER BY id ASC'
@@ -245,10 +269,11 @@ app.get('/api/md/:path{[^/]+\\.md}', async (c) => {
 	if (!key) return c.text('Not found', 404);
 	return serveMdByKey(c, key);
 });
-app.get('/api/search_homepage.json', (c) => searchHomepage(c));
 app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.patch('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.delete('/api/upload_markdown', (c) => uploadMarkdown(c));
+app.on(['GET', 'HEAD'], '/rss.xml', (c) => rssFeed(c));
+app.on(['GET', 'HEAD'], '/feed.xml', (c) => rssFeed(c));
 
 app.post('/api/purge_cache', async (c) => {
 	const authHeader = c.req.header('Authorization');
@@ -274,76 +299,6 @@ app.post('/api/purge_cache', async (c) => {
 	return c.json({ deleted });
 });
 
-// SSR 搜尋結果頁
-async function renderSearchPage(c: any) {
-	const url = new URL(c.req.url);
-	const query = url.searchParams.get('q') ?? '';
-	const pageParam = url.searchParams.get('page');
-	const pageNumber = Number(pageParam);
-	const page = Number.isFinite(pageNumber) && pageNumber > 0 ? Math.floor(pageNumber) : 1;
-
-	// 解析講者 ID 參數 (p)
-	const speakerIdParam = url.searchParams.get('p');
-	const speakerId = speakerIdParam && Number.isFinite(Number(speakerIdParam)) && Number(speakerIdParam) > 0
-		? Math.floor(Number(speakerIdParam))
-		: undefined;
-
-	// 如果有講者 ID，查詢講者名稱
-	let filteredSpeakerName: string | null = null;
-	if (speakerId) {
-		try {
-			const speakerRow = await c.env.DB.prepare('SELECT name FROM speakers WHERE id = ?')
-				.bind(speakerId)
-				.first();
-			if (speakerRow && (speakerRow as any).name) {
-				filteredSpeakerName = (speakerRow as any).name;
-			}
-		} catch (err) {
-			console.error('[search SSR] failed to get speaker name', err);
-		}
-	}
-
-	let result: Awaited<ReturnType<typeof runSearchHomepage>>;
-	try {
-		result = await runSearchHomepage(c.env, query, { page, speakerId });
-	} catch (err) {
-		console.error('[search SSR] query failed', err);
-		return c.text('Internal Server Error', 500);
-	}
-
-	const styles = [SearchResultViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const head = headForSearch(result.query);
-	const scripts = [
-		'<script type="text/javascript" src="/static/speeches/js/foundation/foundation.js" charset="utf-8"></script>',
-		'<script type="text/javascript" src="/static/speeches/js/foundation/foundation.dropdown.js" charset="utf-8"></script>',
-		'<script type="text/javascript" src="/static/speeches/js/speeches.js" charset="utf-8"></script>',
-		PAGEFIND_SCRIPT
-	].join('\n');
-
-	const html = await renderHtml(SearchResultView, {
-		head,
-		styles,
-		components: { Navbar, Footer },
-		props: {
-			query: result.query,
-			speakers: result.speakers,
-			sections: result.sections,
-			page: result.page,
-			page_size: result.page_size,
-			total_pages: result.total_pages,
-			total_sections: result.total_sections,
-			pagination_pages: result.pagination_pages,
-			filteredSpeakerId: speakerId,
-			filteredSpeakerName: filteredSpeakerName
-		},
-		scripts
-	});
-
-	return withCacheHeaders(c.html(html));
-}
-
-app.get('/search', (c) => renderSearchPage(c));
-app.get('/search/', (c) => renderSearchPage(c));
 
 async function renderHomePage(c: any) {
 	const styles = [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
@@ -630,6 +585,8 @@ const excludedPaths = [
 	'speakers',
 	'speaker',
 	'speech',
+	'rss.xml',
+	'feed.xml',
 	'favicon.ico',
 	'robots.txt',
 	'static',
@@ -740,8 +697,12 @@ app.get('/:filename/:nest_filename', async (c) => {
 		nest_filename: nest,
 		nest_display_name: nestDisplayNames[idx] ?? nest
 	}));
+	const alternate = await loadAlternateInfo(c, filename);
 	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForNestedSpeechDetail(nestDisplayName);
+	if (alternate) {
+		head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+	}
 
 	const hasSiblingNav = siblings.length > 0;
 	const navigationScript = hasSiblingNav
@@ -758,7 +719,9 @@ app.get('/:filename/:nest_filename', async (c) => {
 			nestFilename,
 			displayName: nestDisplayName,
 			speechDisplayName,
-			siblings
+			siblings,
+			alternateUrl: alternate?.url ?? null,
+			alternateLabel: alternate?.label ?? null
 		},
 		scripts: [navigationScript, PAGEFIND_SCRIPT].filter(Boolean).join('\n')
 	});
@@ -893,8 +856,12 @@ app.get('/:filename', async (c) => {
 			return c.text('Not Found', 404);
 		}
 
+		const alternate = await loadAlternateInfo(c, filename);
 		const styles = [NestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 		const head = headForNestedSpeech(speechMeta.display_name ?? filename);
+		if (alternate) {
+			head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+		}
 
 		const html = await renderHtml(NestedSpeechView, {
 			head,
@@ -903,7 +870,9 @@ app.get('/:filename', async (c) => {
 			props: {
 				nests,
 				speechName: filename,
-				displayName: speechMeta.display_name ?? filename
+				displayName: speechMeta.display_name ?? filename,
+				alternateUrl: alternate?.url ?? null,
+				alternateLabel: alternate?.label ?? null
 			},
 			scripts: PAGEFIND_SCRIPT
 		});
@@ -961,14 +930,18 @@ app.get('/:filename', async (c) => {
 	}
 
 	const displayName = sections[0]?.display_name ?? speechMeta.display_name ?? filename;
+	const alternate = await loadAlternateInfo(c, filename);
 	const styles = [SingleSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSingleSpeech(displayName);
+	if (alternate) {
+		head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+	}
 
 	const html = await renderHtml(SingleSpeechView, {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: { sections, speechName: filename, displayName },
+		props: { sections, speechName: filename, displayName, alternateUrl: alternate?.url ?? null, alternateLabel: alternate?.label ?? null },
 		scripts: PAGEFIND_SCRIPT
 	});
 

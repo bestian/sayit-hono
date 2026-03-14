@@ -27,7 +27,9 @@ export default /*@__PURE__*/_defineComponent({
   props: {
     sections: { type: Array, required: true },
     speechName: { type: String, required: true },
-    displayName: { type: String, required: false }
+    displayName: { type: String, required: false },
+    alternateUrl: { type: [String, null], required: false },
+    alternateLabel: { type: [String, null], required: false }
   },
   setup(__props: any) {
 
@@ -121,11 +123,22 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     }),
     _: 1 /* STABLE */
   }, _parent))
-  _push(`<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div><div class="full-page"><div class="full-page__row"><div class="full-page__unit"><div class="page-header page-header--speech"><ul class="breadcrumbs"></ul>`)
+  _push(`<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div><div class="full-page"><div class="full-page__row"><div class="full-page__unit"><div class="page-header page-header--speech">`)
   if (!loading && displaySections.value.length > 0 && displaySections.value[0]) {
     _push(`<h1>${_ssrInterpolate(displaySections.value[0].display_name)}</h1>`)
   } else {
     _push(`<h1>${_ssrInterpolate(formattedSpeechName.value)}</h1>`)
+  }
+  if (__props.alternateUrl) {
+    _push(`<a${
+      _ssrRenderAttr("href", __props.alternateUrl)
+    } class="sayit-lang-switch"${
+      _ssrRenderAttr("title", __props.alternateLabel)
+    }>${
+      _ssrInterpolate(__props.alternateLabel)
+    }</a>`)
+  } else {
+    _push(`<!---->`)
   }
   _push(`</div>`)
   if (!loading) {

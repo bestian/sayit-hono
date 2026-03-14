@@ -20,7 +20,9 @@ export default /*@__PURE__*/_defineComponent({
   props: {
     nests: { type: Array, required: true },
     speechName: { type: String, required: true },
-    displayName: { type: String, required: true }
+    displayName: { type: String, required: true },
+    alternateUrl: { type: [String, null], required: false },
+    alternateLabel: { type: [String, null], required: false }
   },
   setup(__props: any) {
 
@@ -76,7 +78,19 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     }),
     _: 1 /* STABLE */
   }, _parent))
-  _push(`<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div><div class="full-page"><div class="full-page__row"><div class="full-page__unit"><div class="page-header page-header--speech"><ul class="breadcrumbs"></ul><h1>${_ssrInterpolate(__props.displayName)}</h1></div><div class="page-content__row"><div class="primary-content__unit"><ul class="section-list"><!--[-->`)
+  _push(`<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div><div class="full-page"><div class="full-page__row"><div class="full-page__unit"><div class="page-header page-header--speech"><h1>${_ssrInterpolate(__props.displayName)}</h1>`)
+  if (__props.alternateUrl) {
+    _push(`<a${
+      _ssrRenderAttr("href", __props.alternateUrl)
+    } class="sayit-lang-switch"${
+      _ssrRenderAttr("title", __props.alternateLabel)
+    }>${
+      _ssrInterpolate(__props.alternateLabel)
+    }</a>`)
+  } else {
+    _push(`<!---->`)
+  }
+  _push(`</div><div class="page-content__row"><div class="primary-content__unit"><ul class="section-list"><!--[-->`)
   _ssrRenderList(nestedList.value, (nest) => {
     _push(`<li class="speech speech--section-signpost speech--with-portrait"><div class="speaker-portrait-wrapper"><span class="section-dot"></span></div><div class="speech-wrapper"><span class="section-title"><a${
       _ssrRenderAttr("href", getNestUrl(nest.nest_filename))
