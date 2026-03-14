@@ -18,6 +18,8 @@ const props = defineProps<{
   sections: Section[]
   speechName: string
   displayName?: string
+  alternateUrl?: string | null
+  alternateLabel?: string | null
 }>()
 
 const displaySections = computed(() => props.sections ?? [])
@@ -80,11 +82,12 @@ const loading = false
 			<div class="full-page__row">
 				<div class="full-page__unit">
 					<div class="page-header page-header--speech">
-						<ul class="breadcrumbs">
-						</ul>
 						<h1 v-if="!loading && displaySections.length > 0 && displaySections[0]">{{ displaySections[0].display_name }}
 						</h1>
 						<h1 v-else>{{ formattedSpeechName }}</h1>
+						<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
+							{{ alternateLabel }}
+						</a>
 					</div>
 					<div class="page-content__row" v-if="!loading">
 						<div class="primary-content__unit">
