@@ -12,6 +12,8 @@ const props = defineProps<{
 	nests: NestedItem[];
 	speechName: string;
 	displayName: string;
+	alternateUrl?: string | null;
+	alternateLabel?: string | null;
 }>();
 
 const nestedList = computed(() => props.nests ?? []);
@@ -35,8 +37,10 @@ const getNestUrl = (nestFilename: string) =>
 			<div class="full-page__row">
 				<div class="full-page__unit">
 					<div class="page-header page-header--speech">
-						<ul class="breadcrumbs"></ul>
 						<h1>{{ displayName }}</h1>
+						<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
+							{{ alternateLabel }}
+						</a>
 					</div>
 					<div class="page-content__row">
 						<div class="primary-content__unit">
