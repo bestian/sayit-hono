@@ -113,15 +113,15 @@
 	<template>
 		<div class="page">
 			<Navbar>
-				<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
-					{{ alternateLabel }}
-				</a>
 				<div id="sayit-search" class="sayit-search" role="search">
 					<div class="sayit-search__input-wrap">
 						<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
 						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
 					</div>
 				</div>
+				<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
+					{{ alternateLabel }}
+				</a>
 			</Navbar>
 			<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
 			<div class="full-page">
