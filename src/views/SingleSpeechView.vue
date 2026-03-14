@@ -70,6 +70,9 @@ const loading = false
 <template>
 	<div class="page">
 		<Navbar>
+			<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
+				{{ alternateLabel }}
+			</a>
 			<div id="sayit-search" class="sayit-search" role="search">
 				<div class="sayit-search__input-wrap">
 					<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
@@ -85,9 +88,6 @@ const loading = false
 						<h1 v-if="!loading && displaySections.length > 0 && displaySections[0]">{{ displaySections[0].display_name }}
 						</h1>
 						<h1 v-else>{{ formattedSpeechName }}</h1>
-						<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
-							{{ alternateLabel }}
-						</a>
 					</div>
 					<div class="page-content__row" v-if="!loading">
 						<div class="primary-content__unit">
