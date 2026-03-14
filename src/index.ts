@@ -209,7 +209,7 @@ async function loadAlternateInfo(c: any, filename: string): Promise<AlternateInf
 		const isCjk = /[\u4e00-\u9fff]/.test(displayName);
 		return {
 			url: `/${encodeURIComponent(row.alternate_filename)}`,
-			label: isCjk ? '中文' : 'English',
+			label: isCjk ? '華文' : 'English',
 			displayName,
 			hreflang: isCjk ? 'zh-Hant' : 'en'
 		};
