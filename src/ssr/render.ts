@@ -90,7 +90,6 @@ const THEME_STYLES = `<style>
   .sayit-lang-switch {
     display: inline-flex;
     align-items: center;
-    margin-top: 0.5rem;
     padding: 0.35em 0.85em;
     font-size: 0.88em;
     font-weight: 500;
