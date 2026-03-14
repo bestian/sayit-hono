@@ -6,6 +6,7 @@
 - `src/views/*.vue`：頁面來源。
 - `scripts/build-views.ts`：將 `.vue` 轉成 Worker 可用的 SSR 元件，輸出到 `src/.generated/views`。
 - `scripts/build-assets.ts`：將 `public/` 靜態資源複製到 `www/`（給 ASSETS 使用）。
+- `scripts/build-search-index.ts`：建置 Pagefind 搜尋索引到 `www/pagefind/`，並產出 `www/stats.json`（部署前需執行，見「部署」一節）。
 - `src/index.ts`：Hono Worker，直接渲染各頁。
 
 ## 開發
@@ -57,10 +58,33 @@ npm run preview:assets
 - 部署或開發前，仍需先執行 `npm run build:views` 生成 `src/.generated/views` 供 Worker 匯入。
 
 ## 部署
+
+**部署前需先建置搜尋索引**：請在 `npm run deploy` 之前執行 `npm run build:search`（或直接使用 `npm run deploy:search`，見下方）。
+
+### 搜尋索引建置（build:search）
+
+```bash
+npm run build:search
+```
+
+- **產出**：`scripts/build-search-index.ts` 會產生 Pagefind 搜尋索引到 `www/pagefind/`，以及首頁統計用的 `www/stats.json`。
+- **理由**：`npm run deploy` 會把 `www/` 整個當成 ASSETS 上傳；若未先跑 `build:search`，則 `www/pagefind/` 與 `www/stats.json` 不存在或過期，站上搜尋與首頁的「篇發言／位講者／場會議」數字會失效。因此**要先 `npm run build:search`，再 `npm run deploy`**。
+
+一鍵完成搜尋建置＋部署：
+
+```bash
+npm run deploy:search
+```
+
+等同 `npm run build:views && npm run build:assets && npm run build:search && wrangler deploy`。
+
+### 一般部署
+
 ```bash
 npm run deploy
 ```
-會先編譯視圖再交給 `wrangler deploy`。ASSETS 來源為 `www/`（由 `build:assets` 產生）。
+
+會先編譯視圖再交給 `wrangler deploy`。ASSETS 來源為 `www/`（需已透過 `build:assets` 與必要時 `build:search` 產出）。
 
 ### 先建置資源再部署 Worker（ASSETS）
 若要在遠端或本地先跑完 `build:assets` 後，再像 `npm run deploy` 一樣更新 Worker 與 ASSETS：
