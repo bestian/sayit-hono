@@ -37,7 +37,9 @@ export default /*@__PURE__*/_defineComponent({
     nestFilename: { type: String, required: true },
     displayName: { type: String, required: false },
     speechDisplayName: { type: String, required: false },
-    siblings: { type: Array, required: false }
+    siblings: { type: Array, required: false },
+    alternateUrl: { type: [String, null], required: false },
+    alternateLabel: { type: [String, null], required: false }
   },
   setup(__props: any) {
 
@@ -170,7 +172,19 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     _ssrInterpolate(formattedParentTitle.value)
   }</a></li></ul><h1 data-v-SingleNestedSpeechView-ssr>${
     _ssrInterpolate(formattedTitle.value)
-  }</h1></div>`)
+  }</h1>`)
+  if (__props.alternateUrl) {
+    _push(`<a${
+      _ssrRenderAttr("href", __props.alternateUrl)
+    } class="sayit-lang-switch"${
+      _ssrRenderAttr("title", __props.alternateLabel)
+    } data-v-SingleNestedSpeechView-ssr>${
+      _ssrInterpolate(__props.alternateLabel)
+    }</a>`)
+  } else {
+    _push(`<!---->`)
+  }
+  _push(`</div>`)
   if (!loading) {
     _push(`<div class="page-content__row" data-v-SingleNestedSpeechView-ssr><div class="primary-content__unit" data-v-SingleNestedSpeechView-ssr><ul class="section-list" data-v-SingleNestedSpeechView-ssr><!--[-->`)
     _ssrRenderList(displaySections.value, (section) => {

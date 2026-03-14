@@ -1,6 +1,6 @@
 import { createSSRApp, type Component } from 'vue';
 import { renderToString } from '@vue/server-renderer';
-import type { HeadSpec } from './heads';
+import type { HeadSpec, LinkEntry } from './heads';
 
 const BASE_HEAD = `<meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -85,6 +85,37 @@ const THEME_STYLES = `<style>
     background: var(--sayit-list-surface-hover);
     box-shadow: var(--sayit-list-shadow-hover);
     transform: translateY(-1px);
+  }
+
+  .sayit-lang-switch {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.5rem;
+    padding: 0.35em 0.85em;
+    font-size: 0.88em;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--sayit-share-text, #2c2c2c);
+    background: var(--sayit-share-bg, #f5f2eb);
+    border: 1.5px solid var(--sayit-share-border, #d4d0c8);
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(44, 44, 44, 0.06);
+    text-decoration: none;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      background 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .sayit-lang-switch:hover,
+  .sayit-lang-switch:focus-visible {
+    color: var(--sayit-share-text, #2c2c2c);
+    background: var(--sayit-share-bg-hover, #fff);
+    border-color: var(--sayit-share-border-strong, #8b7e6a);
+    box-shadow: 0 0 0 3px rgba(139, 126, 106, 0.1);
+    text-decoration: none;
+    outline: none;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -779,10 +810,23 @@ function renderMeta(head?: HeadSpec) {
 		.join('\n  ');
 }
 
+function renderLinks(head?: HeadSpec) {
+	const entries = head?.links ?? [];
+	return entries
+		.map((link) => {
+			const attrs = [`rel="${link.rel}"`, `href="${link.href}"`];
+			if (link.hreflang) attrs.push(`hreflang="${link.hreflang}"`);
+			return `<link ${attrs.join(' ')}>`;
+		})
+		.filter(Boolean)
+		.join('\n  ');
+}
+
 function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptions) {
 	const headTitle = head?.title ?? (title ? `${title} :: SayIt` : 'SayIt');
 	const inlineStyles = styles?.trim() ? `<style>${styles}</style>` : '';
 	const metaTags = renderMeta(head);
+	const linkTags = renderLinks(head);
 	const scriptParts = [SHARE_SCRIPT, scripts?.trim() ? scripts : ''].filter(Boolean);
 	const extraScripts = scriptParts.length > 0 ? `  ${scriptParts.join('\n  ')}` : '';
 
@@ -813,6 +857,7 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
   </style>
   <title>${headTitle}</title>
   ${metaTags}
+  ${linkTags}
   ${inlineStyles}
   ${THEME_STYLES}
 </head>
