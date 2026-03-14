@@ -25,6 +25,9 @@ const getNestUrl = (nestFilename: string) =>
 <template>
 	<div class="page">
 		<Navbar>
+			<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
+				{{ alternateLabel }}
+			</a>
 			<div id="sayit-search" class="sayit-search" role="search">
 				<div class="sayit-search__input-wrap">
 					<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
@@ -38,9 +41,6 @@ const getNestUrl = (nestFilename: string) =>
 				<div class="full-page__unit">
 					<div class="page-header page-header--speech">
 						<h1>{{ displayName }}</h1>
-						<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
-							{{ alternateLabel }}
-						</a>
 					</div>
 					<div class="page-content__row">
 						<div class="primary-content__unit">
