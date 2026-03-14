@@ -4,9 +4,16 @@ export type MetaEntry = {
 	content: string;
 };
 
+export type LinkEntry = {
+	rel: string;
+	href: string;
+	hreflang?: string;
+};
+
 export type HeadSpec = {
 	title: string;
 	meta?: MetaEntry[];
+	links?: LinkEntry[];
 };
 
 const baseOgTitle = 'SayIt';
@@ -81,11 +88,3 @@ export function headForNestedSpeechDetail(nestDisplayName: string): HeadSpec {
 	};
 }
 
-export function headForSearch(query: string): HeadSpec {
-	const text = (query ?? '').trim();
-	const title = text ? ` Search: ${text} :: SayIt ` : ' Search :: SayIt ';
-	return {
-		title,
-		meta: [og(title.trim()), ogDescription(baseOgDescription)]
-	};
-}

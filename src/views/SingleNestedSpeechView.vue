@@ -28,6 +28,8 @@
 		displayName?: string;
 		speechDisplayName?: string;
 		siblings?: SiblingNest[];
+		alternateUrl?: string | null;
+		alternateLabel?: string | null;
 	}>();
 
 	const displaySections = computed(() => props.sections ?? []);
@@ -129,6 +131,9 @@
 								</li>
 							</ul>
 							<h1>{{ formattedTitle }}</h1>
+							<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
+								{{ alternateLabel }}
+							</a>
 						</div>
 						<div class="page-content__row" v-if="!loading">
 							<div class="primary-content__unit">
