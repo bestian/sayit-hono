@@ -276,6 +276,10 @@ const THEME_STYLES = `<style>
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
 
+    .breadcrumbs:empty {
+      display: none;
+    }
+
     .breadcrumbs > * {
       float: none;
       font-size: 0.82rem;
@@ -544,9 +548,14 @@ const THEME_STYLES = `<style>
     }
 
     .speech__links {
-      background-color: rgba(10, 16, 24, 0.86);
+      background-color: rgba(10, 16, 24, 0.46);
       border-radius: 999px;
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+      box-shadow: none;
+    }
+
+    .speech__links a,
+    .speech__links a:visited {
+      color: var(--sayit-text-dim);
     }
 
     .speech-single-speech .speech__meta-data,
