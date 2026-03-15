@@ -64,7 +64,11 @@ async function compileSfc(file: string, target: CompileTarget) {
 		const compiledScript = compileScript(descriptor, {
 			id,
 			inlineTemplate: true,
-			templateOptions: { ssr: true, scoped: hasScoped }
+			templateOptions: {
+				ssr: true,
+				scoped: hasScoped,
+				ssrCssVars: descriptor.cssVars
+			}
 		});
 
 		output = `${header}${compiledScript.content}
@@ -77,7 +81,8 @@ export const styles = ${JSON.stringify(styles)};
 			filename: file,
 			id,
 			ssr: true,
-			scoped: hasScoped
+			scoped: hasScoped,
+			ssrCssVars: descriptor.cssVars
 		});
 
 		output = `${header}import { defineComponent } from 'vue';

@@ -182,9 +182,10 @@ function assignSpeakersToSections(parsed: ParsedSection[], speakerMarks: Speaker
 }
 
 async function findMaxSectionId(c: Context<ApiEnv>): Promise<number> {
-	// 用 MAX(CAST(...)) 取數值最大，不依賴 ORDER BY；WHERE 同用 CAST 避免型別/索引造成漏列
+	// SQLite optimises MAX on INTEGER PRIMARY KEY to O(1) — no WHERE clause so
+	// the B-tree tail lookup is used instead of a full table scan.
 	const result = await c.env.DB.prepare(
-		'SELECT MAX(section_id) AS max_id FROM speech_content WHERE section_id < 10000000'
+		'SELECT MAX(section_id) AS max_id FROM speech_content'
 	).first<{ max_id: number | null }>();
 	const maxId = result?.max_id;
 	// D1 可能回傳 string，強制轉數值
@@ -519,6 +520,8 @@ async function invalidateListPageCaches(
 	if (speeches) {
 		keys.add(`${host}/speeches`);
 		keys.add(`${host}/speeches/`);
+		keys.add(`${host}/rss.xml`);
+		keys.add(`${host}/feed.xml`);
 	}
 	if (speakers) {
 		keys.add(`${host}/speakers`);

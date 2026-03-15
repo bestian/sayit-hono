@@ -308,6 +308,8 @@ button.sayit-search__more:active {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	box-sizing: border-box;
+	margin-top: 5px;
 	padding: 0.45em 0.95em;
 	font-family: 'Noto Sans TC', sans-serif;
 	font-size: 0.9em;

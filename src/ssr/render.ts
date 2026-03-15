@@ -90,7 +90,11 @@ const THEME_STYLES = `<style>
   .sayit-lang-switch {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    margin-top: -13px;
     padding: 0.45em 0.95em;
+    font-family: 'Noto Sans TC', sans-serif;
     font-size: 0.9em;
     font-weight: 500;
     line-height: 1.5;
