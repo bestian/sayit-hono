@@ -62,10 +62,6 @@
 	.navbar__right {
 		width: 100%;
 	}
-
-	.sayit-share-button {
-		margin-left: auto;
-	}
 }
 
 .sayit-search__input-wrap {

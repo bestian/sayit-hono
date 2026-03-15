@@ -1,8 +1,8 @@
 // @ts-nocheck
 // 由 scripts/build-views.ts 自動產生，請勿手動編輯
 import { defineComponent as _defineComponent } from 'vue'
-import { resolveComponent as _resolveComponent, withCtx as _withCtx, createVNode as _createVNode, mergeProps as _mergeProps } from "vue"
-import { ssrRenderComponent as _ssrRenderComponent, ssrRenderAttr as _ssrRenderAttr, ssrRenderStyle as _ssrRenderStyle, ssrRenderClass as _ssrRenderClass, ssrRenderAttrs as _ssrRenderAttrs, ssrInterpolate as _ssrInterpolate, ssrRenderList as _ssrRenderList } from "vue/server-renderer"
+import { resolveComponent as _resolveComponent, withCtx as _withCtx, createVNode as _createVNode, toDisplayString as _toDisplayString, openBlock as _openBlock, createBlock as _createBlock, createCommentVNode as _createCommentVNode, mergeProps as _mergeProps } from "vue"
+import { ssrRenderAttr as _ssrRenderAttr, ssrRenderComponent as _ssrRenderComponent, ssrRenderStyle as _ssrRenderStyle, ssrRenderClass as _ssrRenderClass, ssrRenderAttrs as _ssrRenderAttrs, ssrInterpolate as _ssrInterpolate, ssrRenderList as _ssrRenderList } from "vue/server-renderer"
 
 import { computed } from 'vue'
 import { getSpeakerColor } from '../../utils/speakerColor'
@@ -95,6 +95,19 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
         }><span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true"${
           _scopeId
         }>/</span></div></div>`)
+        if (__props.alternateUrl) {
+          _push(`<a${
+            _ssrRenderAttr("href", __props.alternateUrl)
+          } class="sayit-lang-switch"${
+            _ssrRenderAttr("title", __props.alternateLabel)
+          }${
+            _scopeId
+          }>${
+            _ssrInterpolate(__props.alternateLabel)
+          }</a>`)
+        } else {
+          _push(`<!---->`)
+        }
       } else {
         return [
           _createVNode("div", {
@@ -117,7 +130,15 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
                 "aria-hidden": "true"
               }, "/")
             ])
-          ])
+          ]),
+          (__props.alternateUrl)
+            ? (_openBlock(), _createBlock("a", {
+                key: 0,
+                href: __props.alternateUrl,
+                class: "sayit-lang-switch",
+                title: __props.alternateLabel
+              }, _toDisplayString(__props.alternateLabel), 9 /* TEXT, PROPS */, ["href", "title"]))
+            : _createCommentVNode("v-if", true)
         ]
       }
     }),
@@ -128,17 +149,6 @@ return (_ctx: any,_push: any,_parent: any,_attrs: any) => {
     _push(`<h1>${_ssrInterpolate(displaySections.value[0].display_name)}</h1>`)
   } else {
     _push(`<h1>${_ssrInterpolate(formattedSpeechName.value)}</h1>`)
-  }
-  if (__props.alternateUrl) {
-    _push(`<a${
-      _ssrRenderAttr("href", __props.alternateUrl)
-    } class="sayit-lang-switch"${
-      _ssrRenderAttr("title", __props.alternateLabel)
-    }>${
-      _ssrInterpolate(__props.alternateLabel)
-    }</a>`)
-  } else {
-    _push(`<!---->`)
   }
   _push(`</div>`)
   if (!loading) {
