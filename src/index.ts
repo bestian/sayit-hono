@@ -284,7 +284,7 @@ app.get('/og/speech/:section_id{\\d+\\.png}', async (c) => {
 	const sectionId = Number(c.req.param('section_id').replace(/\.png$/, ''));
 	if (!Number.isInteger(sectionId)) return c.text('Not Found', 404);
 
-	const cacheKey = `og/speech/${sectionId}.png`;
+	const cacheKey = `${CACHE_KEY_VERSION}/og/speech/${sectionId}.png`;
 	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
 	if (cached) {
 		return new Response(cached.body, {
@@ -326,7 +326,7 @@ app.get('/og/*', async (c) => {
 	const filename = decodeURIComponent(raw);
 	if (!filename) return c.text('Not Found', 404);
 
-	const cacheKey = `og/${filename}.png`;
+	const cacheKey = `${CACHE_KEY_VERSION}/og/${filename}.png`;
 	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
 	if (cached) {
 		return new Response(cached.body, {
