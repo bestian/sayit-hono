@@ -155,7 +155,7 @@ function buildSpeechElement(title: string, date: string | null, speakers: string
 					type: 'span',
 					props: {
 						style: { fontSize: 16, fontWeight: 400, color: 'rgba(245,240,232,0.38)', letterSpacing: '4px' },
-						children: 'SAYIT ARCHIVE',
+						children: 'ARCHIVE.TW',
 					},
 				},
 				// Headline
@@ -229,7 +229,7 @@ function buildQuoteElement(
 					type: 'span',
 					props: {
 						style: { fontSize: 16, fontWeight: 400, color: 'rgba(245,240,232,0.38)', letterSpacing: '4px' },
-						children: 'SAYIT ARCHIVE',
+						children: 'ARCHIVE.TW',
 					},
 				},
 				// Quote text
@@ -310,7 +310,7 @@ export async function generateOgImage(
 	// Strip date prefix from title if it's shown separately
 	if (date) title = title.replace(new RegExp(`^${date}[-\\s]*`), '');
 	const speakerText = speakers.join(' \u00b7 ');
-	const allText = ['SAYIT ARCHIVE', title, date ?? '', '\u00b7', ...speakers].join('');
+	const allText = ['ARCHIVE.TW', title, date ?? '', '\u00b7', ...speakers].join('');
 	const element = buildSpeechElement(title, date, speakers);
 	return renderElement(element, allText);
 }
@@ -322,7 +322,7 @@ export async function generateQuoteOgImage(
 ): Promise<Uint8Array> {
 	const plainText = quoteHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 	const displayQuote = truncate(plainText, 120);
-	const allText = ['SAYIT ARCHIVE', displayQuote, speakerName ?? '', speechTitle, '\u2014'].join('');
+	const allText = ['ARCHIVE.TW', displayQuote, speakerName ?? '', speechTitle, '\u2014'].join('');
 	const element = buildQuoteElement(plainText, speakerName, speechTitle);
 	return renderElement(element, allText);
 }
