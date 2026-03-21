@@ -19,11 +19,11 @@
 		"@cloudflare/vitest-pool-workers": "^0.8.19",
 		"@types/node": "^24.10.1",
 		"@vue/compiler-sfc": "^3.5.25",
-		"pagefind": "^1.5.0-beta.1",
+		"fuse.js": "^7.1.0",
 		"tsx": "^4.21.0",
 		"typescript": "^5.5.2",
 		"vitest": "~3.2.0",
-		"wrangler": "^4.53.0"
+		"wrangler": "4.76.0"
 	},
 	"dependencies": {
 		"@resvg/resvg-wasm": "^2.6.2",
