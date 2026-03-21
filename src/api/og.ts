@@ -205,7 +205,8 @@ function buildQuoteElement(
 ) {
 	const maxLen = 120;
 	const displayQuote = truncate(quoteText, maxLen);
-	const fontSize = displayQuote.length > 80 ? 32 : displayQuote.length > 50 ? 38 : 44;
+	const len = displayQuote.length;
+	const fontSize = len > 80 ? 32 : len > 50 ? 38 : len > 30 ? 44 : len > 15 ? 56 : len > 6 ? 72 : 96;
 
 	return {
 		type: 'div',

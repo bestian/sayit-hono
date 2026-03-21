@@ -175,7 +175,7 @@ ${itemXml}
 </rss>`;
 }
 
-const CACHE_KEY_VERSION = 'v4';
+const CACHE_KEY_VERSION = 'v5';
 
 function buildCacheKey(url: string): string {
 	try {
