@@ -17,12 +17,12 @@ import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
-const LOCAL = 'http://localhost:8787';
+const LOCAL = process.env.WARM_TARGET || 'http://localhost:8787';
 const PROD_HOST = 'archive.tw';
 const PROD_BUCKET = 'sayit-speech-cache';
 const CACHE_VERSION = process.argv[2] || 'v5';
-const RENDER_CONCURRENCY = 3;
-const UPLOAD_CONCURRENCY = 5;
+const RENDER_CONCURRENCY = 5;
+const UPLOAD_CONCURRENCY = 10;
 
 interface SpeechEntry {
 	filename: string;
