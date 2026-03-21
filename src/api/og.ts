@@ -306,7 +306,9 @@ export async function generateOgImage(
 	speakers: string[]
 ): Promise<Uint8Array> {
 	const date = extractDate(filename);
-	const title = displayName || filename;
+	let title = displayName || filename;
+	// Strip date prefix from title if it's shown separately
+	if (date) title = title.replace(new RegExp(`^${date}[-\\s]*`), '');
 	const speakerText = speakers.join(' \u00b7 ');
 	const allText = ['SAYIT ARCHIVE', title, date ?? '', '\u00b7', ...speakers].join('');
 	const element = buildSpeechElement(title, date, speakers);
