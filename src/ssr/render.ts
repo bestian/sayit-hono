@@ -6,7 +6,7 @@ const BASE_HEAD = `<meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b121a">
-  <meta property="og:url" content="https://sayit.archive.tw">
+  <meta property="og:url" content="https://archive.tw">
   <meta property="og:site_name" content="SayIt">
   <meta property="og:type" content="website">
   <meta name="google-site-verification" content="DiXRH7TWCHjMPvi1kvFkDgwpHBGkbFkR2Rxki-iGh2o">

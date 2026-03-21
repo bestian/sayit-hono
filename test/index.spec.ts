@@ -122,7 +122,7 @@ describe('Worker routes', () => {
 		expect(xml).toContain('<rss version="2.0"');
 		expect(xml).toContain('<title>SayIt</title>');
 		expect(xml).toContain('<title>2026-03-01 Demo Speech</title>');
-		expect(xml).toContain('<link>https://sayit.archive.tw/2026-03-01-demo-speech</link>');
+		expect(xml).toContain('<link>https://archive.tw/2026-03-01-demo-speech</link>');
 		expect(xml).toContain('<description>Audrey Tang: Demo summary for the RSS feed.</description>');
 	});
 

@@ -34,7 +34,7 @@ export async function writeEdgeCache(
 		const normalizedKey = normalizeEdgeCacheKey(cacheKey);
 		const cloned = response.clone();
 		const res = new Response(cloned.body, response);
-		res.headers.set('Cache-Control', response.headers.get('Cache-Control') ?? defaultCacheControl);
+		res.headers.set('Cache-Control', defaultCacheControl);
 		await caches.default.put(normalizedKey, res);
 	} catch (err) {
 		console.error('[edge cache] write error', err);

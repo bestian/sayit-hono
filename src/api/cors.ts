@@ -4,6 +4,7 @@ import type { ApiEnv } from './types';
 export const ALLOWED_ORIGINS = [
 	'http://localhost:5173',
 	'https://sayit-f5d.pages.dev',
+	'https://archive.tw',
 	'https://sayit.archive.tw',
 ];
 

@@ -474,14 +474,16 @@ async function pruneOrphanSpeakers(c: Context<ApiEnv>, routePathnames: string[])
 }
 
 /** 演講內容或 .an/.md 更新後，刪除 R2 上對應的快取 key */
+const CACHE_KEY_VERSION = 'v2';
+
 async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	const host = new URL(c.req.url).host;
 	const encodedFilename = encodeURIComponent(filename);
 	const keys = [
 		`an/${filename}`,
 		`md/${filename}`,
-		`${host}/${filename}`,
-		`${host}/${encodedFilename}`
+		`${CACHE_KEY_VERSION}/${host}/${filename}`,
+		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`
 	];
 
 	await Promise.allSettled(
@@ -492,12 +494,12 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 /** 講者或演講-講者關聯更新後，刪除 R2 上 speakers 列表與各講者頁快取 */
 async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]) {
 	const host = new URL(c.req.url).host;
-	const keys = new Set<string>([`${host}/speakers`]);
+	const keys = new Set<string>([`${CACHE_KEY_VERSION}/${host}/speakers`]);
 
 	for (const routePathname of speakerRoutePathnames) {
 		if (!routePathname) continue;
-		keys.add(`${host}/speaker/${routePathname}`);
-		keys.add(`${host}/speaker/${encodeURIComponent(routePathname)}`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${routePathname}`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${encodeURIComponent(routePathname)}`);
 	}
 
 	await Promise.allSettled(
@@ -514,18 +516,18 @@ async function invalidateListPageCaches(
 	const keys = new Set<string>();
 
 	if (home) {
-		keys.add(`${host}/`);
-		keys.add(`${host}/index.html`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/index.html`);
 	}
 	if (speeches) {
-		keys.add(`${host}/speeches`);
-		keys.add(`${host}/speeches/`);
-		keys.add(`${host}/rss.xml`);
-		keys.add(`${host}/feed.xml`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/speeches`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/speeches/`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/rss.xml`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/feed.xml`);
 	}
 	if (speakers) {
-		keys.add(`${host}/speakers`);
-		keys.add(`${host}/speakers/`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/speakers`);
+		keys.add(`${CACHE_KEY_VERSION}/${host}/speakers/`);
 	}
 
 	await Promise.allSettled(

@@ -2,10 +2,10 @@ import type { Context } from 'hono';
 import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 
-const SITE_URL = 'https://sayit.archive.tw';
+const SITE_URL = 'https://archive.tw';
 const FEED_PATH = '/rss.xml';
 const FEED_TITLE = 'SayIt';
-const FEED_DESCRIPTION = 'Latest transcripts from sayit.archive.tw';
+const FEED_DESCRIPTION = 'Latest transcripts from archive.tw';
 const FEED_LANGUAGE = 'zh-TW';
 const FEED_LIMIT = 30;
 const FEED_CACHE_CONTROL = 'public, max-age=300, s-maxage=300';
@@ -175,12 +175,14 @@ ${itemXml}
 </rss>`;
 }
 
+const CACHE_KEY_VERSION = 'v2';
+
 function buildCacheKey(url: string): string {
 	try {
 		const u = new URL(url);
-		return `${u.host}${u.pathname}${u.search}`;
+		return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${u.search}`;
 	} catch {
-		return url.replace(/^https?:\/\//, '');
+		return `${CACHE_KEY_VERSION}/${url.replace(/^https?:\/\//, '')}`;
 	}
 }
 

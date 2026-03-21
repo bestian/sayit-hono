@@ -48,13 +48,16 @@ const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=${EDGE_TTL_SECONDS}, s-maxag
 const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></script>';
 const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers);e=document.getElementById('sayit-stat-sections');if(e)e.textContent=fmt(s.sections)}).catch(function(){})})()</script>`;
 
+// Bump when cached HTML format changes (e.g. new meta tags) to invalidate stale edge/R2 entries.
+const CACHE_KEY_VERSION = 'v2';
+
 function buildCacheKey(url: string): string {
 	try {
 		const u = new URL(url);
-		return `${u.host}${u.pathname}${u.search}`;
+		return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${u.search}`;
 	} catch {
 		// fallback: strip protocol manually
-		return url.replace(/^https?:\/\//, '');
+		return `${CACHE_KEY_VERSION}/${url.replace(/^https?:\/\//, '')}`;
 	}
 }
 
@@ -799,7 +802,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForNestedSpeechDetail(nestDisplayName, filename);
 	if (alternate) {
-		head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+		head.links = [{ rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 	}
 
 	const hasSiblingNav = siblings.length > 0;
@@ -958,7 +961,7 @@ app.get('/:filename', async (c) => {
 		const styles = [NestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 		const head = headForNestedSpeech(speechMeta.display_name ?? filename, filename);
 		if (alternate) {
-			head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+			head.links = [{ rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 		}
 
 		const html = await renderHtml(NestedSpeechView, {
@@ -1032,7 +1035,7 @@ app.get('/:filename', async (c) => {
 	const styles = [SingleSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSingleSpeech(displayName, filename);
 	if (alternate) {
-		head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+		head.links = [{ rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 	}
 
 	const html = await renderHtml(SingleSpeechView, {

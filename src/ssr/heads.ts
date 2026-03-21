@@ -18,7 +18,7 @@ export type HeadSpec = {
 
 const baseOgTitle = 'SayIt';
 const baseOgDescription = 'Transcripts for the modern internet';
-const defaultOgImage = 'https://sayit.archive.tw/static/speeches/img/apple-touch-icon-152x152.png';
+const defaultOgImage = 'https://archive.tw/static/speeches/img/apple-touch-icon-152x152.png';
 
 const og = (content: string): MetaEntry => ({ property: 'og:title', content });
 const ogDescription = (content: string): MetaEntry => ({ property: 'og:description', content });
@@ -32,7 +32,7 @@ function defaultImageMeta(): MetaEntry[] {
 }
 
 function speechImageMeta(filename: string): MetaEntry[] {
-	const ogImageUrl = `https://sayit.archive.tw/og/${encodeURIComponent(filename)}.png`;
+	const ogImageUrl = `https://archive.tw/og/${encodeURIComponent(filename)}.png`;
 	return [
 		{ property: 'og:image', content: ogImageUrl },
 		{ property: 'og:image:width', content: '1200' },
@@ -77,7 +77,7 @@ export function headForSpeaker(routePathname: string): HeadSpec {
 export function headForSpeechContent(titleText: string, sectionId: number, sectionHtml?: string): HeadSpec {
 	const safeTitle = titleText ?? '';
 	const descText = sectionHtml ? toPlainText(sectionHtml) : '';
-	const ogImageUrl = `https://sayit.archive.tw/og/speech/${sectionId}.png`;
+	const ogImageUrl = `https://archive.tw/og/speech/${sectionId}.png`;
 	const meta: MetaEntry[] = [
 		og(`${safeTitle} :: SayIt`),
 		{ property: 'og:image', content: ogImageUrl },

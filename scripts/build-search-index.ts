@@ -138,7 +138,7 @@ async function buildSearchIndex() {
 
 	const transcriptDir = process.argv[2] || path.resolve('..', 'transcript');
 	const outputDir = path.resolve('www', 'pagefind');
-	const apiUrl = process.env.SAYIT_API_URL || 'https://sayit.archive.tw/api/speech_index.json';
+	const apiUrl = process.env.SAYIT_API_URL || 'https://archive.tw/api/speech_index.json';
 	const apiBase = apiUrl.replace(/\/api\/speech_index\.json$/, '');
 
 	// Sections dump: env var, or default path in scripts/
