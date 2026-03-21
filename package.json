@@ -26,10 +26,12 @@
 		"wrangler": "^4.53.0"
 	},
 	"dependencies": {
+		"@resvg/resvg-wasm": "^2.6.2",
 		"@vue/server-renderer": "^3.5.25",
 		"cheerio": "^1.1.0",
 		"hono": "^4.10.7",
 		"marked": "^17.0.1",
+		"satori": "^0.26.0",
 		"vue": "^3.5.25"
 	}
 }

@@ -9,10 +9,6 @@ const BASE_HEAD = `<meta charset="utf-8">
   <meta property="og:url" content="https://sayit.archive.tw">
   <meta property="og:site_name" content="SayIt">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="https://sayit.archive.tw/static/speeches/img/apple-touch-icon-152x152.png">
-  <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="152">
-  <meta property="og:image:height" content="152">
   <meta name="google-site-verification" content="DiXRH7TWCHjMPvi1kvFkDgwpHBGkbFkR2Rxki-iGh2o">
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@100;300;400;500;700&display=swap" rel="stylesheet">
