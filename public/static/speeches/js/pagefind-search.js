@@ -7,30 +7,39 @@
 	var speechList = document.getElementById('sayit-speech-list');
 	if (!input || !results) return;
 
-	// Bilingual placeholders
 	var isZh = document.documentElement.classList.contains('lang-zh');
 	input.setAttribute('placeholder', isZh ? '搜尋對話內容…' : 'Search speeches…');
 	if (isZh) input.setAttribute('aria-label', '搜尋對話');
 
-	var pagefindInstance = null;
+	var worker = null;
 	var debounceTimer = null;
 	var currentQuery = '';
 	var PAGE_SIZE = 12;
 	var currentSearchResults = null;
 	var displayedCount = 0;
+	var requestId = 0;
+	var pendingResolves = {};
 
-	// Lazy-load Pagefind on first interaction
-	function ensurePagefind() {
-		if (pagefindInstance) return pagefindInstance;
-		pagefindInstance = import('/pagefind/pagefind.js').then(function (pf) {
-			pf.init();
-			return pf;
-		}).catch(function (err) {
-			console.error('[sayit-search] Failed to load Pagefind:', err);
-			pagefindInstance = null;
-			return null;
+	function ensureWorker() {
+		if (worker) return;
+		worker = new Worker('/static/speeches/js/fuse-search.worker.js');
+		worker.addEventListener('message', function (e) {
+			var msg = e.data;
+			if (msg.requestId != null && pendingResolves[msg.requestId]) {
+				pendingResolves[msg.requestId](msg);
+				delete pendingResolves[msg.requestId];
+			}
 		});
-		return pagefindInstance;
+		// Warmup: trigger index fetch
+		worker.postMessage({ type: 'warmup' });
+	}
+
+	function searchViaWorker(query, limit) {
+		var id = ++requestId;
+		return new Promise(function (resolve) {
+			pendingResolves[id] = resolve;
+			worker.postMessage({ type: 'search', query: query, limit: limit, requestId: id });
+		});
 	}
 
 	function escapeHtml(str) {
@@ -82,13 +91,11 @@
 	}
 
 	function renderResultItem(data) {
-		var title = data.meta && data.meta.title ? data.meta.title : data.url;
-		var date = data.meta && data.meta.date ? data.meta.date : '';
-		var speaker = data.meta && data.meta.speaker ? data.meta.speaker : '';
-		var excerpt = data.excerpt || '';
-		var subs = data.sub_results || [];
+		var title = data.title || data.url;
+		var date = data.date || '';
+		var speaker = data.speaker || '';
+		var snippet = data.snippet || '';
 
-		// Strip date prefix from title since date is shown separately in meta
 		var displayTitle = date ? title.replace(new RegExp('^' + date + '\\s*'), '') : title;
 
 		var metaParts = [];
@@ -102,21 +109,8 @@
 				? '<div class="sayit-search__result-meta">' + metaParts.join('<span aria-hidden="true"> \u00b7 </span>') + '</div>'
 				: '');
 
-		if (subs.length > 0) {
-			html += '<div class="sayit-search__sub-results">';
-			for (var i = 0; i < subs.length; i++) {
-				var sub = subs[i];
-				var subExcerpt = sub.excerpt || '';
-				if (subExcerpt) {
-					html +=
-						'<a href="' + escapeHtml(sub.url) + '" class="sayit-search__sub-result">' +
-						'<span class="sayit-search__sub-result-excerpt">' + subExcerpt + '</span>' +
-						'</a>';
-				}
-			}
-			html += '</div>';
-		} else if (excerpt) {
-			html += '<div class="sayit-search__result-excerpt">' + excerpt + '</div>';
+		if (snippet) {
+			html += '<div class="sayit-search__result-excerpt">' + escapeHtml(snippet) + '</div>';
 		}
 
 		html += '</div>';
@@ -129,37 +123,22 @@
 			: 'Show more (' + remaining + ' remaining)';
 	}
 
-	async function loadMore() {
+	function loadMore() {
 		if (!currentSearchResults || displayedCount >= currentSearchResults.length) return;
 		var btn = document.getElementById('sayit-search-more');
-		if (btn) {
-			btn.textContent = isZh ? '載入中…' : 'Loading…';
-			btn.style.pointerEvents = 'none';
-		}
 		var nextSlice = currentSearchResults.slice(displayedCount, displayedCount + PAGE_SIZE);
-		try {
-			var items = await Promise.all(nextSlice.map(function (r) { return r.data(); }));
-			if (!currentSearchResults) return;
-			var container = document.getElementById('sayit-search-items');
-			if (container) {
-				for (var i = 0; i < items.length; i++) {
-					container.insertAdjacentHTML('beforeend', renderResultItem(items[i]));
-				}
+		var container = document.getElementById('sayit-search-items');
+		if (container) {
+			for (var i = 0; i < nextSlice.length; i++) {
+				container.insertAdjacentHTML('beforeend', renderResultItem(nextSlice[i]));
 			}
-			displayedCount += items.length;
-			if (btn) {
-				if (displayedCount >= currentSearchResults.length) {
-					btn.remove();
-				} else {
-					btn.textContent = moreButtonText(currentSearchResults.length - displayedCount);
-					btn.style.pointerEvents = '';
-				}
-			}
-		} catch (err) {
-			console.error('[sayit-search] Load more error:', err);
-			if (btn) {
-				btn.textContent = isZh ? '載入失敗，點擊重試' : 'Failed, click to retry';
-				btn.style.pointerEvents = '';
+		}
+		displayedCount += nextSlice.length;
+		if (btn) {
+			if (displayedCount >= currentSearchResults.length) {
+				btn.remove();
+			} else {
+				btn.textContent = moreButtonText(currentSearchResults.length - displayedCount);
 			}
 		}
 	}
@@ -199,7 +178,7 @@
 		if (moreBtn) moreBtn.addEventListener('click', loadMore);
 	}
 
-	async function doSearch(query) {
+	function doSearch(query) {
 		if (!query.trim()) {
 			hideResults();
 			return;
@@ -210,48 +189,28 @@
 		displayedCount = 0;
 		renderLoading();
 
-		var pf = await ensurePagefind();
-		if (!pf) {
-			renderError();
-			return;
-		}
+		ensureWorker();
 
-		// Guard against stale results
-		if (query !== currentQuery) return;
-
-		var search;
-		try {
-			search = await pf.search(query, { sort: { date: 'desc' } });
-		} catch (err) {
-			console.error('[sayit-search] Search error:', err);
-			renderNoResults(query);
-			return;
-		}
-
-		if (query !== currentQuery) return;
-
-		if (!search.results || search.results.length === 0) {
-			renderNoResults(query);
-			return;
-		}
-
-		currentSearchResults = search.results;
-		var totalCount = search.results.length;
-		var slice = search.results.slice(0, PAGE_SIZE);
-
-		try {
-			var items = await Promise.all(slice.map(function (r) { return r.data(); }));
-
+		searchViaWorker(query, 100).then(function (msg) {
 			if (query !== currentQuery) return;
-			displayedCount = items.length;
-			renderResults(items, query, totalCount);
-		} catch (err) {
-			console.error('[sayit-search] Data fetch error:', err);
-			renderNoResults(query);
-		}
+
+			if (msg.type === 'error') {
+				renderError();
+				return;
+			}
+
+			if (!msg.results || msg.results.length === 0) {
+				renderNoResults(query);
+				return;
+			}
+
+			currentSearchResults = msg.results;
+			var firstPage = msg.results.slice(0, PAGE_SIZE);
+			displayedCount = firstPage.length;
+			renderResults(firstPage, query, msg.results.length);
+		});
 	}
 
-	// Input handler with debounce
 	input.addEventListener('input', function () {
 		clearTimeout(debounceTimer);
 		var query = input.value;
@@ -265,7 +224,6 @@
 		}, 250);
 	});
 
-	// Clear on Escape
 	input.addEventListener('keydown', function (e) {
 		if (e.key === 'Escape') {
 			input.value = '';
@@ -276,7 +234,6 @@
 		}
 	});
 
-	// / keyboard shortcut to focus search
 	document.addEventListener('keydown', function (e) {
 		if (e.key !== '/') return;
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -288,11 +245,9 @@
 		input.select();
 	});
 
-	// Hide shortcut badge when focused
 	input.addEventListener('focus', function () {
 		if (shortcutBadge) shortcutBadge.style.opacity = '0';
-		// Preload Pagefind on first focus
-		ensurePagefind();
+		ensureWorker();
 	});
 
 	input.addEventListener('blur', function () {
