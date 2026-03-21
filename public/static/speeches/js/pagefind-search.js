@@ -103,8 +103,8 @@
 		if (speaker) metaParts.push('<span>' + escapeHtml(speaker) + '</span>');
 
 		var html =
-			'<div class="sayit-search__result">' +
-			'<a href="' + escapeHtml(data.url) + '" class="sayit-search__result-title">' + escapeHtml(displayTitle) + '</a>' +
+			'<a href="' + escapeHtml(data.url) + '" class="sayit-search__result">' +
+			'<div class="sayit-search__result-title">' + escapeHtml(displayTitle) + '</div>' +
 			(metaParts.length > 0
 				? '<div class="sayit-search__result-meta">' + metaParts.join('<span aria-hidden="true"> \u00b7 </span>') + '</div>'
 				: '');
@@ -113,7 +113,7 @@
 			html += '<div class="sayit-search__result-excerpt">' + escapeHtml(snippet) + '</div>';
 		}
 
-		html += '</div>';
+		html += '</a>';
 		return html;
 	}
 
