@@ -184,3 +184,4 @@ dist
 !.env.example
 .wrangler/
 .claude/
+og-preview*.png
