@@ -513,6 +513,16 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 		return c.text('Bad Request', 400);
 	}
 
+	const cacheKey = buildCacheKey(c.req.url);
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) {
+		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
+		return r2Cached;
+	}
+
 	let section: any;
 	try {
 		section = await loadSection(c, sectionId);
@@ -528,7 +538,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 	const sectionHtml = parseContent(section.section_content ?? '');
 	const plain = toPlainText(sectionHtml);
 	const snippet = plain ? `${plain.slice(0, 80)}${plain.length > 80 ? '...' : ''}` : section.display_name ?? '';
-	const titleText = snippet ? `“${snippet}”` : 'View Section';
+	const titleText = snippet ? `”${snippet}”` : 'View Section';
 	const styles = [SingleParagraphViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const navigationScript = `<script>(function(){var box=document.getElementById('keyboard-shortcuts');if(!box)return;var prev=box.getAttribute('data-prev-url')||'';var next=box.getAttribute('data-next-url')||'';function editable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||tag==='select'||tag==='option'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(editable(document.activeElement))return;if(e.key==='j'){if(prev){window.location.href=prev;}}else if(e.key==='k'){if(next){window.location.href=next;}}});})();</script>`;
 
@@ -541,7 +551,10 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 		scripts: [navigationScript, PAGEFIND_SCRIPT].filter(Boolean).join('\n')
 	});
 
-	return c.html(html);
+	const response = withCacheHeaders(c.html(html));
+	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
+	await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
+	return response;
 });
 
 // SSR 講者頁

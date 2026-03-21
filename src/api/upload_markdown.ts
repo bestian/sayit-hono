@@ -486,6 +486,18 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`
 	];
 
+	// Also invalidate cached /speech/:section_id pages for this speech
+	try {
+		const result = await c.env.DB.prepare(
+			'SELECT section_id FROM speech_content WHERE filename = ?'
+		).bind(filename).all();
+		for (const row of result.results as any[]) {
+			keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${row.section_id}`);
+		}
+	} catch (err) {
+		console.error('[invalidate] section query error', err);
+	}
+
 	await Promise.allSettled(
 		keys.flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)])
 	);
