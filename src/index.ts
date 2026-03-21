@@ -10,6 +10,7 @@ import { speechAn, serveAnByKey } from './api/an';
 import { serveMdByKey } from './api/md';
 import { uploadMarkdown } from './api/upload_markdown';
 import { rssFeed } from './api/rss';
+import { generateOgImage, generateQuoteOgImage } from './api/og';
 import type { ApiEnv } from './api/types';
 import HomeView, { styles as HomeViewStyles } from './.generated/views/HomeView';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
@@ -76,7 +77,7 @@ async function serveAsset(c: any, path?: string): Promise<Response> {
 /** 優先嘗試從 ASSETS 回應靜態檔，找不到再交給後續 API/SSR 路由 */
 async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 	const pathname = new URL(c.req.url).pathname;
-	if (pathname.startsWith('/api/')) return next();
+	if (pathname.startsWith('/api/') || pathname.startsWith('/og/')) return next();
 	if (
 		pathname === '/' ||
 		pathname === '/index.html' ||
@@ -275,6 +276,102 @@ app.delete('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.on(['GET', 'HEAD'], '/rss.xml', (c) => rssFeed(c));
 app.on(['GET', 'HEAD'], '/feed.xml', (c) => rssFeed(c));
 
+// OG image for single-quote (section) pages — must be before /og/* wildcard
+app.get('/og/speech/:section_id{\\d+\\.png}', async (c) => {
+	const sectionId = Number(c.req.param('section_id').replace(/\.png$/, ''));
+	if (!Number.isInteger(sectionId)) return c.text('Not Found', 404);
+
+	const cacheKey = `og/speech/${sectionId}.png`;
+	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
+	if (cached) {
+		return new Response(cached.body, {
+			headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
+		});
+	}
+
+	let section: any;
+	try {
+		section = await loadSection(c, sectionId);
+	} catch (err) {
+		console.error('[og/speech] DB error', err);
+		return c.text('Internal Server Error', 500);
+	}
+	if (!section) return c.text('Not Found', 404);
+
+	const sectionHtml = parseContent(section.section_content ?? '');
+	const speakerName = section.name ?? null;
+	const speechTitle = section.display_name ?? section.filename ?? '';
+
+	try {
+		const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle);
+		await c.env.SPEECH_CACHE.put(cacheKey, png, {
+			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
+		});
+		return new Response(png, {
+			headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
+		});
+	} catch (err) {
+		console.error('[og/speech] generation error', err);
+		return c.text('OG image generation failed', 500);
+	}
+});
+
+// Dynamic OG image for speech pages
+app.get('/og/*', async (c) => {
+	const pathname = new URL(c.req.url).pathname;
+	const raw = pathname.replace(/^\/og\//, '').replace(/\.png$/, '');
+	const filename = decodeURIComponent(raw);
+	if (!filename) return c.text('Not Found', 404);
+
+	const cacheKey = `og/${filename}.png`;
+	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
+	if (cached) {
+		return new Response(cached.body, {
+			headers: {
+				'Content-Type': 'image/png',
+				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+			},
+		});
+	}
+
+	const speechMeta = await loadSpeechMeta(c, filename);
+	if (!speechMeta) return c.text('Not Found', 404);
+
+	let speakers: string[] = [];
+	try {
+		const result = await c.env.DB.prepare(
+			`SELECT sp.name, MIN(sc.section_id) AS first_appearance
+			 FROM speech_content sc
+			 JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+			 WHERE sc.filename = ? AND sp.name IS NOT NULL
+			 GROUP BY sp.name
+			 ORDER BY first_appearance
+			 LIMIT 5`
+		)
+			.bind(filename)
+			.all();
+		speakers = result.results.map((r: any) => r.name).filter(Boolean);
+	} catch (err) {
+		console.error('[og] speakers query error', err);
+	}
+
+	try {
+		const png = await generateOgImage(c.env, filename, speechMeta.display_name, speakers);
+		await c.env.SPEECH_CACHE.put(cacheKey, png, {
+			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
+		});
+		return new Response(png, {
+			headers: {
+				'Content-Type': 'image/png',
+				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+			},
+		});
+	} catch (err) {
+		console.error('[og] generation error', err);
+		return c.text('OG image generation failed', 500);
+	}
+});
+
 app.post('/api/purge_cache', async (c) => {
 	const authHeader = c.req.header('Authorization');
 	if (!authHeader?.startsWith('Bearer ')) return c.text('Forbidden', 403);
@@ -432,7 +529,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 	const styles = [SingleParagraphViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const navigationScript = `<script>(function(){var box=document.getElementById('keyboard-shortcuts');if(!box)return;var prev=box.getAttribute('data-prev-url')||'';var next=box.getAttribute('data-next-url')||'';function editable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||tag==='select'||tag==='option'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(editable(document.activeElement))return;if(e.key==='j'){if(prev){window.location.href=prev;}}else if(e.key==='k'){if(next){window.location.href=next;}}});})();</script>`;
 
-	const head = headForSpeechContent(titleText, sectionHtml);
+	const head = headForSpeechContent(titleText, sectionId, sectionHtml);
 	const html = await renderHtml(SingleParagraphView, {
 		head,
 		styles,
@@ -585,6 +682,7 @@ const excludedPaths = [
 	'speakers',
 	'speaker',
 	'speech',
+	'og',
 	'rss.xml',
 	'feed.xml',
 	'favicon.ico',
@@ -699,7 +797,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 	}));
 	const alternate = await loadAlternateInfo(c, filename);
 	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const head = headForNestedSpeechDetail(nestDisplayName);
+	const head = headForNestedSpeechDetail(nestDisplayName, filename);
 	if (alternate) {
 		head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 	}
@@ -858,7 +956,7 @@ app.get('/:filename', async (c) => {
 
 		const alternate = await loadAlternateInfo(c, filename);
 		const styles = [NestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-		const head = headForNestedSpeech(speechMeta.display_name ?? filename);
+		const head = headForNestedSpeech(speechMeta.display_name ?? filename, filename);
 		if (alternate) {
 			head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 		}
@@ -932,7 +1030,7 @@ app.get('/:filename', async (c) => {
 	const displayName = sections[0]?.display_name ?? speechMeta.display_name ?? filename;
 	const alternate = await loadAlternateInfo(c, filename);
 	const styles = [SingleSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const head = headForSingleSpeech(displayName);
+	const head = headForSingleSpeech(displayName, filename);
 	if (alternate) {
 		head.links = [{ rel: 'alternate', href: `https://sayit.archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 	}
