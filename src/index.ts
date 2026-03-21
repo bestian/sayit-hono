@@ -80,7 +80,7 @@ async function serveAsset(c: any, path?: string): Promise<Response> {
 /** 優先嘗試從 ASSETS 回應靜態檔，找不到再交給後續 API/SSR 路由 */
 async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 	const pathname = new URL(c.req.url).pathname;
-	if (pathname.startsWith('/api/') || pathname.startsWith('/og/') || pathname.startsWith('/speech/') || pathname.startsWith('/speaker/')) return next();
+	if (pathname.startsWith('/api/') || pathname.startsWith('/og/') || pathname.startsWith('/speech/') || pathname.startsWith('/speaker/') || pathname === '/search-index.json') return next();
 	if (
 		pathname === '/' ||
 		pathname === '/index.html' ||
@@ -259,6 +259,18 @@ async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
 
 // API CORS preflight
 app.options('/api/*', (c) => handleOptions(c));
+
+// Search index from R2
+app.get('/search-index.json', async (c) => {
+	const obj = await c.env.SPEECH_CACHE.get('search-index.json');
+	if (!obj) return c.text('Not found', 404);
+	return new Response(obj.body, {
+		headers: {
+			'Content-Type': 'application/json; charset=utf-8',
+			'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+		},
+	});
+});
 
 // D1 APIs
 app.get('/api/speech_index.json', (c) => speechIndex(c));
@@ -912,15 +924,17 @@ app.get('/:filename', async (c) => {
 			[];
 
 		try {
+			// Aggregation query: count sections and get first section content per nest
 			const result = await c.env.DB.prepare(
 				`SELECT
 					nest_filename,
 					nest_display_name,
-					section_id,
-					section_content
+					COUNT(*) AS section_count,
+					MIN(section_id) AS first_section_id
 				FROM speech_content
-				WHERE filename = ?
-				ORDER BY section_id ASC`
+				WHERE filename = ? AND nest_filename IS NOT NULL
+				GROUP BY nest_filename, nest_display_name
+				ORDER BY first_section_id ASC`
 			)
 				.bind(filename)
 				.all();
@@ -929,38 +943,31 @@ app.get('/:filename', async (c) => {
 				throw new Error('Database query failed');
 			}
 
-			const map = new Map<
-				string,
-				{ nest_filename: string; nest_display_name: string; section_count: number; preview?: string }
-			>();
-
-			for (const row of result.results as any[]) {
-				const nestKey = row.nest_filename;
-				if (!nestKey) continue;
-
-				const existing = map.get(nestKey) ?? {
-					nest_filename: nestKey,
-					nest_display_name: row.nest_display_name ?? nestKey,
-					section_count: 0,
-					preview: undefined
-				};
-
-				const currentCount = existing.section_count + 1;
-				let preview = existing.preview;
-				if (!preview) {
-					const parsedContent = parseContent(row.section_content ?? '');
-					const plain = toPlainText(parsedContent);
-					preview = plain ? `${plain.slice(0, 80)}${plain.length > 80 ? '...' : ''}` : undefined;
+			// Fetch preview content for each nest's first section in one query
+			const firstIds = (result.results as any[]).map((r: any) => r.first_section_id);
+			let previewMap = new Map<number, string>();
+			if (firstIds.length > 0) {
+				const placeholders = firstIds.map(() => '?').join(',');
+				const previewResult = await c.env.DB.prepare(
+					`SELECT section_id, section_content FROM speech_content WHERE section_id IN (${placeholders})`
+				)
+					.bind(...firstIds)
+					.all();
+				if (previewResult.success) {
+					for (const row of previewResult.results as any[]) {
+						const parsedContent = parseContent(row.section_content ?? '');
+						const plain = toPlainText(parsedContent);
+						if (plain) previewMap.set(row.section_id, plain.slice(0, 80) + (plain.length > 80 ? '...' : ''));
+					}
 				}
-
-				map.set(nestKey, {
-					...existing,
-					section_count: currentCount,
-					preview
-				});
 			}
 
-			nests = Array.from(map.values());
+			nests = (result.results as any[]).map((row: any) => ({
+				nest_filename: row.nest_filename,
+				nest_display_name: row.nest_display_name ?? row.nest_filename,
+				section_count: row.section_count,
+				preview: previewMap.get(row.first_section_id)
+			}));
 		} catch (err) {
 			console.error('[nested speech list] DB error', err);
 			return c.text('Internal Server Error', 500);
@@ -996,7 +1003,7 @@ app.get('/:filename', async (c) => {
 
 	let sections: Section[];
 	try {
-		// 直接查 speech_content + JOIN，避免 sections view 在大資料量時效能問題
+		// Query speech_content + speakers only (display_name from speechMeta, skip speech_index join)
 		const result = await c.env.DB.prepare(
 			`SELECT
 				sc.filename,
@@ -1005,11 +1012,9 @@ app.get('/:filename', async (c) => {
 				sc.next_section_id,
 				sc.section_speaker,
 				sc.section_content,
-				si.display_name,
 				sp.photoURL,
 				sp.name
 			FROM speech_content sc
-			LEFT JOIN speech_index si ON sc.filename = si.filename
 			LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
 			WHERE sc.filename = ?
 			ORDER BY sc.section_id ASC`
@@ -1021,6 +1026,7 @@ app.get('/:filename', async (c) => {
 			throw new Error('Database query failed');
 		}
 
+		const displayName_ = speechMeta.display_name ?? filename;
 		const rawSections = result.results.map((row: any) => ({
 			filename: row.filename,
 			section_id: row.section_id,
@@ -1028,7 +1034,7 @@ app.get('/:filename', async (c) => {
 			next_section_id: row.next_section_id,
 			section_speaker: row.section_speaker,
 			section_content: row.section_content,
-			display_name: row.display_name,
+			display_name: displayName_,
 			photoURL: row.photoURL ?? null,
 			name: row.name ?? null
 		}));

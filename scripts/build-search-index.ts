@@ -1,9 +1,9 @@
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 /** Regex to detect speaker heading lines: 1-6 # followed by name ending in : or ： */
-const speakerLineRegExp = /^#{1,6}\s*(.+?)\s*[:：]\s*$/;
+const speakerLineRegExp = /^(#{1,6})\s*(.+?)\s*[:：]\s*$/;
 
 /** Extract display name from the first line (strip leading # ) */
 function extractTitle(markdown: string): string {
@@ -17,53 +17,9 @@ function extractDate(displayName: string): string {
 	return match ? match[1] : '';
 }
 
-/** Convert YYYY-MM-DD to YYYYMMDD numeric string for pagefind sort (requires numbers) */
-function dateToSortKey(date: string): string {
-	return date.replace(/-/g, '');
-}
-
 /** Transform filename: lowercase, strip .md, replace full-width colon, max 50 chars */
 function transformFilename(input: string): string {
 	return input.toLowerCase().replace(/\.md$/, '').replace(/：/g, '-').slice(0, 50);
-}
-
-/** Extract unique speaker names from markdown */
-function extractSpeakers(markdown: string): string[] {
-	const speakers = new Set<string>();
-	for (const line of markdown.split('\n')) {
-		const match = speakerLineRegExp.exec(line.trim());
-		if (match) {
-			const name = match[1].replace(/\s*[:：]\s*$/, '').trim();
-			if (name) speakers.add(name);
-		}
-	}
-	return Array.from(speakers);
-}
-
-/** Strip markdown formatting for plain text content */
-function stripMarkdown(markdown: string): string {
-	return (
-		markdown
-			// Remove the title line
-			.replace(/^#\s+.*\n/, '')
-			// Remove speaker heading lines
-			.replace(/^#{1,6}\s*.+[:：]\s*$/gm, '')
-			// Remove quote markers
-			.replace(/^>\s?/gm, '')
-			// Remove markdown links, keep text
-			.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-			// Remove images
-			.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-			// Remove inline code backticks
-			.replace(/`([^`]+)`/g, '$1')
-			// Remove bold/italic markers
-			.replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1')
-			// Remove heading markers
-			.replace(/^#{1,6}\s+/gm, '')
-			// Collapse whitespace
-			.replace(/\n{3,}/g, '\n\n')
-			.trim()
-	);
 }
 
 /** Strip HTML tags and collapse whitespace */
@@ -71,109 +27,196 @@ function stripHtml(html: string): string {
 	return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/** Section shape from /api/speech/{filename} or sections dump */
+/** Strip markdown formatting for plain text */
+function stripInlineMarkdown(text: string): string {
+	return text
+		.replace(/^>\s?/gm, '')
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+		.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+		.replace(/`([^`]+)`/g, '$1')
+		.replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1')
+		.replace(/^#{1,6}\s+/gm, '')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
+}
+
+interface SearchDoc {
+	t: string; // title
+	c: string; // content
+	u: string; // url
+	d?: string; // date
+	s?: string; // speaker
+}
+
 type ApiSection = {
 	filename: string;
 	nest_filename: string | null;
 	section_id: number;
-	section_speaker: string | null;
 	section_content: string;
 	display_name: string;
 	name: string | null;
 };
 
-/** Sections dump: { [filename]: ApiSection[] } */
 type SectionsDump = Record<string, ApiSection[]>;
 
-/** Load sections dump from file, or fetch from API */
-async function loadSectionsDump(dumpPath: string | null, apiBase: string, dbEntries: Array<{ filename: string }>): Promise<SectionsDump> {
-	if (dumpPath && existsSync(dumpPath)) {
-		console.log(`[build-search] Loading sections from dump: ${dumpPath}`);
-		const raw = await readFile(dumpPath, 'utf-8');
-		return JSON.parse(raw) as SectionsDump;
-	}
-
-	// Fallback: fetch from API (slow, ~2s per speech)
-	console.log(`[build-search] No sections dump found, fetching from API (${dbEntries.length} speeches, 10 concurrent)...`);
-	const dump: SectionsDump = {};
-	let done = 0;
-
-	async function fetchOne(filename: string): Promise<void> {
-		const url = `${apiBase}/api/speech/${encodeURIComponent(filename)}`;
-		for (let attempt = 0; attempt < 3; attempt++) {
-			try {
-				const resp = await fetch(url);
-				if (resp.status === 404) break;
-				if (!resp.ok) {
-					if (attempt < 2) { await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); continue; }
-					break;
-				}
-				const data = (await resp.json()) as ApiSection[];
-				if (Array.isArray(data) && data.length > 0) dump[filename] = data;
-				break;
-			} catch {
+/** Fetch sections for a single speech from API with retries */
+async function fetchSpeechSections(apiBase: string, filename: string): Promise<ApiSection[] | null> {
+	const url = `${apiBase}/api/speech/${encodeURIComponent(filename)}`;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		try {
+			const resp = await fetch(url);
+			if (resp.status === 404) return null;
+			if (!resp.ok) {
 				if (attempt < 2) { await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); continue; }
+				return null;
 			}
+			const data = (await resp.json()) as ApiSection[];
+			return Array.isArray(data) && data.length > 0 ? data : null;
+		} catch {
+			if (attempt < 2) { await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); continue; }
 		}
-		done++;
-		if (done % 200 === 0) console.log(`[build-search]   ${done}/${dbEntries.length} fetched...`);
 	}
+	return null;
+}
 
-	// 10 concurrent
-	const queue = [...dbEntries];
-	const workers = Array.from({ length: Math.min(10, queue.length) }, async () => {
+/** Fetch sections for multiple speeches concurrently, updating dump in place */
+async function fetchMissingSections(
+	apiBase: string,
+	filenames: string[],
+	dump: SectionsDump,
+	concurrency = 20
+): Promise<void> {
+	if (filenames.length === 0) return;
+	let done = 0;
+	const queue = [...filenames];
+
+	const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
 		while (queue.length > 0) {
-			const entry = queue.shift()!;
-			await fetchOne(entry.filename);
+			const filename = queue.shift()!;
+			const sections = await fetchSpeechSections(apiBase, filename);
+			if (sections) dump[filename] = sections;
+			done++;
+			if (done % 200 === 0) console.log(`[build-search]   ${done}/${filenames.length} fetched...`);
 		}
 	});
 	await Promise.all(workers);
+}
 
-	return dump;
+/** Build section-level search docs from API sections dump */
+function docsFromSections(sections: ApiSection[], url: string): SearchDoc[] {
+	const title = sections[0]?.display_name || '';
+	const date = extractDate(title);
+	const docs: SearchDoc[] = [];
+
+	// Group by nest_filename
+	const groups = new Map<string, ApiSection[]>();
+	for (const section of sections) {
+		const key = section.nest_filename || '';
+		const arr = groups.get(key) || [];
+		arr.push(section);
+		groups.set(key, arr);
+	}
+
+	for (const [nestFilename, groupSections] of groups) {
+		const groupUrl = nestFilename
+			? `${url}/${encodeURIComponent(nestFilename)}`
+			: url;
+
+		for (const section of groupSections) {
+			const content = stripHtml(section.section_content || '').trim();
+			if (!content) continue;
+
+			const doc: SearchDoc = {
+				t: title,
+				c: content,
+				u: `${groupUrl}#s${section.section_id}`,
+			};
+			if (date) doc.d = date;
+			if (section.name) doc.s = section.name;
+			docs.push(doc);
+		}
+	}
+
+	return docs;
+}
+
+/** Fallback: parse markdown into section-level docs (no real section IDs) */
+function docsFromMarkdown(markdown: string, url: string): SearchDoc[] {
+	const title = extractTitle(markdown);
+	if (!title) return [];
+	const date = extractDate(title);
+
+	const lines = markdown.split('\n');
+	const docs: SearchDoc[] = [];
+	let currentSpeaker: string | null = null;
+	let currentLines: string[] = [];
+
+	function flushSection() {
+		const content = stripInlineMarkdown(currentLines.join('\n'));
+		if (!content) return;
+		const doc: SearchDoc = { t: title, c: content, u: url };
+		if (date) doc.d = date;
+		if (currentSpeaker) doc.s = currentSpeaker;
+		docs.push(doc);
+	}
+
+	for (let i = 0; i < lines.length; i++) {
+		if (i === 0 && /^#\s/.test(lines[i])) continue;
+		const match = speakerLineRegExp.exec(lines[i].trim());
+		if (match) {
+			flushSection();
+			currentSpeaker = match[2].trim();
+			currentLines = [];
+		} else {
+			currentLines.push(lines[i]);
+		}
+	}
+	flushSection();
+
+	if (docs.length === 0) {
+		const content = stripInlineMarkdown(markdown.replace(/^#\s+.*\n/, ''));
+		if (content) {
+			const doc: SearchDoc = { t: title, c: content, u: url };
+			if (date) doc.d = date;
+			docs.push(doc);
+		}
+	}
+
+	return docs;
+}
+
+interface Manifest {
+	[filename: string]: number; // mtime ms
 }
 
 async function buildSearchIndex() {
-	// pagefind is ESM-only; use dynamic import
-	const pagefind = await import('pagefind');
-
 	const transcriptDir = process.argv[2] || path.resolve('..', 'transcript');
-	const outputDir = path.resolve('www', 'pagefind');
+	const outputPath = path.resolve('www', 'search-index.json');
+	const manifestPath = path.resolve('www', 'search-index-manifest.json');
+	const dumpPath = path.resolve('scripts', 'sections-dump.json');
 	const apiUrl = process.env.SAYIT_API_URL || 'https://archive.tw/api/speech_index.json';
 	const apiBase = apiUrl.replace(/\/api\/speech_index\.json$/, '');
 
-	// Sections dump: env var, or default path in scripts/
-	const sectionsDumpPath = process.env.SECTIONS_DUMP
-		|| path.resolve(__dirname, 'sections-dump.json');
-
 	console.log(`[build-search] Reading .md files from: ${transcriptDir}`);
-	console.log(`[build-search] Output: ${outputDir}`);
 
-	// Build maps from transformFilename(mdFile) → mdFile for reverse lookup
 	const entries = await readdir(transcriptDir);
 	const mdFiles = entries.filter((f) => f.endsWith('.md') && !f.startsWith('.'));
-	const mdByTransformed = new Map<string, string>();
-	// Normalize for fuzzy matching: strip hyphens between ASCII/CJK and CJK punctuation
-	const stripMixedHyphens = (s: string) => s.replace(/([a-z0-9])-(?=[^\x00-\x7f])/g, '$1').replace(/(?<=[^\x00-\x7f])-([a-z0-9])/g, '$1');
-	const normalize = (s: string) => stripMixedHyphens(s).replace(/[、，。；：！？]/g, '');
-	const mdByNormalized = new Map<string, string>();
-	for (const file of mdFiles) {
-		const transformed = transformFilename(file);
-		mdByTransformed.set(transformed, file);
-		mdByNormalized.set(normalize(transformed), file);
-	}
-
 	console.log(`[build-search] Found ${mdFiles.length} markdown files`);
 
-	// Fetch canonical filenames from production DB
-	console.log(`[build-search] Fetching canonical filenames from ${apiUrl}`);
-	const resp = await fetch(apiUrl);
-	if (!resp.ok) throw new Error(`Failed to fetch speech index: HTTP ${resp.status}`);
-	const dbEntries = (await resp.json()) as Array<{ filename: string; display_name: string }>;
-	console.log(`[build-search] Got ${dbEntries.length} entries from DB`);
+	// Fetch canonical filenames from DB (single request)
+	console.log(`[build-search] Fetching speech index from ${apiUrl}`);
+	let dbEntries: Array<{ filename: string; display_name: string }> = [];
+	try {
+		const resp = await fetch(apiUrl);
+		if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+		dbEntries = (await resp.json()) as Array<{ filename: string; display_name: string }>;
+		console.log(`[build-search] Got ${dbEntries.length} entries from DB`);
+	} catch (err) {
+		console.warn(`[build-search] speech_index.json fetch failed (${err}), using filenames from markdown`);
+	}
 
-	// Fetch speakers count from production API
+	// Fetch speakers count
 	const speakersApiUrl = apiUrl.replace('speech_index.json', 'speakers_index.json');
-	console.log(`[build-search] Fetching speakers from ${speakersApiUrl}`);
 	let speakersCount = 0;
 	try {
 		const speakersResp = await fetch(speakersApiUrl);
@@ -182,217 +225,226 @@ async function buildSearchIndex() {
 			speakersCount = speakersData.length;
 		}
 	} catch (err) {
-		console.warn('[build-search] Failed to fetch speakers, will count from markdown', err);
+		console.warn('[build-search] Failed to fetch speakers count', err);
 	}
 
-	// Load section data from dump file or API
-	const sectionsDump = await loadSectionsDump(sectionsDumpPath, apiBase, dbEntries);
-	console.log(`[build-search] Sections data available for ${Object.keys(sectionsDump).length} speeches`);
+	// Build canonical URL lookup
+	const stripMixedHyphens = (s: string) => s.replace(/([a-z0-9])-(?=[^\x00-\x7f])/g, '$1').replace(/(?<=[^\x00-\x7f])-([a-z0-9])/g, '$1');
+	const normalize = (s: string) => stripMixedHyphens(s).replace(/[、，。；：！？]/g, '');
+	const canonicalByTransformed = new Map<string, string>();
+	const canonicalByNormalized = new Map<string, string>();
+	for (const entry of dbEntries) {
+		canonicalByTransformed.set(entry.filename, entry.filename);
+		canonicalByNormalized.set(normalize(entry.filename), entry.filename);
+	}
 
-	// Create Pagefind index
-	const { index } = await pagefind.createIndex({
-		forceLanguage: 'zh-tw',
-	});
+	function resolveCanonical(mdFile: string): string {
+		const derived = transformFilename(mdFile);
+		return canonicalByTransformed.get(derived)
+			|| canonicalByNormalized.get(normalize(derived))
+			|| derived;
+	}
 
-	if (!index) {
-		throw new Error('Failed to create Pagefind index');
+	// Load sections dump: local file → R2 fallback
+	let dump: SectionsDump = {};
+	if (existsSync(dumpPath)) {
+		console.log(`[build-search] Loading sections dump from: ${dumpPath}`);
+		dump = JSON.parse(await readFile(dumpPath, 'utf-8'));
+		console.log(`[build-search] Dump has ${Object.keys(dump).length} speeches`);
+	} else {
+		console.log(`[build-search] No local dump, fetching from R2...`);
+		try {
+			const { execSync } = await import('node:child_process');
+			execSync(`npx wrangler r2 object get sayit-speech-cache/sections-dump.json --file "${dumpPath}" --remote`, { stdio: 'inherit' });
+			dump = JSON.parse(await readFile(dumpPath, 'utf-8'));
+			console.log(`[build-search] Downloaded dump from R2 (${Object.keys(dump).length} speeches)`);
+		} catch {
+			console.log(`[build-search] No dump in R2 either, will fetch from API`);
+		}
+	}
+
+	// Load manifest for incremental builds
+	let oldManifest: Manifest = {};
+	let existingDocs: SearchDoc[] = [];
+	if (existsSync(manifestPath) && existsSync(outputPath)) {
+		try {
+			oldManifest = JSON.parse(await readFile(manifestPath, 'utf-8'));
+			existingDocs = JSON.parse(await readFile(outputPath, 'utf-8'));
+			console.log(`[build-search] Loaded existing index (${existingDocs.length} docs)`);
+		} catch {
+			oldManifest = {};
+			existingDocs = [];
+		}
+	}
+
+	// Determine changed files by mtime
+	const newManifest: Manifest = {};
+	const changedFiles: string[] = [];
+	const currentFiles = new Set<string>();
+
+	for (const file of mdFiles) {
+		currentFiles.add(file);
+		const fileStat = await stat(path.join(transcriptDir, file));
+		const mtime = fileStat.mtimeMs;
+		newManifest[file] = mtime;
+		if (oldManifest[file] !== mtime) {
+			changedFiles.push(file);
+		}
+	}
+
+	const deletedFiles = Object.keys(oldManifest).filter(f => !currentFiles.has(f));
+	const isIncremental = existingDocs.length > 0 && (changedFiles.length + deletedFiles.length) < mdFiles.length;
+
+	if (isIncremental) {
+		console.log(`[build-search] Incremental: ${changedFiles.length} changed, ${deletedFiles.length} deleted, ${mdFiles.length - changedFiles.length} unchanged`);
+	} else {
+		console.log(`[build-search] Full rebuild`);
+	}
+
+	// Fetch sections for speeches missing from dump
+	const filesToProcess = isIncremental ? changedFiles : mdFiles;
+	const canonicalsToFetch: string[] = [];
+	for (const file of filesToProcess) {
+		const canonical = resolveCanonical(file);
+		if (!dump[canonical]) {
+			canonicalsToFetch.push(canonical);
+		}
+	}
+
+	// Also fetch any DB entries missing from dump
+	if (!isIncremental) {
+		for (const entry of dbEntries) {
+			if (!dump[entry.filename] && !canonicalsToFetch.includes(entry.filename)) {
+				canonicalsToFetch.push(entry.filename);
+			}
+		}
+	}
+
+	const skipFetch = process.env.SKIP_FETCH === '1';
+	if (skipFetch && canonicalsToFetch.length > 0) {
+		console.log(`[build-search] SKIP_FETCH=1, skipping ${canonicalsToFetch.length} API fetches (markdown fallback)`);
+	} else if (canonicalsToFetch.length > 0) {
+		console.log(`[build-search] Fetching sections for ${canonicalsToFetch.length} speeches from API...`);
+		await fetchMissingSections(apiBase, canonicalsToFetch, dump);
+		// Save updated dump locally and to R2
+		await writeFile(dumpPath, JSON.stringify(dump));
+		console.log(`[build-search] Sections dump saved locally (${Object.keys(dump).length} speeches)`);
+		try {
+			const { execSync } = await import('node:child_process');
+			for (const bucket of ['sayit-speech-cache', 'sayit-speech-cache-preview']) {
+				execSync(`npx wrangler r2 object put ${bucket}/sections-dump.json --file "${dumpPath}" --content-type "application/json; charset=utf-8" --remote`, { stdio: 'inherit' });
+			}
+			console.log(`[build-search] Sections dump uploaded to R2 (prod + preview)`);
+		} catch (err) {
+			console.warn(`[build-search] R2 dump upload failed:`, err);
+		}
+	}
+
+	// Build docs
+	const allDocs: SearchDoc[] = [];
+	const allSpeakers = new Set<string>();
+
+	if (isIncremental) {
+		// URLs to remove from existing index (changed/deleted files)
+		const changedUrls = new Set<string>();
+		for (const file of [...changedFiles, ...deletedFiles]) {
+			changedUrls.add(`/${encodeURIComponent(resolveCanonical(file))}`);
+		}
+		// Keep unchanged docs
+		for (const doc of existingDocs) {
+			const baseUrl = doc.u.split('#')[0];
+			if (!changedUrls.has(baseUrl)) {
+				allDocs.push(doc);
+				if (doc.s) allSpeakers.add(doc.s);
+			}
+		}
 	}
 
 	let indexed = 0;
 	let skipped = 0;
-	let noFile = 0;
-	let sectionCount = 0;
-	let docLevelFallback = 0;
-	const allSpeakers = new Set<string>();
+	let fromDump = 0;
+	let fromMarkdown = 0;
 
-	/** Build an HTML page for Pagefind to index natively (heading-based sub_results) */
-	function buildSpeechHtml(
-		url: string,
-		title: string,
-		date: string,
-		speakers: string[],
-		sectionsHtml: string
-	): string {
-		const speakerFilters = speakers.map(s => `speaker:${s}`).join(', ');
+	for (const file of filesToProcess) {
+		const canonical = resolveCanonical(file);
+		const url = `/${encodeURIComponent(canonical)}`;
+		const sections = dump[canonical];
 
-		// Use separate elements for each meta field to avoid comma-parsing issues
-		const metaElements: string[] = [];
-		if (date) metaElements.push(`<meta data-pagefind-meta="date:${escapeAttr(date)}">`);
-		if (speakers.length > 0) metaElements.push(`<meta data-pagefind-meta="speaker:${escapeAttr(speakers.join(', '))}">`);
-
-		return [
-			'<html lang="zh-tw"><body>',
-			`<article data-pagefind-body`,
-			speakerFilters ? ` data-pagefind-filter="${escapeAttr(speakerFilters)}"` : '',
-			date ? ` data-pagefind-sort="date:${escapeAttr(dateToSortKey(date))}"` : '',
-			'>',
-			metaElements.join(''),
-			`<h1 data-pagefind-meta="title">${escapeHtml(title)}</h1>`,
-			sectionsHtml,
-			'</article></body></html>',
-		].join('');
-	}
-
-	function escapeHtml(s: string): string {
-		return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-	}
-
-	function escapeAttr(s: string): string {
-		return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-	}
-
-	for (const dbEntry of dbEntries) {
-		const canonicalFilename = dbEntry.filename;
-		const sections = sectionsDump[canonicalFilename];
-
+		let docs: SearchDoc[];
 		if (sections && sections.length > 0) {
-			const title = sections[0].display_name || dbEntry.display_name;
-			const date = extractDate(title);
-			sectionCount += sections.length;
-
-			// Group sections by nest_filename for separate HTML pages
-			const groups = new Map<string, ApiSection[]>();
-			for (const section of sections) {
-				const key = section.nest_filename || '';
-				const arr = groups.get(key) || [];
-				arr.push(section);
-				groups.set(key, arr);
-			}
-
-			for (const [nestFilename, groupSections] of groups) {
-				const speakers = new Set<string>();
-				const bodyParts: string[] = [];
-
-				for (const section of groupSections) {
-					const content = section.section_content || '';
-					if (!stripHtml(content).trim()) { skipped++; continue; }
-
-					const speakerName = section.name || null;
-					if (speakerName) {
-						speakers.add(speakerName);
-						allSpeakers.add(speakerName);
-					}
-
-					// h2 with section anchor — Pagefind splits sub_results on headings
-					const heading = speakerName ? escapeHtml(speakerName) : `#${section.section_id}`;
-					bodyParts.push(`<h2 id="s${section.section_id}">${heading}</h2>\n${content}`);
-				}
-
-				if (bodyParts.length === 0) continue;
-
-				const url = nestFilename
-					? `/${encodeURIComponent(canonicalFilename)}/${encodeURIComponent(nestFilename)}`
-					: `/${encodeURIComponent(canonicalFilename)}`;
-
-				const html = buildSpeechHtml(url, title, date, Array.from(speakers), bodyParts.join('\n'));
-
-				await index.addHTMLFile({ url, content: html });
-				indexed++;
-			}
-			continue;
+			docs = docsFromSections(sections, url);
+			fromDump++;
+		} else {
+			// Fallback to markdown parsing (no section IDs)
+			const markdown = await readFile(path.join(transcriptDir, file), 'utf-8');
+			docs = docsFromMarkdown(markdown, url);
+			fromMarkdown++;
 		}
 
-		// Fallback: no section data, try document-level from markdown
-		const mdFile = mdByTransformed.get(canonicalFilename)
-			|| mdByNormalized.get(normalize(canonicalFilename));
-
-		if (!mdFile) {
-			noFile++;
-			continue;
+		if (docs.length === 0) { skipped++; continue; }
+		for (const doc of docs) {
+			if (doc.s) allSpeakers.add(doc.s);
 		}
-
-		const filePath = path.join(transcriptDir, mdFile);
-		const markdown = await readFile(filePath, 'utf-8');
-
-		const title = extractTitle(markdown) || dbEntry.display_name;
-		const date = extractDate(title);
-		const speakers = extractSpeakers(markdown);
-		for (const s of speakers) allSpeakers.add(s);
-		const content = stripMarkdown(markdown);
-
-		if (!content.trim()) {
-			skipped++;
-			continue;
-		}
-
-		const url = `/${encodeURIComponent(canonicalFilename)}`;
-
-		await index.addCustomRecord({
-			url,
-			content,
-			language: 'zh-tw',
-			meta: {
-				title,
-				...(date ? { date } : {}),
-				...(speakers.length > 0 ? { speaker: speakers.join(', ') } : {}),
-			},
-			filters: {
-				...(speakers.length > 0 ? { speaker: speakers } : {}),
-			},
-			sort: {
-				...(date ? { date: dateToSortKey(date) } : {}),
-			},
-		});
-
+		allDocs.push(...docs);
 		indexed++;
-		docLevelFallback++;
 	}
 
-	// Also index .md files that aren't in the DB yet (new files not yet uploaded)
-	const dbFilenames = new Set(dbEntries.map((e) => e.filename));
-	const dbNormalized = new Set(dbEntries.map((e) => normalize(e.filename)));
-	for (const file of mdFiles) {
-		const derived = transformFilename(file);
-		// Skip if already indexed via DB entry (exact or fuzzy match)
-		if (dbFilenames.has(derived) || dbNormalized.has(normalize(derived))) continue;
+	// Also index DB entries that have dump data but no local .md file
+	if (!isIncremental) {
+		const processedCanonicals = new Set(filesToProcess.map(resolveCanonical));
+		for (const entry of dbEntries) {
+			if (processedCanonicals.has(entry.filename)) continue;
+			const sections = dump[entry.filename];
+			if (!sections || sections.length === 0) continue;
 
-		const filePath = path.join(transcriptDir, file);
-		const markdown = await readFile(filePath, 'utf-8');
-		const title = extractTitle(markdown);
-		if (!title) { skipped++; continue; }
-		const content = stripMarkdown(markdown);
-		if (!content.trim()) { skipped++; continue; }
-
-		const date = extractDate(title);
-		const speakers = extractSpeakers(markdown);
-		for (const s of speakers) allSpeakers.add(s);
-		const url = `/${encodeURIComponent(derived)}`;
-
-		await index.addCustomRecord({
-			url, content, language: 'zh-tw',
-			meta: { title, ...(date ? { date } : {}), ...(speakers.length > 0 ? { speaker: speakers.join(', ') } : {}) },
-			filters: { ...(speakers.length > 0 ? { speaker: speakers } : {}) },
-			sort: { ...(date ? { date } : {}) },
-		});
-		indexed++;
-		docLevelFallback++;
+			const url = `/${encodeURIComponent(entry.filename)}`;
+			const docs = docsFromSections(sections, url);
+			for (const doc of docs) {
+				if (doc.s) allSpeakers.add(doc.s);
+			}
+			allDocs.push(...docs);
+			indexed++;
+			fromDump++;
+		}
 	}
 
-	console.log(`[build-search] Indexed: ${indexed} (${sectionCount} sections, ${docLevelFallback} doc-level fallback), Skipped: ${skipped}, No .md file: ${noFile}`);
+	// Sort by date descending
+	allDocs.sort((a, b) => (b.d || '').localeCompare(a.d || ''));
 
-	// Write the index
-	const { errors } = await index.writeFiles({
-		outputPath: outputDir,
-	});
+	console.log(`[build-search] Processed: ${indexed} speeches (${fromDump} from dump, ${fromMarkdown} from markdown), Skipped: ${skipped}`);
+	console.log(`[build-search] Total: ${allDocs.length} section docs`);
 
-	if (errors.length > 0) {
-		console.error('[build-search] Errors:', errors);
-		throw new Error(`Pagefind indexing produced ${errors.length} errors`);
+	await mkdir(path.dirname(outputPath), { recursive: true });
+	const jsonData = JSON.stringify(allDocs);
+	await writeFile(outputPath, jsonData);
+	await writeFile(manifestPath, JSON.stringify(newManifest));
+	const sizeMB = (Buffer.byteLength(jsonData) / 1024 / 1024).toFixed(1);
+	console.log(`[build-search] Index written to ${outputPath} (${sizeMB} MB)`);
+
+	// Upload to R2 via wrangler, then remove from www/ (too large for static assets)
+	const { execSync } = await import('node:child_process');
+	try {
+		for (const bucket of ['sayit-speech-cache', 'sayit-speech-cache-preview']) {
+			execSync(`npx wrangler r2 object put ${bucket}/search-index.json --file "${outputPath}" --content-type "application/json; charset=utf-8" --remote`, { stdio: 'inherit' });
+		}
+		console.log(`[build-search] Uploaded to R2 (prod + preview)`);
+	} catch (err) {
+		console.error(`[build-search] R2 upload failed:`, err);
+		console.log(`[build-search] Index kept at ${outputPath} for manual upload`);
 	}
+	// Remove from www/ so wrangler deploy doesn't hit the 25 MB asset limit
+	const { unlink } = await import('node:fs/promises');
+	try { await unlink(outputPath); } catch {};
 
-	console.log(`[build-search] Index written to ${outputDir}`);
-
-	// Write stats.json for the homepage
+	// Write stats.json
 	const stats = {
-		speeches: sectionCount,
+		speeches: dbEntries.length,
 		speakers: speakersCount || allSpeakers.size,
-		sections: dbEntries.length,
+		sections: allDocs.length,
 	};
 	const statsPath = path.resolve('www', 'stats.json');
 	await writeFile(statsPath, JSON.stringify(stats));
 	console.log(`[build-search] Stats written to ${statsPath}:`, stats);
-
-	await pagefind.close();
 }
 
 buildSearchIndex().catch((err) => {
