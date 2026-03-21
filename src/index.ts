@@ -80,7 +80,7 @@ async function serveAsset(c: any, path?: string): Promise<Response> {
 /** 優先嘗試從 ASSETS 回應靜態檔，找不到再交給後續 API/SSR 路由 */
 async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 	const pathname = new URL(c.req.url).pathname;
-	if (pathname.startsWith('/api/') || pathname.startsWith('/og/')) return next();
+	if (pathname.startsWith('/api/') || pathname.startsWith('/og/') || pathname.startsWith('/speech/') || pathname.startsWith('/speaker/')) return next();
 	if (
 		pathname === '/' ||
 		pathname === '/index.html' ||
