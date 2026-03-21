@@ -428,14 +428,14 @@ async function renderHomePage(c: any) {
 
 async function renderSpeechesPage(c: any) {
 	const cacheKey = buildCacheKey(c.req.url);
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) {
 		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
 		return r2Cached;
 	}
-
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
 
 	let speeches: SpeechListItem[];
 	try {
@@ -466,14 +466,14 @@ async function renderSpeechesPage(c: any) {
 
 async function renderSpeakersPage(c: any) {
 	const cacheKey = buildCacheKey(c.req.url);
+	const edgeCached = await readEdgeCache(cacheKey);
+	if (edgeCached) return edgeCached;
+
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) {
 		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
 		return r2Cached;
 	}
-
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
 
 	let speakers: SpeakerListItem[];
 	try {
