@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
 import type { ApiEnv } from './types';
 import { marked } from 'marked';
-import { deleteEdgeCache, deleteR2Cache } from './cache';
+import { CACHE_KEY_VERSION, deleteEdgeCache, deleteR2Cache } from './cache';
 
 const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
 
@@ -474,8 +474,6 @@ async function pruneOrphanSpeakers(c: Context<ApiEnv>, routePathnames: string[])
 }
 
 /** 演講內容或 .an/.md 更新後，刪除 R2 上對應的快取 key */
-const CACHE_KEY_VERSION = 'v5';
-
 async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	const host = new URL(c.req.url).host;
 	const encodedFilename = encodeURIComponent(filename);

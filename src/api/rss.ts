@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
+import { CACHE_KEY_VERSION, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 
 const SITE_URL = 'https://archive.tw';
@@ -175,7 +175,6 @@ ${itemXml}
 </rss>`;
 }
 
-const CACHE_KEY_VERSION = 'v4';
 
 function buildCacheKey(url: string): string {
 	try {
