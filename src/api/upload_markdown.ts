@@ -668,7 +668,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				);
 		} else if (method === 'POST') {
 			// POST：新增一筆演講。寫入 speech_index、speakers、speech_speakers、speech_content（段落）
-			let body: { filename?: string; markdown?: string };
+			let body: { filename?: string; markdown?: string; alternate_filename?: string };
 			try {
 				body = await c.req.json();
 			} catch (err) {
@@ -756,6 +756,19 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			await withRetry(() => c.env.DB.batch(metaBatch));
 
+			// 1b. 雙向語言連結：若指定 alternate_filename，兩邊互指
+			const altFilename = body.alternate_filename
+				? transformFilename(body.alternate_filename.trim())
+				: null;
+			if (altFilename) {
+				await withRetry(() =>
+					c.env.DB.batch([
+						c.env.DB.prepare('UPDATE speech_index SET alternate_filename = ? WHERE filename = ?').bind(altFilename, filename),
+						c.env.DB.prepare('UPDATE speech_index SET alternate_filename = ? WHERE filename = ?').bind(filename, altFilename),
+					])
+				);
+			}
+
 			// 2. 段落分批寫入（每批約 50 筆，使用多行 VALUES 減少語句數）
 			const ROWS_PER_INSERT = 10;
 			const INSERTS_PER_BATCH = 5; // 5 statements × 10 rows = 50 rows per batch
@@ -794,7 +807,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 
 			return c.json(
-				{ success: true, filename, sectionsCount: normalized.length },
+				{ success: true, filename, sectionsCount: normalized.length, ...(altFilename ? { alternate_filename: altFilename } : {}) },
 				200,
 				corsHeadersWithMethods
 			);
