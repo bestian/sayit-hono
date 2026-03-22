@@ -16,3 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_speech_content_section_speaker ON speech_content(
 -- 檔名 + 巢檔複合索引，可精確鎖定單一巢檔（若不需要可移除）
 CREATE INDEX IF NOT EXISTS idx_speech_content_filename_nest ON speech_content(filename, nest_filename);
 
+-- 前/後段落 ID：loadSection 自連結取前後文時使用
+CREATE INDEX IF NOT EXISTS idx_speech_content_next_section_id ON speech_content(next_section_id);
+CREATE INDEX IF NOT EXISTS idx_speech_content_previous_section_id ON speech_content(previous_section_id);
+
