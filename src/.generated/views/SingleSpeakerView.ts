@@ -95,11 +95,22 @@ const resolvedRoutePathname = computed(() => {
   return ''
 })
 
+const decodeHtmlEntities = (text: string) => {
+  return text
+    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_m, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+}
+
 const stripHtmlTags = (html: string) => {
   if (!html) {
     return ''
   }
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return decodeHtmlEntities(html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
 }
 
 const normalizeSpeaker = (raw: SpeakerApiResponse | Speaker | null): Speaker | null => {

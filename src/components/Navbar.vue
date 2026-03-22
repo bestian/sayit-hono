@@ -134,6 +134,11 @@
 .sayit-search__results {
 	margin-top: 0.4em;
 	overflow: hidden;
+	max-width: 71.25em;
+	margin-left: auto;
+	margin-right: auto;
+	padding-left: .75em;
+	padding-right: .75em;
 }
 
 .sayit-search__results[hidden] {
