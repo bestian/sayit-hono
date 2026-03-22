@@ -78,7 +78,7 @@ async function serveAsset(c: any, path?: string): Promise<Response> {
 /** 優先嘗試從 ASSETS 回應靜態檔，找不到再交給後續 API/SSR 路由 */
 async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 	const pathname = new URL(c.req.url).pathname;
-	if (pathname.startsWith('/api/') || pathname.startsWith('/og/') || pathname.startsWith('/speech/') || pathname.startsWith('/speaker/') || pathname === '/search-index.json' || pathname === '/sections-dump.json') return next();
+	if (pathname.startsWith('/api/') || pathname.startsWith('/og/') || pathname.startsWith('/speech/') || pathname.startsWith('/speaker/') || pathname === '/search-index.json' || pathname === '/sections-dump.json' || pathname === '/stats.json') return next();
 	if (
 		pathname === '/' ||
 		pathname === '/index.html' ||
@@ -261,6 +261,17 @@ app.options('/api/*', (c) => handleOptions(c));
 // Search index from R2
 app.get('/search-index.json', async (c) => {
 	const obj = await c.env.SPEECH_CACHE.get('search-index.json');
+	if (!obj) return c.text('Not found', 404);
+	return new Response(obj.body, {
+		headers: {
+			'Content-Type': 'application/json; charset=utf-8',
+			'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+		},
+	});
+});
+
+app.get('/stats.json', async (c) => {
+	const obj = await c.env.SPEECH_CACHE.get('stats.json');
 	if (!obj) return c.text('Not found', 404);
 	return new Response(obj.body, {
 		headers: {
