@@ -49,7 +49,7 @@ const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></
 const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers);e=document.getElementById('sayit-stat-sections');if(e)e.textContent=fmt(s.sections)}).catch(function(){})})()</script>`;
 
 // Bump when cached HTML format changes (e.g. new meta tags) to invalidate stale edge/R2 entries.
-const CACHE_KEY_VERSION = 'v4';
+const CACHE_KEY_VERSION = 'v5';
 
 function buildCacheKey(url: string): string {
 	try {
@@ -80,7 +80,7 @@ async function serveAsset(c: any, path?: string): Promise<Response> {
 /** 優先嘗試從 ASSETS 回應靜態檔，找不到再交給後續 API/SSR 路由 */
 async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 	const pathname = new URL(c.req.url).pathname;
-	if (pathname.startsWith('/api/') || pathname.startsWith('/og/') || pathname.startsWith('/speech/') || pathname.startsWith('/speaker/') || pathname === '/search-index.json') return next();
+	if (pathname.startsWith('/api/') || pathname.startsWith('/og/') || pathname.startsWith('/speech/') || pathname.startsWith('/speaker/') || pathname === '/search-index.json' || pathname === '/sections-dump.json') return next();
 	if (
 		pathname === '/' ||
 		pathname === '/index.html' ||
@@ -263,6 +263,17 @@ app.options('/api/*', (c) => handleOptions(c));
 // Search index from R2
 app.get('/search-index.json', async (c) => {
 	const obj = await c.env.SPEECH_CACHE.get('search-index.json');
+	if (!obj) return c.text('Not found', 404);
+	return new Response(obj.body, {
+		headers: {
+			'Content-Type': 'application/json; charset=utf-8',
+			'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+		},
+	});
+});
+
+app.get('/sections-dump.json', async (c) => {
+	const obj = await c.env.SPEECH_CACHE.get('sections-dump.json');
 	if (!obj) return c.text('Not found', 404);
 	return new Response(obj.body, {
 		headers: {
@@ -552,7 +563,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 	const snippet = plain ? `${plain.slice(0, 80)}${plain.length > 80 ? '...' : ''}` : section.display_name ?? '';
 	const titleText = snippet ? `”${snippet}”` : 'View Section';
 	const styles = [SingleParagraphViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const navigationScript = `<script>(function(){var box=document.getElementById('keyboard-shortcuts');if(!box)return;var prev=box.getAttribute('data-prev-url')||'';var next=box.getAttribute('data-next-url')||'';function editable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||tag==='select'||tag==='option'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(editable(document.activeElement))return;if(e.key==='j'){if(prev){window.location.href=prev;}}else if(e.key==='k'){if(next){window.location.href=next;}}});})();</script>`;
+	const navigationScript = `<script>(function(){var box=document.getElementById('keyboard-shortcuts');if(!box)return;var prev=box.getAttribute('data-prev-url')||'';var next=box.getAttribute('data-next-url')||'';function editable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||tag==='select'||tag==='option'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(editable(document.activeElement))return;if(e.key==='j'){if(next){window.location.href=next;}}else if(e.key==='k'){if(prev){window.location.href=prev;}}});})();</script>`;
 
 	const head = headForSpeechContent(titleText, sectionId, sectionHtml);
 	const html = await renderHtml(SingleParagraphView, {
@@ -832,7 +843,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 
 	const hasSiblingNav = siblings.length > 0;
 	const navigationScript = hasSiblingNav
-		? `<script>(function(){var prev=document.querySelector('[data-prev-btn]');var next=document.querySelector('[data-next-btn]');function isEditable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(isEditable(document.activeElement))return;if(e.key==='j'&&prev&&prev.getAttribute('href')){window.location.href=prev.getAttribute('href');}if(e.key==='k'&&next&&next.getAttribute('href')){window.location.href=next.getAttribute('href');}});})();</script>`
+		? `<script>(function(){var prev=document.querySelector('[data-prev-btn]');var next=document.querySelector('[data-next-btn]');function isEditable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(isEditable(document.activeElement))return;if(e.key==='j'&&next&&next.getAttribute('href')){window.location.href=next.getAttribute('href');}if(e.key==='k'&&prev&&prev.getAttribute('href')){window.location.href=prev.getAttribute('href');}});})();</script>`
 		: undefined;
 
 	const html = await renderHtml(SingleNestedSpeechView, {

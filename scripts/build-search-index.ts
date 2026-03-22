@@ -252,14 +252,16 @@ async function buildSearchIndex() {
 		dump = JSON.parse(await readFile(dumpPath, 'utf-8'));
 		console.log(`[build-search] Dump has ${Object.keys(dump).length} speeches`);
 	} else {
-		console.log(`[build-search] No local dump, fetching from R2...`);
+		console.log(`[build-search] No local dump, fetching from ${apiBase}/sections-dump.json ...`);
 		try {
-			const { execSync } = await import('node:child_process');
-			execSync(`npx wrangler r2 object get sayit-speech-cache/sections-dump.json --file "${dumpPath}" --remote`, { stdio: 'inherit' });
-			dump = JSON.parse(await readFile(dumpPath, 'utf-8'));
-			console.log(`[build-search] Downloaded dump from R2 (${Object.keys(dump).length} speeches)`);
-		} catch {
-			console.log(`[build-search] No dump in R2 either, will fetch from API`);
+			const resp = await fetch(`${apiBase}/sections-dump.json`);
+			if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+			const text = await resp.text();
+			await writeFile(dumpPath, text);
+			dump = JSON.parse(text);
+			console.log(`[build-search] Downloaded dump via HTTP (${Object.keys(dump).length} speeches)`);
+		} catch (err) {
+			console.log(`[build-search] HTTP dump download failed (${err}), will fetch from API`);
 		}
 	}
 

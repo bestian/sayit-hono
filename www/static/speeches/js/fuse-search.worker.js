@@ -140,12 +140,7 @@ self.addEventListener('message', function (event) {
 			? Math.min(500, Math.max(limit * 10, 100))
 			: Math.max(limit * 5, 100);
 
-		var speakerFilter = message.speakerFilter || '';
-
-		var fuseResults = state.fuse.search(query, { limit: speakerFilter ? candidateLimit * 3 : candidateLimit });
-		if (speakerFilter) {
-			fuseResults = fuseResults.filter(function (r) { return r.item.s === speakerFilter; });
-		}
+		var fuseResults = state.fuse.search(query, { limit: candidateLimit });
 		var prioritized = prioritizeLatinWholeWordMatches(query, fuseResults);
 
 		var ranked;
@@ -155,11 +150,8 @@ self.addEventListener('message', function (event) {
 			});
 		} else {
 			var wholeWordMatcher = buildLatinWholeWordRegex(query);
-			var wholeWordDocs = speakerFilter
-				? state.docs.filter(function (d) { return d.s === speakerFilter; })
-				: state.docs;
 			var wholeWordFromAll = collectLatinWholeWordDocs(
-				query, wholeWordDocs,
+				query, state.docs,
 				Math.min(1200, Math.max(limit * 8, 300))
 			);
 			var merged = new Map();
@@ -217,7 +209,6 @@ self.addEventListener('message', function (event) {
 		self.postMessage({
 			type: 'results',
 			requestId: message.requestId,
-			speakerFilter: speakerFilter,
 			results: results,
 			total: results.length
 		});
