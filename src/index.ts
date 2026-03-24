@@ -507,9 +507,9 @@ async function renderSpeakersPage(c: any) {
 	return response;
 }
 
-app.get('/speeches', (c) => renderSpeechesPage(c));
+app.get('/speeches', (c) => c.redirect('/speeches/', 302));
 app.get('/speeches/', (c) => renderSpeechesPage(c));
-app.get('/speakers', (c) => renderSpeakersPage(c));
+app.get('/speakers', (c) => c.redirect('/speakers/', 302));
 app.get('/speakers/', (c) => renderSpeakersPage(c));
 app.get('/', (c) => renderHomePage(c));
 app.get('/index.html', (c) => renderHomePage(c));
