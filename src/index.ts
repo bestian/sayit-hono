@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
-import { CACHE_KEY_VERSION, deleteEdgeCache, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
+import { CACHE_KEY_VERSION, deleteEdgeCache, readR2Cache, writeR2Cache } from './api/cache';
 import { speakersIndex } from './api/speakers_index';
 import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
@@ -448,14 +448,8 @@ async function renderHomePage(c: any) {
 
 async function renderSpeechesPage(c: any) {
 	const cacheKey = buildCacheKey(c.req.url);
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
-
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
+	if (r2Cached) return r2Cached;
 
 	let speeches: SpeechListItem[];
 	try {
@@ -479,21 +473,14 @@ async function renderSpeechesPage(c: any) {
 	response = withCacheHeaders(response);
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	}
 	return response;
 }
 
 async function renderSpeakersPage(c: any) {
 	const cacheKey = buildCacheKey(c.req.url);
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
-
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
+	if (r2Cached) return r2Cached;
 
 	let speakers: SpeakerListItem[];
 	try {
@@ -516,7 +503,6 @@ async function renderSpeakersPage(c: any) {
 	response = withCacheHeaders(response);
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	}
 	return response;
 }
@@ -546,14 +532,8 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 	}
 
 	const cacheKey = buildCacheKey(c.req.url);
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
-
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
+	if (r2Cached) return r2Cached;
 
 	let section: any;
 	try {
@@ -585,22 +565,14 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 
 	const response = withCacheHeaders(c.html(html));
 	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-	await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	return response;
 });
 
 // SSR 講者頁
 app.get('/speaker/:route_pathname', async (c) => {
 	const cacheKey = buildCacheKey(c.req.url);
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
-
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		console.log('writing to edge cache', cacheKey);
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
+	if (r2Cached) return r2Cached;
 
 	const routePathname = encodeURIComponent(c.req.param('route_pathname'));
 	console.log(routePathname);
@@ -715,7 +687,6 @@ app.get('/speaker/:route_pathname', async (c) => {
 	if (response.ok && response.status < 400) {
 		console.log('writing to R2 cache', cacheKey);
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	}
 
 	return response;
@@ -746,14 +717,8 @@ function isExcludedPath(segment: string) {
 // SSR 巢狀演講內容頁（巢狀子項）
 app.get('/:filename/:nest_filename', async (c) => {
 	const cacheKey = buildCacheKey(c.req.url);
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
-
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
-		return r2Cached;
-	}
+	if (r2Cached) return r2Cached;
 
 	const encodedFilename = c.req.param('filename');
 	const encodedNestFilename = c.req.param('nest_filename');
@@ -877,7 +842,6 @@ app.get('/:filename/:nest_filename', async (c) => {
 
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	}
 
 	return response;
@@ -892,16 +856,9 @@ app.on(['GET', 'HEAD'], '/:path{[^/]+\\.an}', (c) => serveAnByKey(c, c.req.param
 // SSR 演講頁（單一演講或巢狀清單，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
 app.get('/:filename', async (c) => {
 	const cacheKey = buildCacheKey(c.req.url);
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) {
-		console.log('[edge cache] hit', cacheKey);
-		return edgeCached;
-	}
-
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) {
 		console.log('[r2 cache] hit', cacheKey);
-		await writeEdgeCache(cacheKey, r2Cached.clone(), DEFAULT_HTML_CACHE_CONTROL);
 		return r2Cached;
 	}
 
@@ -1090,7 +1047,6 @@ app.get('/:filename', async (c) => {
 
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		await writeEdgeCache(cacheKey, response.clone(), DEFAULT_HTML_CACHE_CONTROL);
 	}
 
 	return response;

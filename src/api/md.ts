@@ -140,6 +140,7 @@ function an2md(anXml: string): string {
 					.replace(/&gt;/g, '>')
 					.replace(/&quot;/g, '"')
 					.replace(/&apos;/g, "'")
+					.replace(/&#39;/g, "'")
 					.trim();
 				return restoreSpecialTags(out, restores);
 			})()
@@ -176,6 +177,7 @@ function an2md(anXml: string): string {
 					.replace(/&gt;/g, '>')
 					.replace(/&quot;/g, '"')
 					.replace(/&apos;/g, "'")
+					.replace(/&#39;/g, "'")
 					.trim();
 				return restoreSpecialTags(out, restores);
 			})
@@ -205,6 +207,10 @@ function an2md(anXml: string): string {
 	lines.push(merged.join('\n\n'));
 	return lines.join('\n');
 }
+
+export const __test__ = {
+	an2md
+};
 
 /** 提供 .md 檔案，依 objectKey 取得 .an 後轉成 markdown
  * - 629603.md：單一 section（不快取）
