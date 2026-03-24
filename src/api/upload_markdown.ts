@@ -1043,7 +1043,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			// 失效快取（R2，在 D1 交易之外）
 			await invalidateSpeechCaches(c, filename);
 			await invalidateSpeakerCaches(c, finalImpactedSpeakers);
-			await invalidateListPageCaches(c, { home: true, speeches: false, speakers: true });
+			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 
 			return c.json(
 				{
