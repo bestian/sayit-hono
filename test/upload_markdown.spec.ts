@@ -9,9 +9,10 @@ type PreparedStatement = {
 	args: unknown[];
 };
 
-function createUploadEnv() {
+function createUploadEnv(options?: { currentAlternateFilename?: string | null }) {
 	const operations: PreparedStatement[] = [];
 	const deletedKeys: string[] = [];
+	const currentAlternateFilename = options?.currentAlternateFilename ?? null;
 
 	const speechIndexRows = [
 		{
@@ -19,7 +20,8 @@ function createUploadEnv() {
 			display_name: 'Demo Speech',
 			isNested: 0,
 			nest_filenames: '',
-			nest_display_names: ''
+			nest_display_names: '',
+			alternate_filename: currentAlternateFilename
 		}
 	];
 
@@ -48,6 +50,15 @@ function createUploadEnv() {
 		}
 		if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
 			return { success: true, results: oldSections };
+		}
+		if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
+			if (args[0] === 'old-paired') {
+				return { success: true, results: [{ section_id: 99001 }] };
+			}
+			if (args[0] === 'paired-speech') {
+				return { success: true, results: [{ section_id: 99002 }] };
+			}
+			return { success: true, results: oldSections.map(({ section_id }) => ({ section_id })) };
 		}
 		if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
 			return { success: true, results: [] };
@@ -164,6 +175,66 @@ describe('upload_markdown PATCH', () => {
 				'v6/example.com/speeches/',
 				'v6/example.com/rss.xml',
 				'v6/example.com/feed.xml'
+			])
+		);
+	});
+
+	it('updates alternate links via PATCH without re-posting the speech', async () => {
+		const env = createUploadEnv({ currentAlternateFilename: 'old-paired' });
+		const body = [
+			'# Demo Speech',
+			'Alpha',
+			'',
+			'Beta'
+		].join('\n');
+
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: body,
+				alternate_filename: 'paired-speech'
+			})
+		});
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({
+			success: true,
+			filename: 'demo-speech',
+			alternate_filename: 'paired-speech',
+			sectionsCount: 2,
+			insertedCount: 0,
+			updatedCount: 2,
+			deletedCount: 0
+		});
+
+		const speechIndexOps = env.__operations.filter((stmt) => stmt.sql.startsWith('UPDATE speech_index'));
+		expect(speechIndexOps.map((stmt) => [stmt.sql, stmt.args])).toEqual(
+			expect.arrayContaining([
+				[
+					'UPDATE speech_index SET display_name = ?, alternate_filename = ? WHERE filename = ?',
+					['Demo Speech', 'paired-speech', 'demo-speech']
+				],
+				[
+					'UPDATE speech_index SET alternate_filename = NULL WHERE filename = ? AND alternate_filename = ?',
+					['old-paired', 'demo-speech']
+				],
+				[
+					'UPDATE speech_index SET alternate_filename = ? WHERE filename = ?',
+					['demo-speech', 'paired-speech']
+				]
+			])
+		);
+		expect(env.__deletedKeys).toEqual(
+			expect.arrayContaining([
+				'v6/example.com/demo-speech',
+				'v6/example.com/old-paired',
+				'v6/example.com/paired-speech',
+				'v6/example.com/speeches'
 			])
 		);
 	});

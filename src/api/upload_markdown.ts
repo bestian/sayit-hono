@@ -811,7 +811,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			);
 		} else if (method === 'PATCH') {
 			// PATCH：更新既有演講。以 LCS 對齊舊/新段落，更新/插入/刪除 speech_content，重建講者關聯
-			let body: { filename?: string; markdown?: string };
+			let body: { filename?: string; markdown?: string; alternate_filename?: string | null };
 			try {
 				body = await c.req.json();
 			} catch (err) {
@@ -830,10 +830,10 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const filename = transformFilename(rawFilename.trim());
 			const markdown = body.markdown;
 			const existingSpeech = await withRetry(() => c.env.DB.prepare(
-				'SELECT filename FROM speech_index WHERE filename = ?'
+				'SELECT filename, alternate_filename FROM speech_index WHERE filename = ?'
 			)
 				.bind(filename)
-				.first<{ filename: string }>());
+				.first<{ filename: string; alternate_filename?: string | null }>());
 			if (!existingSpeech) {
 				return c.json(
 					{ success: false, message: 'Filename not found in speech index', filename },
@@ -841,6 +841,28 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					corsHeadersWithMethods
 				);
 			}
+			const hasAlternateFilename = Object.prototype.hasOwnProperty.call(body, 'alternate_filename');
+			let nextAlternateFilename: string | null | undefined = undefined;
+			if (hasAlternateFilename) {
+				const rawAlternateFilename = body.alternate_filename;
+				if (rawAlternateFilename == null) {
+					nextAlternateFilename = null;
+				} else if (typeof rawAlternateFilename === 'string') {
+					const trimmedAlternateFilename = rawAlternateFilename.trim();
+					nextAlternateFilename = trimmedAlternateFilename ? transformFilename(trimmedAlternateFilename) : null;
+				} else {
+					return c.json({ error: 'alternate_filename must be a string or null' }, 400, corsHeadersWithMethods);
+				}
+			}
+			if (nextAlternateFilename === filename) {
+				return c.json({ error: 'alternate_filename cannot match filename' }, 400, corsHeadersWithMethods);
+			}
+			const currentAlternateFilename =
+				typeof existingSpeech.alternate_filename === 'string' && existingSpeech.alternate_filename.trim()
+					? transformFilename(existingSpeech.alternate_filename.trim())
+					: null;
+			const desiredAlternateFilename =
+				nextAlternateFilename === undefined ? currentAlternateFilename : nextAlternateFilename;
 
 			const firstLine = markdown.split('\n')[0]?.trim() ?? '';
 			const displayName = firstLine.replace(/^#\s*/, '') || filename;
@@ -901,9 +923,22 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			// 1. 更新 display_name
 			batchStatements.push(
-				c.env.DB.prepare('UPDATE speech_index SET display_name = ? WHERE filename = ?')
-					.bind(displayName, filename)
+				c.env.DB.prepare('UPDATE speech_index SET display_name = ?, alternate_filename = ? WHERE filename = ?')
+					.bind(displayName, desiredAlternateFilename, filename)
 			);
+			if (hasAlternateFilename && currentAlternateFilename && currentAlternateFilename !== desiredAlternateFilename) {
+				batchStatements.push(
+					c.env.DB.prepare(
+						'UPDATE speech_index SET alternate_filename = NULL WHERE filename = ? AND alternate_filename = ?'
+					).bind(currentAlternateFilename, filename)
+				);
+			}
+			if (hasAlternateFilename && desiredAlternateFilename) {
+				batchStatements.push(
+					c.env.DB.prepare('UPDATE speech_index SET alternate_filename = ? WHERE filename = ?')
+						.bind(filename, desiredAlternateFilename)
+				);
+			}
 
 			// 2. 確保講者存在（冪等 upsert）
 			for (const routePathname of newSpeakerRoutePathnames) {
@@ -1042,6 +1077,12 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			// 失效快取（R2，在 D1 交易之外）
 			await invalidateSpeechCaches(c, filename);
+			const affectedAlternateFilenames = Array.from(
+				new Set([currentAlternateFilename, desiredAlternateFilename].filter((value): value is string => Boolean(value && value !== filename)))
+			);
+			for (const alternateFilename of affectedAlternateFilenames) {
+				await invalidateSpeechCaches(c, alternateFilename);
+			}
 			await invalidateSpeakerCaches(c, finalImpactedSpeakers);
 			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 
@@ -1049,6 +1090,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				{
 					success: true,
 					filename,
+					...(hasAlternateFilename ? { alternate_filename: desiredAlternateFilename } : {}),
 					sectionsCount: normalized.length,
 					insertedCount: normalized.filter((section) => !oldSectionIds.has(section.section_id)).length,
 					updatedCount: normalized.filter((section) => oldSectionIds.has(section.section_id)).length,
