@@ -18,6 +18,7 @@ function createEnv() {
 	const r2Store = new Map<string, { body: string; cacheControl?: string; contentType?: string }>();
 
 	return {
+		__r2Store: r2Store,
 		ASSETS: {
 			// 僅對已知靜態路徑回傳 200，其餘回傳 404
 			fetch: (url: string) => {
@@ -57,6 +58,26 @@ function createEnv() {
 		DB: {
 			prepare: (sql: string) => ({
 				bind: (...args: unknown[]) => ({
+					first: async () => {
+						if (sql.includes('FROM speech_index WHERE filename = ?')) {
+							if (args[0] === '2026-03-24-demo-speech') {
+								return {
+									filename: '2026-03-24-demo-speech',
+									display_name: '2026-03-24 Demo Speech',
+									isNested: 0,
+									nest_filenames: null,
+									nest_display_names: null
+								};
+							}
+							return null;
+						}
+
+						if (sql.includes('FROM speech_index si') && sql.includes('alternate_filename')) {
+							return null;
+						}
+
+						return null;
+					},
 					all: async () => {
 						if (sql.includes('FROM speech_index si') && sql.includes('first_section_content')) {
 							const limit = Number(args[0] ?? 30);
@@ -75,6 +96,37 @@ function createEnv() {
 									}
 								].slice(0, limit)
 							};
+						}
+
+						if (sql.includes('FROM speech_content sc') && sql.includes('WHERE sc.filename = ?')) {
+							if (args[0] === '2026-03-24-demo-speech') {
+								return {
+									success: true,
+									results: [
+										{
+											filename: '2026-03-24-demo-speech',
+											section_id: 101,
+											previous_section_id: null,
+											next_section_id: 102,
+											section_speaker: 'audrey-tang',
+											section_content: '<p>First paragraph.</p>',
+											photoURL: null,
+											name: 'Audrey Tang'
+										},
+										{
+											filename: '2026-03-24-demo-speech',
+											section_id: 102,
+											previous_section_id: 101,
+											next_section_id: null,
+											section_speaker: 'audrey-tang',
+											section_content: '<p>Second paragraph.</p>',
+											photoURL: null,
+											name: 'Audrey Tang'
+										}
+									]
+								};
+							}
+							return { success: true, results: [] };
 						}
 
 						return {
@@ -129,5 +181,21 @@ describe('Worker routes', () => {
 	it('returns 404 for unknown path', async () => {
 		const { res } = await request('/not-found');
 		expect(res.status).toBe(404);
+	});
+
+	it('uses one speech-page cache key regardless of query string', async () => {
+		const env = createEnv();
+
+		const first = await request('/2026-03-24-demo-speech', env);
+		expect(first.res.status).toBe(200);
+
+		const second = await request('/2026-03-24-demo-speech??', env);
+		expect(second.res.status).toBe(200);
+
+		const keys = Array.from((env as any).__r2Store.keys());
+		expect(keys).toContain('v7/example.com/2026-03-24-demo-speech');
+		expect(keys).not.toContain('v7/example.com/2026-03-24-demo-speech?');
+		expect(keys.filter((key: string) => key.includes('2026-03-24-demo-speech'))).toHaveLength(1);
+		expect(await first.res.text()).toBe(await second.res.text());
 	});
 });

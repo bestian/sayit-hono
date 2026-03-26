@@ -49,13 +49,14 @@ const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></
 const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers);e=document.getElementById('sayit-stat-sections');if(e)e.textContent=fmt(s.sections)}).catch(function(){})})()</script>`;
 
 
-function buildCacheKey(url: string): string {
+function buildCacheKey(url: string, { includeSearch = true }: { includeSearch?: boolean } = {}): string {
 	try {
 		const u = new URL(url);
-		return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${u.search}`;
+		return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${includeSearch ? u.search : ''}`;
 	} catch {
 		// fallback: strip protocol manually
-		return `${CACHE_KEY_VERSION}/${url.replace(/^https?:\/\//, '')}`;
+		const stripped = url.replace(/^https?:\/\//, '');
+		return includeSearch ? `${CACHE_KEY_VERSION}/${stripped}` : `${CACHE_KEY_VERSION}/${stripped.split('?')[0]}`;
 	}
 }
 
@@ -447,7 +448,7 @@ async function renderHomePage(c: any) {
 }
 
 async function renderSpeechesPage(c: any) {
-	const cacheKey = buildCacheKey(c.req.url);
+	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) return r2Cached;
 
@@ -478,7 +479,7 @@ async function renderSpeechesPage(c: any) {
 }
 
 async function renderSpeakersPage(c: any) {
-	const cacheKey = buildCacheKey(c.req.url);
+	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) return r2Cached;
 
@@ -531,7 +532,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 		return c.text('Bad Request', 400);
 	}
 
-	const cacheKey = buildCacheKey(c.req.url);
+	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) return r2Cached;
 
@@ -716,7 +717,7 @@ function isExcludedPath(segment: string) {
 
 // SSR 巢狀演講內容頁（巢狀子項）
 app.get('/:filename/:nest_filename', async (c) => {
-	const cacheKey = buildCacheKey(c.req.url);
+	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) return r2Cached;
 
@@ -855,7 +856,7 @@ app.on(['GET', 'HEAD'], '/:path{[^/]+\\.an}', (c) => serveAnByKey(c, c.req.param
 
 // SSR 演講頁（單一演講或巢狀清單，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
 app.get('/:filename', async (c) => {
-	const cacheKey = buildCacheKey(c.req.url);
+	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) {
 		console.log('[r2 cache] hit', cacheKey);
