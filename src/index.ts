@@ -40,13 +40,113 @@ type WorkerEnv = ApiEnv['Bindings'];
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
-// 靜態檔優先：先嘗試 ASSETS（Cloudflare CI 建置），找不到再走 API/SSR
-app.use('*', staticFirstMiddleware);
-
 const EDGE_TTL_SECONDS = 60;
-const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=${EDGE_TTL_SECONDS}, s-maxage=${EDGE_TTL_SECONDS}`;
+const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}`;
 const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></script>';
 const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers);e=document.getElementById('sayit-stat-sections');if(e)e.textContent=fmt(s.sections)}).catch(function(){})})()</script>`;
+
+const excludedPaths = [
+	'api',
+	'speeches',
+	'speakers',
+	'speaker',
+	'speech',
+	'og',
+	'rss.xml',
+	'feed.xml',
+	'favicon.ico',
+	'robots.txt',
+	'static',
+	'media',
+	'index.html'
+];
+
+function isExcludedPath(segment: string) {
+	return excludedPaths.includes(segment.toLowerCase());
+}
+
+function normalizeSpeakerPageSearch(url: URL): string {
+	const rawPage = url.searchParams.get('page');
+	if (rawPage == null) return '';
+
+	const page = Number(rawPage);
+	if (!Number.isInteger(page) || page < 2) return '';
+
+	return `?page=${page}`;
+}
+
+function buildCanonicalPageUrl(requestUrl: string): string | null {
+	try {
+		const url = new URL(requestUrl);
+		const { pathname, search } = url;
+		const segments = pathname.split('/').filter(Boolean);
+		const lastSegment = segments[segments.length - 1] ?? '';
+		const isTopLevelSpeechPath = segments.length === 1 && !isExcludedPath(segments[0] ?? '') && !lastSegment.includes('.');
+		const isNestedSpeechPath = segments.length === 2 && !isExcludedPath(segments[0] ?? '') && !lastSegment.includes('.');
+		const isSectionPagePath = segments.length === 2 && segments[0] === 'speech' && /^\d+$/.test(segments[1] ?? '');
+		const isSpeakerPagePath = segments.length === 2 && segments[0] === 'speaker';
+
+		let canonicalPath = pathname;
+		let canonicalSearch = search;
+
+		if (pathname === '/index.html') {
+			canonicalPath = '/';
+		} else if (pathname === '/speeches') {
+			canonicalPath = '/speeches/';
+		} else if (pathname === '/speakers') {
+			canonicalPath = '/speakers/';
+		}
+
+		if (
+			pathname === '/' ||
+			pathname === '/index.html' ||
+			pathname === '/speeches' ||
+			pathname === '/speeches/' ||
+			pathname === '/speakers' ||
+			pathname === '/speakers/' ||
+			isTopLevelSpeechPath ||
+			isNestedSpeechPath ||
+			isSectionPagePath
+		) {
+			canonicalSearch = '';
+		} else if (isSpeakerPagePath) {
+			canonicalSearch = normalizeSpeakerPageSearch(url);
+		} else {
+			return null;
+		}
+
+		if (canonicalPath === pathname && canonicalSearch === search) {
+			return null;
+		}
+
+		const canonicalUrl = new URL(url.toString());
+		canonicalUrl.pathname = canonicalPath;
+		canonicalUrl.search = canonicalSearch;
+		return canonicalUrl.toString();
+	} catch {
+		return null;
+	}
+}
+
+async function canonicalHtmlPageMiddleware(c: any, next: () => Promise<void>) {
+	if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+		return next();
+	}
+
+	const canonicalUrl = buildCanonicalPageUrl(c.req.url);
+	if (!canonicalUrl) {
+		return next();
+	}
+
+	const response = c.redirect(canonicalUrl, 302);
+	response.headers.set('Cache-Control', 'no-store');
+	return response;
+}
+
+app.use('*', canonicalHtmlPageMiddleware);
+
+// 靜態檔優先：先嘗試 ASSETS（Cloudflare CI 建置），找不到再走 API/SSR
+app.use('*', staticFirstMiddleware);
 
 
 function buildCacheKey(url: string, { includeSearch = true }: { includeSearch?: boolean } = {}): string {
@@ -696,25 +796,6 @@ app.get('/speaker/:route_pathname', async (c) => {
 
 // favicon、robots、/media/*、/static/* 由 staticFirstMiddleware 從 ASSETS 提供
 
-const excludedPaths = [
-	'api',
-	'speeches',
-	'speakers',
-	'speaker',
-	'speech',
-	'og',
-	'rss.xml',
-	'feed.xml',
-	'favicon.ico',
-	'robots.txt',
-	'static',
-	'index.html'
-];
-
-function isExcludedPath(segment: string) {
-	return excludedPaths.includes(segment.toLowerCase());
-}
-
 // SSR 巢狀演講內容頁（巢狀子項）
 app.get('/:filename/:nest_filename', async (c) => {
 	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
@@ -976,7 +1057,14 @@ app.get('/:filename', async (c) => {
 			scripts: PAGEFIND_SCRIPT
 		});
 
-		return c.html(html);
+		let response = c.html(html);
+		response = withCacheHeaders(response);
+
+		if (response.ok && response.status < 400) {
+			await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
+		}
+
+		return response;
 	}
 
 	let sections: Section[];

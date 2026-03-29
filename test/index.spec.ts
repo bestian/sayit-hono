@@ -1,17 +1,14 @@
 import { createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import worker from '../src/index';
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 function createEnv() {
 	const okPaths = new Set([
-		'/',
-		'/index.html',
-		'/speeches',
-		'/speeches.html',
-		'/speeches/',
-		'/speeches/index.html',
+		'/about',
+		'/about/',
 		'/favicon.ico',
 		'/robots.txt'
 	]);
@@ -152,10 +149,28 @@ async function request(path: string, env = createEnv()) {
 }
 
 describe('Worker routes', () => {
-	it.each(['/', '/about', '/about/', '/speeches', '/speeches/'])('serves static asset: %s', async (path) => {
+	it.each(['/about', '/about/'])('serves static asset: %s', async (path) => {
 		const { res } = await request(path);
 		expect(res.status).toBe(200);
 		expect(await res.text()).toContain('asset:');
+	});
+
+	it('renders the home page', async () => {
+		const { res } = await request('/');
+		expect(res.status).toBe(200);
+		expect(await res.text()).toContain('SayIt');
+	});
+
+	it('redirects speeches to the canonical trailing-slash URL', async () => {
+		const { res } = await request('/speeches');
+		expect(res.status).toBe(302);
+		expect(res.headers.get('location')).toBe('https://example.com/speeches/');
+	});
+
+	it('strips ignored query params from the speeches page URL', async () => {
+		const { res } = await request('/speeches?x');
+		expect(res.status).toBe(302);
+		expect(res.headers.get('location')).toBe('https://example.com/speeches/');
 	});
 
 	it('returns speech index from D1', async () => {
@@ -183,19 +198,19 @@ describe('Worker routes', () => {
 		expect(res.status).toBe(404);
 	});
 
-	it('uses one speech-page cache key regardless of query string', async () => {
+	it('redirects query variants of speech pages to the canonical URL before caching', async () => {
 		const env = createEnv();
 
 		const first = await request('/2026-03-24-demo-speech', env);
 		expect(first.res.status).toBe(200);
 
-		const second = await request('/2026-03-24-demo-speech??', env);
-		expect(second.res.status).toBe(200);
+		const second = await request('/2026-03-24-demo-speech?x', env);
+		expect(second.res.status).toBe(302);
+		expect(second.res.headers.get('location')).toBe('https://example.com/2026-03-24-demo-speech');
 
-		const keys = Array.from((env as any).__r2Store.keys());
-		expect(keys).toContain('v7/example.com/2026-03-24-demo-speech');
-		expect(keys).not.toContain('v7/example.com/2026-03-24-demo-speech?');
-		expect(keys.filter((key: string) => key.includes('2026-03-24-demo-speech'))).toHaveLength(1);
-		expect(await first.res.text()).toBe(await second.res.text());
+		const keys = Array.from((env as any).__r2Store.keys()) as string[];
+		expect(keys).toContain(`${CACHE_KEY_VERSION}/example.com/2026-03-24-demo-speech`);
+		expect(keys).not.toContain(`${CACHE_KEY_VERSION}/example.com/2026-03-24-demo-speech?x`);
+		expect(keys.filter((key) => key.includes('2026-03-24-demo-speech'))).toHaveLength(1);
 	});
 });

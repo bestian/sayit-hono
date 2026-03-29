@@ -14,13 +14,14 @@ import { exec } from 'node:child_process';
 import { writeFile, mkdir, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 
 const execAsync = promisify(exec);
 
 const LOCAL = process.env.WARM_TARGET || 'http://localhost:8787';
 const PROD_HOST = 'archive.tw';
 const PROD_BUCKET = 'sayit-speech-cache';
-const CACHE_VERSION = process.argv[2] || 'v5';
+const CACHE_VERSION = process.argv[2] || CACHE_KEY_VERSION;
 const RENDER_CONCURRENCY = 5;
 const UPLOAD_CONCURRENCY = 10;
 
@@ -115,7 +116,7 @@ async function main() {
 	const speeches = (await speechResp.json()) as SpeechEntry[];
 	console.log(`[warm-cache] ${speeches.length} speeches`);
 
-	paths.push('/speeches');
+	paths.push('/speeches/');
 	for (const s of speeches) {
 		paths.push(`/${encodeURIComponent(s.filename)}`);
 		if (s.isNested && s.nest_filenames) {
