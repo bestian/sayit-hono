@@ -1,5 +1,6 @@
 import { createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import worker from '../src/index';
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
@@ -9,12 +10,24 @@ type PreparedStatement = {
 	args: unknown[];
 };
 
-function createUploadEnv(options?: { currentAlternateFilename?: string | null }) {
+type SpeechIndexRow = {
+	filename: string;
+	display_name: string;
+	isNested: number;
+	nest_filenames: string;
+	nest_display_names: string;
+	alternate_filename?: string | null;
+};
+
+function createUploadEnv(options?: {
+	currentAlternateFilename?: string | null;
+	extraSpeechIndexRows?: SpeechIndexRow[];
+}) {
 	const operations: PreparedStatement[] = [];
 	const deletedKeys: string[] = [];
 	const currentAlternateFilename = options?.currentAlternateFilename ?? null;
 
-	const speechIndexRows = [
+	const speechIndexRows: SpeechIndexRow[] = [
 		{
 			filename: 'demo-speech',
 			display_name: 'Demo Speech',
@@ -22,7 +35,8 @@ function createUploadEnv(options?: { currentAlternateFilename?: string | null })
 			nest_filenames: '',
 			nest_display_names: '',
 			alternate_filename: currentAlternateFilename
-		}
+		},
+		...(options?.extraSpeechIndexRows ?? [])
 	];
 
 	const oldSections = [
@@ -46,10 +60,13 @@ function createUploadEnv(options?: { currentAlternateFilename?: string | null })
 
 	function query(sql: string, args: unknown[]) {
 		if (sql.includes('FROM speech_index WHERE filename = ?')) {
-			return { success: true, results: speechIndexRows };
+			return { success: true, results: speechIndexRows.filter((row) => row.filename === args[0]) };
+		}
+		if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
+			return { success: true, results: [{ max_id: oldSections[oldSections.length - 1]?.section_id ?? 0 }] };
 		}
 		if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
-			return { success: true, results: oldSections };
+			return { success: true, results: args[0] === 'demo-speech' ? oldSections : [] };
 		}
 		if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
 			if (args[0] === 'old-paired') {
@@ -171,10 +188,10 @@ describe('upload_markdown PATCH', () => {
 		expect(insertedSectionIds).toEqual([10001]);
 		expect(env.__deletedKeys).toEqual(
 			expect.arrayContaining([
-				'v6/example.com/speeches',
-				'v6/example.com/speeches/',
-				'v6/example.com/rss.xml',
-				'v6/example.com/feed.xml'
+				`${CACHE_KEY_VERSION}/example.com/speeches`,
+				`${CACHE_KEY_VERSION}/example.com/speeches/`,
+				`${CACHE_KEY_VERSION}/example.com/rss.xml`,
+				`${CACHE_KEY_VERSION}/example.com/feed.xml`
 			])
 		);
 	});
@@ -231,10 +248,56 @@ describe('upload_markdown PATCH', () => {
 		);
 		expect(env.__deletedKeys).toEqual(
 			expect.arrayContaining([
-				'v6/example.com/demo-speech',
-				'v6/example.com/old-paired',
-				'v6/example.com/paired-speech',
-				'v6/example.com/speeches'
+				`${CACHE_KEY_VERSION}/example.com/demo-speech`,
+				`${CACHE_KEY_VERSION}/example.com/old-paired`,
+				`${CACHE_KEY_VERSION}/example.com/paired-speech`,
+				`${CACHE_KEY_VERSION}/example.com/speeches`
+			])
+		);
+	});
+});
+
+describe('upload_markdown POST', () => {
+	it('invalidates the counterpart page when creating a new alternate-language pair', async () => {
+		const env = createUploadEnv({
+			extraSpeechIndexRows: [
+				{
+					filename: 'paired-speech',
+					display_name: 'Paired Speech',
+					isNested: 0,
+					nest_filenames: '',
+					nest_display_names: '',
+					alternate_filename: null
+				}
+			]
+		});
+
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'fresh-speech',
+				markdown: '# Fresh Speech\nAlpha',
+				alternate_filename: 'paired-speech'
+			})
+		});
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({
+			success: true,
+			filename: 'fresh-speech',
+			sectionsCount: 1,
+			alternate_filename: 'paired-speech'
+		});
+		expect(env.__deletedKeys).toEqual(
+			expect.arrayContaining([
+				`${CACHE_KEY_VERSION}/example.com/fresh-speech`,
+				`${CACHE_KEY_VERSION}/example.com/paired-speech`,
+				`${CACHE_KEY_VERSION}/example.com/speech/99002`,
+				`${CACHE_KEY_VERSION}/example.com/speeches`
 			])
 		);
 	});

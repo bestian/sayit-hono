@@ -801,6 +801,9 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			}
 
 			await invalidateSpeechCaches(c, filename);
+			if (altFilename && altFilename !== filename) {
+				await invalidateSpeechCaches(c, altFilename);
+			}
 			await invalidateSpeakerCaches(c, speakerRoutePathnames);
 			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 
