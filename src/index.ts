@@ -10,7 +10,6 @@ import { speechAn, serveAnByKey } from './api/an';
 import { serveMdByKey } from './api/md';
 import { uploadMarkdown } from './api/upload_markdown';
 import { rssFeed } from './api/rss';
-import { generateOgImage, generateQuoteOgImage } from './api/og';
 import type { ApiEnv } from './api/types';
 import HomeView, { styles as HomeViewStyles } from './.generated/views/HomeView';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
@@ -35,6 +34,14 @@ import {
 } from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
 import { normalizeSections } from './utils/sectionUtils';
+import {
+	SEARCH_INDEX_BASELINE_BR_KEY,
+	SEARCH_INDEX_BASELINE_KEY,
+	SEARCH_INDEX_MANIFEST_KEY,
+	SEARCH_STATS_KEY,
+	SEARCH_UPDATES_PREFIX,
+	createEmptySearchOverlayManifest
+} from './search/indexFormat';
 
 type WorkerEnv = ApiEnv['Bindings'];
 
@@ -169,6 +176,46 @@ function withCacheHeaders(response: Response): Response {
 	return res;
 }
 
+function requestAcceptsBrotli(c: any): boolean {
+	const acceptEncoding = c.req.header('Accept-Encoding') ?? '';
+	return /\bbr\b/i.test(acceptEncoding);
+}
+
+async function serveBucketJson(
+	c: any,
+	key: string,
+	{
+		cacheControl,
+		contentEncoding
+	}: {
+		cacheControl: string;
+		contentEncoding?: string;
+	}
+): Promise<Response | null> {
+	const object = await c.env.SPEECH_CACHE.get(key);
+	if (!object) return null;
+
+	const headers = new Headers();
+	headers.set('Content-Type', 'application/json; charset=utf-8');
+	headers.set('Cache-Control', cacheControl);
+	if (contentEncoding) {
+		headers.set('Content-Encoding', contentEncoding);
+		headers.set('Vary', 'Accept-Encoding');
+	}
+	if (typeof object.size === 'number') {
+		headers.set('Content-Length', object.size.toString());
+	}
+	if (object.httpEtag) {
+		headers.set('ETag', object.httpEtag);
+	}
+
+	return new Response(object.body, { headers });
+}
+
+async function loadOgModule() {
+	return import('./api/og');
+}
+
 /** 向 Cloudflare 靜態資源 (ASSETS) 要求檔案，path 可指定子路徑，未指定則用請求 URL */
 async function serveAsset(c: any, path?: string): Promise<Response> {
 	const url = new URL(c.req.url);
@@ -179,7 +226,17 @@ async function serveAsset(c: any, path?: string): Promise<Response> {
 /** 優先嘗試從 ASSETS 回應靜態檔，找不到再交給後續 API/SSR 路由 */
 async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 	const pathname = new URL(c.req.url).pathname;
-	if (pathname.startsWith('/api/') || pathname.startsWith('/og/') || pathname.startsWith('/speech/') || pathname.startsWith('/speaker/') || pathname === '/search-index.json' || pathname === '/sections-dump.json' || pathname === '/stats.json') return next();
+	if (
+		pathname.startsWith('/api/')
+		|| pathname.startsWith('/og/')
+		|| pathname.startsWith('/speech/')
+		|| pathname.startsWith('/speaker/')
+		|| pathname.startsWith('/search-updates/')
+		|| pathname === '/search-index.json'
+		|| pathname === '/search-index-manifest.json'
+		|| pathname === '/sections-dump.json'
+		|| pathname === '/stats.json'
+	) return next();
 	if (
 		pathname === '/' ||
 		pathname === '/index.html' ||
@@ -361,25 +418,42 @@ app.options('/api/*', (c) => handleOptions(c));
 
 // Search index from R2
 app.get('/search-index.json', async (c) => {
-	const obj = await c.env.SPEECH_CACHE.get('search-index.json');
-	if (!obj) return c.text('Not found', 404);
-	return new Response(obj.body, {
-		headers: {
-			'Content-Type': 'application/json; charset=utf-8',
-			'Cache-Control': 'public, max-age=3600, s-maxage=86400',
-		},
+	const cacheControl = 'public, max-age=3600, s-maxage=86400';
+	if (requestAcceptsBrotli(c)) {
+		const compressed = await serveBucketJson(c, SEARCH_INDEX_BASELINE_BR_KEY, {
+			cacheControl,
+			contentEncoding: 'br'
+		});
+		if (compressed) return compressed;
+	}
+	const response = await serveBucketJson(c, SEARCH_INDEX_BASELINE_KEY, { cacheControl });
+	return response ?? c.text('Not found', 404);
+});
+
+app.get('/search-index-manifest.json', async (c) => {
+	const response = await serveBucketJson(c, SEARCH_INDEX_MANIFEST_KEY, {
+		cacheControl: 'public, max-age=60, s-maxage=60'
+	});
+	if (response) return response;
+	return c.json(createEmptySearchOverlayManifest(), 200, {
+		'Cache-Control': 'public, max-age=60, s-maxage=60'
 	});
 });
 
-app.get('/stats.json', async (c) => {
-	const obj = await c.env.SPEECH_CACHE.get('stats.json');
-	if (!obj) return c.text('Not found', 404);
-	return new Response(obj.body, {
-		headers: {
-			'Content-Type': 'application/json; charset=utf-8',
-			'Cache-Control': 'public, max-age=3600, s-maxage=86400',
-		},
+app.get('/search-updates/:path{[^/]+\\.json}', async (c) => {
+	const pathParam = c.req.param('path');
+	if (!pathParam) return c.text('Not found', 404);
+	const response = await serveBucketJson(c, `${SEARCH_UPDATES_PREFIX}/${pathParam}`, {
+		cacheControl: 'public, max-age=3600, s-maxage=86400'
 	});
+	return response ?? c.text('Not found', 404);
+});
+
+app.get('/stats.json', async (c) => {
+	const response = await serveBucketJson(c, SEARCH_STATS_KEY, {
+		cacheControl: 'public, max-age=300, s-maxage=300'
+	});
+	return response ?? c.text('Not found', 404);
 });
 
 app.get('/sections-dump.json', async (c) => {
@@ -439,6 +513,7 @@ app.get('/og/speech/:section_id{\\d+\\.png}', async (c) => {
 	const speechTitle = section.display_name ?? section.filename ?? '';
 
 	try {
+		const { generateQuoteOgImage } = await loadOgModule();
 		const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle);
 		await c.env.SPEECH_CACHE.put(cacheKey, png, {
 			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
@@ -492,6 +567,7 @@ app.get('/og/*', async (c) => {
 	}
 
 	try {
+		const { generateOgImage } = await loadOgModule();
 		const png = await generateOgImage(c.env, filename, speechMeta.display_name, speakers);
 		await c.env.SPEECH_CACHE.put(cacheKey, png, {
 			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },

@@ -7,6 +7,12 @@ www/pagefind/
 # Sections dump (generated from API, used by build:search)
 scripts/sections-dump.json
 search-index.json
+scripts/search-build-manifest.json
+scripts/search-index-cache.json
+www/search-index.json
+www/search-index.json.br
+www/search-index-manifest.json
+www/stats.json
 # Logs
 
 logs

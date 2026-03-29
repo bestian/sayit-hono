@@ -1,7 +1,8 @@
 /* global Fuse */
 importScripts('/static/speeches/js/fuse.min.js');
 
-// Doc shape: { t: title, c: content, u: url, d?: date, s?: speaker }
+// Normalized doc shape inside the worker:
+// { f: filename, t: title, c: content, u: url, d: date, s: speaker }
 
 var SEARCH_OPTIONS = {
 	includeMatches: true,
@@ -18,6 +19,132 @@ var statePromise = null;
 
 function escapeRegExp(value) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractDate(title) {
+	var match = /^(\d{4}-\d{2}-\d{2})/.exec(title || '');
+	return match ? match[1] : '';
+}
+
+function deriveFilenameFromUrl(url) {
+	try {
+		var parsed = new URL(url, 'https://archive.tw');
+		var segments = parsed.pathname.split('/').filter(Boolean);
+		return segments[0] ? decodeURIComponent(segments[0]) : '';
+	} catch (_error) {
+		return '';
+	}
+}
+
+function normalizeLegacyDocs(payload) {
+	if (!Array.isArray(payload)) return [];
+	return payload.map(function (doc) {
+		return {
+			f: deriveFilenameFromUrl(doc.u || ''),
+			t: doc.t || '',
+			c: doc.c || '',
+			u: doc.u || '',
+			d: doc.d || extractDate(doc.t || ''),
+			s: doc.s || ''
+		};
+	});
+}
+
+function inflatePackedDocs(payload) {
+	if (!payload || payload.v !== 2 || !Array.isArray(payload.pages) || !Array.isArray(payload.docs)) {
+		return normalizeLegacyDocs(payload);
+	}
+
+	var speakers = Array.isArray(payload.speakers) ? payload.speakers : [];
+	var docs = [];
+
+	for (var i = 0; i < payload.docs.length; i++) {
+		var doc = payload.docs[i];
+		var page = payload.pages[doc[0]];
+		if (!page) continue;
+
+		var filename = page[0] || '';
+		var pageUrl = page[1] || '';
+		var title = page[2] || '';
+		var sectionId = doc[1];
+		var speakerIndex = doc[2];
+		var content = doc[3] || '';
+		var url = sectionId == null ? pageUrl : pageUrl + '#s' + sectionId;
+
+		docs.push({
+			f: filename,
+			t: title,
+			c: content,
+			u: url,
+			d: extractDate(title),
+			s: speakerIndex >= 0 ? speakers[speakerIndex] || '' : ''
+		});
+	}
+
+	return docs;
+}
+
+function fetchJson(url) {
+	return fetch(url, { headers: { Accept: 'application/json' } }).then(function (response) {
+		if (!response.ok) throw new Error('JSON fetch failed: ' + response.status + ' for ' + url);
+		return response.json();
+	});
+}
+
+function loadManifest() {
+	return fetchJson('/search-index-manifest.json').catch(function () {
+		return { baselineVersion: '', overlays: {} };
+	});
+}
+
+function loadOverlayDocs(manifest) {
+	var overlays = manifest && manifest.overlays ? manifest.overlays : {};
+	var filenames = Object.keys(overlays);
+	if (filenames.length === 0) {
+		return Promise.resolve({
+			deleted: {},
+			successful: {},
+			docs: []
+		});
+	}
+
+	var deleted = {};
+	var overlayRequests = [];
+	for (var i = 0; i < filenames.length; i++) {
+		var filename = filenames[i];
+		var overlay = overlays[filename] || {};
+		if (overlay.deleted) {
+			deleted[filename] = true;
+			continue;
+		}
+
+		var version = overlay.updatedAt ? '?v=' + encodeURIComponent(overlay.updatedAt) : '';
+		(function (overlayFilename, overlayUrl) {
+			overlayRequests.push(
+				fetchJson(overlayUrl)
+					.then(function (payload) {
+						return { filename: overlayFilename, docs: inflatePackedDocs(payload) };
+					})
+					.catch(function () {
+						return null;
+					})
+			);
+		})(filename, '/search-updates/' + encodeURIComponent(filename) + '.json' + version);
+	}
+
+	return Promise.all(overlayRequests).then(function (results) {
+		var successful = {};
+		var docs = [];
+		for (var i = 0; i < results.length; i++) {
+			var result = results[i];
+			if (!result) continue;
+			successful[result.filename] = true;
+			for (var j = 0; j < result.docs.length; j++) {
+				docs.push(result.docs[j]);
+			}
+		}
+		return { deleted: deleted, successful: successful, docs: docs };
+	});
 }
 
 function isLatinAlphabetQuery(query) {
@@ -105,15 +232,35 @@ function buildSnippet(result) {
 function loadState() {
 	if (statePromise) return statePromise;
 
-	statePromise = fetch('/search-index.json', { headers: { Accept: 'application/json' } })
-		.then(function (response) {
-			if (!response.ok) throw new Error('Search index fetch failed: ' + response.status);
-			return response.json();
+	statePromise = loadManifest()
+		.then(function (manifest) {
+			var version = manifest && manifest.baselineVersion
+				? '?v=' + encodeURIComponent(manifest.baselineVersion)
+				: '';
+			return Promise.all([
+				fetchJson('/search-index.json' + version),
+				loadOverlayDocs(manifest)
+			]);
 		})
-		.then(function (docs) {
+		.then(function (parts) {
+			var baselinePayload = parts[0];
+			var overlays = parts[1];
+			var baselineDocs = inflatePackedDocs(baselinePayload);
+			var mergedDocs = [];
+
+			for (var i = 0; i < baselineDocs.length; i++) {
+				var doc = baselineDocs[i];
+				if (overlays.deleted[doc.f]) continue;
+				if (overlays.successful[doc.f]) continue;
+				mergedDocs.push(doc);
+			}
+			for (var j = 0; j < overlays.docs.length; j++) {
+				mergedDocs.push(overlays.docs[j]);
+			}
+
 			return {
-				docs: docs,
-				fuse: new Fuse(docs, SEARCH_OPTIONS)
+				docs: mergedDocs,
+				fuse: new Fuse(mergedDocs, SEARCH_OPTIONS)
 			};
 		})
 		.catch(function (error) {
@@ -151,7 +298,8 @@ self.addEventListener('message', function (event) {
 		} else {
 			var wholeWordMatcher = buildLatinWholeWordRegex(query);
 			var wholeWordFromAll = collectLatinWholeWordDocs(
-				query, state.docs,
+				query,
+				state.docs,
 				Math.min(1200, Math.max(limit * 8, 300))
 			);
 			var merged = new Map();
@@ -175,13 +323,11 @@ self.addEventListener('message', function (event) {
 			ranked = Array.from(merged.values()).slice(0, limit);
 		}
 
-		// Deduplicate: keep best section per speech (by base URL without #anchor)
 		var seen = new Map();
 		for (var ri = 0; ri < ranked.length; ri++) {
 			var entry = ranked[ri];
 			var baseUrl = entry.doc.u.split('#')[0];
 			if (seen.has(baseUrl)) {
-				// Prefer a result that matched on content over title-only
 				var existing = seen.get(baseUrl);
 				var existingHasContentMatch = existing.fuseResult && existing.fuseResult.matches &&
 					existing.fuseResult.matches.some(function (m) { return m.key === 'c'; });
