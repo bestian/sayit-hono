@@ -25,6 +25,7 @@ function createUploadEnv(options?: {
 }) {
 	const operations: PreparedStatement[] = [];
 	const deletedKeys: string[] = [];
+	const putObjects = new Map<string, string>();
 	const currentAlternateFilename = options?.currentAlternateFilename ?? null;
 
 	const speechIndexRows: SpeechIndexRow[] = [
@@ -59,6 +60,15 @@ function createUploadEnv(options?: {
 	];
 
 	function query(sql: string, args: unknown[]) {
+		if (sql.includes('SELECT COUNT(*) AS count FROM speech_index')) {
+			return { success: true, results: [{ count: speechIndexRows.length }] };
+		}
+		if (sql.includes('SELECT COUNT(*) AS count FROM speakers')) {
+			return { success: true, results: [{ count: 0 }] };
+		}
+		if (sql.includes('SELECT COUNT(*) AS count FROM speech_content')) {
+			return { success: true, results: [{ count: oldSections.length }] };
+		}
 		if (sql.includes('FROM speech_index WHERE filename = ?')) {
 			return { success: true, results: speechIndexRows.filter((row) => row.filename === args[0]) };
 		}
@@ -75,7 +85,38 @@ function createUploadEnv(options?: {
 			if (args[0] === 'paired-speech') {
 				return { success: true, results: [{ section_id: 99002 }] };
 			}
+			if (args[0] === 'fresh-speech') {
+				return { success: true, results: [{ section_id: 200 }] };
+			}
 			return { success: true, results: oldSections.map(({ section_id }) => ({ section_id })) };
+		}
+		if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si ON sc.filename = si.filename')) {
+			if (args[0] === 'fresh-speech') {
+				return {
+					success: true,
+					results: [
+						{
+							filename: 'fresh-speech',
+							nest_filename: null,
+							section_id: 200,
+							section_content: '<p>Alpha</p>',
+							display_name: 'Fresh Speech',
+							name: null
+						}
+					]
+				};
+			}
+			return {
+				success: true,
+				results: oldSections.map((section) => ({
+					filename: 'demo-speech',
+					nest_filename: null,
+					section_id: section.section_id,
+					section_content: section.section_content,
+					display_name: 'Demo Speech',
+					name: null
+				}))
+			};
 		}
 		if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
 			return { success: true, results: [] };
@@ -105,12 +146,14 @@ function createUploadEnv(options?: {
 				return true;
 			},
 			get: async () => null,
-			put: async () => undefined,
+			put: async (key: string, body: string) => {
+				putObjects.set(key, body);
+			},
 			list: async () => ({ objects: [], truncated: false, cursor: '' })
 		},
 		DB: {
-			prepare: (sql: string) => ({
-				bind: (...args: unknown[]) => ({
+			prepare: (sql: string) => {
+				const run = (args: unknown[]) => ({
 					sql,
 					args,
 					first: async () => {
@@ -118,8 +161,13 @@ function createUploadEnv(options?: {
 						return result.results[0] ?? null;
 					},
 					all: async () => query(sql, args)
-				})
-			}),
+				});
+				return {
+					bind: (...args: unknown[]) => run(args),
+					first: async () => run([]).first(),
+					all: async () => run([]).all()
+				};
+			},
 			batch: async (statements: PreparedStatement[]) => {
 				for (const stmt of statements) {
 					applyStatement(stmt);
@@ -128,7 +176,8 @@ function createUploadEnv(options?: {
 			}
 		},
 		__operations: operations,
-		__deletedKeys: deletedKeys
+		__deletedKeys: deletedKeys,
+		__putObjects: putObjects
 	};
 }
 
@@ -194,6 +243,9 @@ describe('upload_markdown PATCH', () => {
 				`${CACHE_KEY_VERSION}/example.com/feed.xml`
 			])
 		);
+		expect(env.__putObjects.get('search-updates/demo-speech.json')).toContain('"v":2');
+		expect(env.__putObjects.get('search-index-manifest.json')).toContain('"demo-speech"');
+		expect(env.__putObjects.get('stats.json')).toContain('"sections"');
 	});
 
 	it('updates alternate links via PATCH without re-posting the speech', async () => {
@@ -300,5 +352,7 @@ describe('upload_markdown POST', () => {
 				`${CACHE_KEY_VERSION}/example.com/speeches`
 			])
 		);
+		expect(env.__putObjects.get('search-updates/fresh-speech.json')).toContain('"v":2');
+		expect(env.__putObjects.get('search-index-manifest.json')).toContain('"fresh-speech"');
 	});
 });

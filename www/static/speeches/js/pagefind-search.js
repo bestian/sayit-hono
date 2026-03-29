@@ -19,8 +19,16 @@
 	var displayedCount = 0;
 	var requestId = 0;
 	var pendingResolves = {};
+	var workerWarmed = false;
 
-	function ensureWorker() {
+	function shouldWarmupOnFocus() {
+		var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+		if (!connection) return true;
+		if (connection.saveData) return false;
+		return !/^(slow-2g|2g|3g)$/i.test(connection.effectiveType || '');
+	}
+
+	function ensureWorker(shouldWarmup) {
 		if (worker) return;
 		worker = new Worker('/static/speeches/js/fuse-search.worker.js');
 		worker.addEventListener('message', function (e) {
@@ -30,11 +38,18 @@
 				delete pendingResolves[msg.requestId];
 			}
 		});
-		// Warmup: trigger index fetch
-		worker.postMessage({ type: 'warmup' });
+		if (shouldWarmup !== false) {
+			workerWarmed = true;
+			worker.postMessage({ type: 'warmup' });
+		}
 	}
 
 	function searchViaWorker(query, limit) {
+		if (!worker) ensureWorker(true);
+		if (!workerWarmed) {
+			workerWarmed = true;
+			worker.postMessage({ type: 'warmup' });
+		}
 		var id = ++requestId;
 		return new Promise(function (resolve) {
 			pendingResolves[id] = resolve;
@@ -189,7 +204,7 @@
 		displayedCount = 0;
 		renderLoading();
 
-		ensureWorker();
+		ensureWorker(true);
 
 		searchViaWorker(query, 100).then(function (msg) {
 			if (query !== currentQuery) return;
@@ -247,7 +262,7 @@
 
 	input.addEventListener('focus', function () {
 		if (shortcutBadge) shortcutBadge.style.opacity = '0';
-		ensureWorker();
+		ensureWorker(shouldWarmupOnFocus());
 	});
 
 	input.addEventListener('blur', function () {

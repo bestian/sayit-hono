@@ -1,0 +1,35 @@
+/**
+ * Test-only Wrangler config.
+ * Mirrors production bindings while avoiding the full `process` shim that
+ * breaks Vitest's own runtime (`process.on(...)`).
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sayit-hono-test",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-12-02",
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "sayit-database",
+			"database_id": "309347b7-de29-4d0f-b755-55d2638defc9"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "SPEECH_CACHE",
+			"bucket_name": "sayit-speech-cache",
+			"preview_bucket_name": "sayit-speech-cache-preview"
+		}
+	],
+	"assets": { "directory": "./www/", "binding": "ASSETS" },
+	"define": {
+		"process.env.NODE_ENV": "\"test\"",
+		"process.env.SATORI_STANDALONE": "undefined",
+		"process.env.JEST_WORKER_ID": "undefined",
+		"process.env": "{}"
+	}
+}
