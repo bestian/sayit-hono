@@ -18,12 +18,20 @@ import {
 } from '../src/search/indexFormat';
 
 const R2_BUCKETS = ['sayit-speech-cache', 'sayit-speech-cache-preview'] as const;
+const SEARCH_BUILD_FORMAT_VERSION = 2;
+const SEARCH_BUILD_FORMAT_VERSION_KEY = '__search_build_format_version';
 
 type SectionsDump = Record<string, ApiSection[]>;
 
 interface Manifest {
 	[filename: string]: number;
 }
+
+type SearchStats = {
+	speeches?: number;
+	speakers?: number;
+	sections?: number;
+};
 
 /** Transform filename: lowercase, strip .md, replace full-width colon, max 50 chars */
 function transformFilename(input: string): string {
@@ -125,7 +133,9 @@ async function buildSearchIndex() {
 	}
 
 	const speakersApiUrl = apiUrl.replace('speech_index.json', 'speakers_index.json');
+	const statsApiUrl = `${apiBase}/stats.json`;
 	let speakersCount = 0;
+	let statsFromApi: SearchStats | null = null;
 	try {
 		const speakersResp = await fetch(speakersApiUrl);
 		if (speakersResp.ok) {
@@ -134,6 +144,14 @@ async function buildSearchIndex() {
 		}
 	} catch (err) {
 		console.warn('[build-search] Failed to fetch speakers count', err);
+	}
+	try {
+		const statsResp = await fetch(statsApiUrl);
+		if (statsResp.ok) {
+			statsFromApi = await statsResp.json() as SearchStats;
+		}
+	} catch (err) {
+		console.warn('[build-search] Failed to fetch stats.json', err);
 	}
 
 	const stripMixedHyphens = (value: string) =>
@@ -179,8 +197,17 @@ async function buildSearchIndex() {
 	if (existsSync(buildManifestPath) && existsSync(cacheIndexPath)) {
 		try {
 			oldManifest = JSON.parse(await readFile(buildManifestPath, 'utf-8')) as Manifest;
+			if (oldManifest[SEARCH_BUILD_FORMAT_VERSION_KEY] !== SEARCH_BUILD_FORMAT_VERSION) {
+				console.log('[build-search] Cached build format changed, forcing full rebuild');
+				oldManifest = {};
+			}
 			const existingPayload = JSON.parse(await readFile(cacheIndexPath, 'utf-8')) as SearchIndexPayload;
 			existingDocs = unpackSearchDocs(existingPayload);
+			if (existingDocs.some((doc) => doc.sectionId != null)) {
+				console.log('[build-search] Cached index is from the old section-level format, forcing full rebuild');
+				oldManifest = {};
+				existingDocs = [];
+			}
 			console.log(`[build-search] Loaded cached index (${existingDocs.length} docs)`);
 		} catch {
 			oldManifest = {};
@@ -201,8 +228,11 @@ async function buildSearchIndex() {
 			changedFiles.push(file);
 		}
 	}
+	newManifest[SEARCH_BUILD_FORMAT_VERSION_KEY] = SEARCH_BUILD_FORMAT_VERSION;
 
-	const deletedFiles = Object.keys(oldManifest).filter((file) => !currentFiles.has(file));
+	const deletedFiles = Object.keys(oldManifest).filter((file) =>
+		!file.startsWith('__') && !currentFiles.has(file)
+	);
 	const isIncremental = existingDocs.length > 0 && (changedFiles.length + deletedFiles.length) < mdFiles.length;
 
 	if (isIncremental) {
@@ -262,7 +292,6 @@ async function buildSearchIndex() {
 		for (const doc of existingDocs) {
 			if (!changedFilenames.has(doc.filename)) {
 				allDocs.push(doc);
-				if (doc.speaker) allSpeakers.add(doc.speaker);
 			}
 		}
 	}
@@ -280,6 +309,9 @@ async function buildSearchIndex() {
 		let docs: SearchDocRecord[];
 		if (sections && sections.length > 0) {
 			docs = docsFromSections(sections, pageUrl, canonical);
+			for (const section of sections) {
+				if (section.name) allSpeakers.add(section.name);
+			}
 			fromDump++;
 		} else {
 			const markdown = await readFile(path.join(transcriptDir, file), 'utf-8');
@@ -290,9 +322,6 @@ async function buildSearchIndex() {
 		if (docs.length === 0) {
 			skipped++;
 			continue;
-		}
-		for (const doc of docs) {
-			if (doc.speaker) allSpeakers.add(doc.speaker);
 		}
 		allDocs.push(...docs);
 		indexed++;
@@ -306,8 +335,8 @@ async function buildSearchIndex() {
 			if (!sections || sections.length === 0) continue;
 
 			const docs = docsFromSections(sections, `/${encodeURIComponent(entry.filename)}`, entry.filename);
-			for (const doc of docs) {
-				if (doc.speaker) allSpeakers.add(doc.speaker);
+			for (const section of sections) {
+				if (section.name) allSpeakers.add(section.name);
 			}
 			allDocs.push(...docs);
 			indexed++;
@@ -316,11 +345,15 @@ async function buildSearchIndex() {
 	}
 
 	allDocs.sort((a, b) => extractDate(b.title).localeCompare(extractDate(a.title)));
+	const sectionsCount = Number(
+		statsFromApi?.sections
+		?? Object.values(dump).reduce((total, sections) => total + sections.length, 0)
+	);
 
 	console.log(
 		`[build-search] Processed: ${indexed} speeches (${fromDump} from dump, ${fromMarkdown} from markdown), Skipped: ${skipped}`
 	);
-	console.log(`[build-search] Total: ${allDocs.length} section docs`);
+	console.log(`[build-search] Total: ${allDocs.length} page docs from ${sectionsCount} sections`);
 
 	await mkdir(path.dirname(outputPath), { recursive: true });
 	await mkdir(path.dirname(cacheIndexPath), { recursive: true });
@@ -332,9 +365,9 @@ async function buildSearchIndex() {
 	const baselineVersion = createHash('sha256').update(jsonData).digest('hex').slice(0, 16);
 	const runtimeManifest = createEmptySearchOverlayManifest(baselineVersion, generatedAt);
 	const stats = {
-		speeches: dbEntries.length,
-		speakers: speakersCount || allSpeakers.size,
-		sections: allDocs.length
+		speeches: Number(statsFromApi?.speeches ?? dbEntries.length),
+		speakers: Number(statsFromApi?.speakers ?? speakersCount ?? allSpeakers.size),
+		sections: sectionsCount
 	};
 
 	await writeFile(outputPath, jsonData);

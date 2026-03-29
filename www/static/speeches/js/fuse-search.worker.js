@@ -10,12 +10,14 @@ var SEARCH_OPTIONS = {
 	minMatchCharLength: 2,
 	threshold: 0.35,
 	keys: [
-		{ name: 't', weight: 0.7 },
+		{ name: 't', weight: 0.55 },
+		{ name: 's', weight: 0.15 },
 		{ name: 'c', weight: 0.3 }
 	]
 };
 
 var statePromise = null;
+var remoteResultCache = new Map();
 
 function escapeRegExp(value) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -89,6 +91,31 @@ function fetchJson(url) {
 		if (!response.ok) throw new Error('JSON fetch failed: ' + response.status + ' for ' + url);
 		return response.json();
 	});
+}
+
+function fetchRemoteResults(query, limit) {
+	if (!query || limit <= 0) return Promise.resolve([]);
+
+	var cacheKey = query + '\0' + limit;
+	if (remoteResultCache.has(cacheKey)) {
+		return Promise.resolve(remoteResultCache.get(cacheKey));
+	}
+
+	var params = new URLSearchParams();
+	params.set('q', query);
+	params.set('limit', String(limit));
+
+	return fetchJson('/api/search.json?' + params.toString())
+		.then(function (payload) {
+			var results = Array.isArray(payload && payload.results)
+				? payload.results
+				: (Array.isArray(payload) ? payload : []);
+			remoteResultCache.set(cacheKey, results);
+			return results;
+		})
+		.catch(function () {
+			return [];
+		});
 }
 
 function loadManifest() {
@@ -271,8 +298,95 @@ function loadState() {
 	return statePromise;
 }
 
+function runLocalSearch(state, query, limit) {
+	var latinQuery = isLatinAlphabetQuery(query);
+	var candidateLimit = latinQuery
+		? Math.min(180, Math.max(limit * 3, 60))
+		: Math.min(220, Math.max(limit * 4, 80));
+
+	var fuseResults = state.fuse.search(query, { limit: candidateLimit });
+	var prioritized = prioritizeLatinWholeWordMatches(query, fuseResults);
+
+	var ranked;
+	if (!latinQuery) {
+		ranked = prioritized.slice(0, limit).map(function (r) {
+			return { doc: r.item, fuseResult: r };
+		});
+	} else {
+		var wholeWordMatcher = buildLatinWholeWordRegex(query);
+		var wholeWordFromAll = collectLatinWholeWordDocs(
+			query,
+			state.docs,
+			Math.min(320, Math.max(limit * 4, 120))
+		);
+		var merged = new Map();
+		var addDoc = function (entry) {
+			merged.set(entry.doc.t + '\0' + entry.doc.u, entry);
+		};
+
+		for (var i = 0; i < prioritized.length; i++) {
+			var doc = prioritized[i].item;
+			if (
+				wholeWordMatcher.test(doc.t)
+				|| wholeWordMatcher.test(doc.c)
+				|| wholeWordMatcher.test(doc.s || '')
+			) {
+				addDoc({ doc: doc, fuseResult: prioritized[i] });
+			}
+		}
+		for (var j = 0; j < wholeWordFromAll.length; j++) {
+			addDoc({ doc: wholeWordFromAll[j] });
+		}
+		for (var k = 0; k < prioritized.length; k++) {
+			addDoc({ doc: prioritized[k].item, fuseResult: prioritized[k] });
+		}
+
+		ranked = Array.from(merged.values()).slice(0, limit);
+	}
+
+	var seen = new Map();
+	for (var ri = 0; ri < ranked.length; ri++) {
+		var entry = ranked[ri];
+		var baseUrl = entry.doc.u.split('#')[0];
+		if (seen.has(baseUrl)) continue;
+		seen.set(baseUrl, entry);
+	}
+
+	return Array.from(seen.values()).map(function (entry) {
+		return {
+			title: entry.doc.t,
+			url: entry.doc.u,
+			date: entry.doc.d || '',
+			speaker: entry.doc.s || '',
+			snippet: entry.fuseResult ? buildSnippet(entry.fuseResult) : trimSnippet(entry.doc.c)
+		};
+	});
+}
+
+function mergeResults(primary, secondary, limit) {
+	var merged = [];
+	var seen = new Set();
+
+	function addAll(items) {
+		for (var i = 0; i < items.length; i++) {
+			var item = items[i];
+			var baseUrl = (item.url || '').split('#')[0];
+			if (seen.has(baseUrl)) continue;
+			seen.add(baseUrl);
+			merged.push(item);
+			if (merged.length >= limit) return;
+		}
+	}
+
+	addAll(primary);
+	if (merged.length < limit) addAll(secondary);
+	return merged.slice(0, limit);
+}
+
 self.addEventListener('message', function (event) {
 	var message = event.data;
+	var query = (message.query || '').trim();
+	var limit = message.limit || 50;
 
 	loadState().then(function (state) {
 		if (message.type === 'warmup') {
@@ -280,89 +394,39 @@ self.addEventListener('message', function (event) {
 			return;
 		}
 
-		var query = message.query.trim();
-		var limit = message.limit || 50;
-		var latinQuery = isLatinAlphabetQuery(query);
-		var candidateLimit = latinQuery
-			? Math.min(500, Math.max(limit * 10, 100))
-			: Math.max(limit * 5, 100);
-
-		var fuseResults = state.fuse.search(query, { limit: candidateLimit });
-		var prioritized = prioritizeLatinWholeWordMatches(query, fuseResults);
-
-		var ranked;
-		if (!latinQuery) {
-			ranked = prioritized.slice(0, limit).map(function (r) {
-				return { doc: r.item, fuseResult: r };
+		return Promise.all([
+			Promise.resolve(runLocalSearch(state, query, limit)),
+			query.length >= 2 ? fetchRemoteResults(query, limit) : Promise.resolve([])
+		]).then(function (parts) {
+			var localResults = parts[0];
+			var remoteResults = parts[1];
+			var results = mergeResults(remoteResults, localResults, limit);
+			self.postMessage({
+				type: 'results',
+				requestId: message.requestId,
+				results: results,
+				total: results.length
 			});
-		} else {
-			var wholeWordMatcher = buildLatinWholeWordRegex(query);
-			var wholeWordFromAll = collectLatinWholeWordDocs(
-				query,
-				state.docs,
-				Math.min(1200, Math.max(limit * 8, 300))
-			);
-			var merged = new Map();
-			var addDoc = function (entry) {
-				merged.set(entry.doc.t + '\0' + entry.doc.u, entry);
-			};
-
-			for (var i = 0; i < prioritized.length; i++) {
-				var doc = prioritized[i].item;
-				if (wholeWordMatcher.test(doc.t) || wholeWordMatcher.test(doc.c)) {
-					addDoc({ doc: doc, fuseResult: prioritized[i] });
-				}
-			}
-			for (var j = 0; j < wholeWordFromAll.length; j++) {
-				addDoc({ doc: wholeWordFromAll[j] });
-			}
-			for (var k = 0; k < prioritized.length; k++) {
-				addDoc({ doc: prioritized[k].item, fuseResult: prioritized[k] });
-			}
-
-			ranked = Array.from(merged.values()).slice(0, limit);
-		}
-
-		var seen = new Map();
-		for (var ri = 0; ri < ranked.length; ri++) {
-			var entry = ranked[ri];
-			var baseUrl = entry.doc.u.split('#')[0];
-			if (seen.has(baseUrl)) {
-				var existing = seen.get(baseUrl);
-				var existingHasContentMatch = existing.fuseResult && existing.fuseResult.matches &&
-					existing.fuseResult.matches.some(function (m) { return m.key === 'c'; });
-				var newHasContentMatch = entry.fuseResult && entry.fuseResult.matches &&
-					entry.fuseResult.matches.some(function (m) { return m.key === 'c'; });
-				if (newHasContentMatch && !existingHasContentMatch) {
-					seen.set(baseUrl, entry);
-				}
-				continue;
-			}
-			seen.set(baseUrl, entry);
-		}
-		var deduped = Array.from(seen.values());
-
-		var results = deduped.map(function (entry) {
-			return {
-				title: entry.doc.t,
-				url: entry.doc.u,
-				date: entry.doc.d || '',
-				speaker: entry.doc.s || '',
-				snippet: entry.fuseResult ? buildSnippet(entry.fuseResult) : trimSnippet(entry.doc.c)
-			};
-		});
-
-		self.postMessage({
-			type: 'results',
-			requestId: message.requestId,
-			results: results,
-			total: results.length
 		});
 	}).catch(function (error) {
-		self.postMessage({
-			type: 'error',
-			requestId: message.requestId,
-			message: error instanceof Error ? error.message : 'Search index load failed'
+		if (message.type === 'warmup') {
+			self.postMessage({ type: 'ready' });
+			return;
+		}
+
+		fetchRemoteResults(query, limit).then(function (remoteResults) {
+			self.postMessage({
+				type: 'results',
+				requestId: message.requestId,
+				results: remoteResults,
+				total: remoteResults.length
+			});
+		}).catch(function () {
+			self.postMessage({
+				type: 'error',
+				requestId: message.requestId,
+				message: error instanceof Error ? error.message : 'Search index load failed'
+			});
 		});
 	});
 });
