@@ -2,6 +2,7 @@ import type { SearchDocRecord } from './indexFormat';
 
 /** Regex to detect speaker heading lines: 1-6 # followed by name ending in : or ： */
 const speakerLineRegExp = /^(#{1,6})\s*(.+?)\s*[:：]\s*$/;
+const MAX_OFFLINE_CONTENT_CHARS = 360;
 
 export type ApiSection = {
 	filename: string;
@@ -41,6 +42,44 @@ export function extractDate(displayName: string): string {
 	return match ? match[1] : '';
 }
 
+function uniqueSpeakerNames(values: Array<string | null | undefined>): string[] {
+	const seen = new Set<string>();
+	const result: string[] = [];
+	for (const value of values) {
+		const trimmed = value?.trim();
+		if (!trimmed || seen.has(trimmed)) continue;
+		seen.add(trimmed);
+		result.push(trimmed);
+	}
+	return result;
+}
+
+function summarizeSpeakers(values: Array<string | null | undefined>, limit = 3): string | null {
+	const names = uniqueSpeakerNames(values);
+	if (names.length === 0) return null;
+	if (names.length <= limit) return names.join(', ');
+	return `${names.slice(0, limit).join(', ')}, +${names.length - limit} more`;
+}
+
+function mergeContentBlocks(blocks: Array<{ content: string; speaker?: string | null }>): string {
+	return blocks
+		.map(({ content, speaker }) => {
+			const normalizedContent = content.trim();
+			if (!normalizedContent) return '';
+			const normalizedSpeaker = speaker?.trim();
+			return normalizedSpeaker ? `${normalizedSpeaker}: ${normalizedContent}` : normalizedContent;
+		})
+		.filter(Boolean)
+		.join('\n\n')
+		.trim();
+}
+
+function buildOfflineExcerpt(content: string, maxChars = MAX_OFFLINE_CONTENT_CHARS): string {
+	const normalized = content.replace(/\s+/g, ' ').trim();
+	if (normalized.length <= maxChars) return normalized;
+	return `${normalized.slice(0, maxChars).trimEnd()}...`;
+}
+
 export function docsFromSections(
 	sections: ApiSection[],
 	baseUrl: string,
@@ -61,44 +100,42 @@ export function docsFromSections(
 		const pageUrl = nestFilename
 			? `${baseUrl}/${encodeURIComponent(nestFilename)}`
 			: baseUrl;
-
-		for (const section of groupSections) {
-			const content = stripHtml(section.section_content || '').trim();
-			if (!content) continue;
-
-			docs.push({
-				filename,
-				pageUrl,
-				title,
-				content,
-				sectionId: Number(section.section_id),
+		const content = buildOfflineExcerpt(mergeContentBlocks(
+			groupSections.map((section) => ({
+				content: stripHtml(section.section_content || ''),
 				speaker: section.name ?? null
-			});
-		}
-	}
+			}))
+		));
+		if (!content) continue;
 
-	return docs;
-}
-
-/** Fallback: parse markdown into section-level docs (no real section IDs) */
-export function docsFromMarkdown(markdown: string, pageUrl: string, filename: string): SearchDocRecord[] {
-	const title = extractTitle(markdown);
-	if (!title) return [];
-
-	const lines = markdown.split('\n');
-	const docs: SearchDocRecord[] = [];
-	let currentSpeaker: string | null = null;
-	let currentLines: string[] = [];
-
-	function flushSection() {
-		const content = stripInlineMarkdown(currentLines.join('\n'));
-		if (!content) return;
 		docs.push({
 			filename,
 			pageUrl,
 			title,
 			content,
 			sectionId: null,
+			speaker: summarizeSpeakers(groupSections.map((section) => section.name))
+		});
+	}
+
+	return docs;
+}
+
+/** Fallback: parse markdown into page-level docs (no real section IDs) */
+export function docsFromMarkdown(markdown: string, pageUrl: string, filename: string): SearchDocRecord[] {
+	const title = extractTitle(markdown);
+	if (!title) return [];
+
+	const lines = markdown.split('\n');
+	let currentSpeaker: string | null = null;
+	let currentLines: string[] = [];
+	const blocks: Array<{ content: string; speaker: string | null }> = [];
+
+	function flushSection() {
+		const content = stripInlineMarkdown(currentLines.join('\n'));
+		if (!content) return;
+		blocks.push({
+			content,
 			speaker: currentSpeaker
 		});
 	}
@@ -116,19 +153,25 @@ export function docsFromMarkdown(markdown: string, pageUrl: string, filename: st
 	}
 	flushSection();
 
-	if (docs.length === 0) {
+	if (blocks.length === 0) {
 		const content = stripInlineMarkdown(markdown.replace(/^#\s+.*\n/, ''));
 		if (content) {
-			docs.push({
-				filename,
-				pageUrl,
-				title,
+			blocks.push({
 				content,
-				sectionId: null,
 				speaker: null
 			});
 		}
 	}
 
-	return docs;
+	const mergedContent = buildOfflineExcerpt(mergeContentBlocks(blocks));
+	if (!mergedContent) return [];
+
+	return [{
+		filename,
+		pageUrl,
+		title,
+		content: mergedContent,
+		sectionId: null,
+		speaker: summarizeSpeakers(blocks.map((block) => block.speaker))
+	}];
 }
