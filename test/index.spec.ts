@@ -70,6 +70,24 @@ function createEnv() {
 							return null;
 						}
 
+						if (sql.includes('SELECT id, route_pathname, name FROM speakers WHERE id = ?')) {
+							if (args[0] === 16224) {
+								return {
+									id: 16224,
+									route_pathname: 'Yoichi%20Ochiai',
+									name: 'Yoichi Ochiai'
+								};
+							}
+							return null;
+						}
+
+						if (sql.includes('SELECT COUNT(*) AS count') && sql.includes('FROM speech_content sc')) {
+							if (args[0] === 'ochiai') {
+								return { count: 1 };
+							}
+							return { count: 0 };
+						}
+
 						if (sql.includes('FROM speech_index si') && sql.includes('alternate_filename')) {
 							return null;
 						}
@@ -106,8 +124,27 @@ function createEnv() {
 											nest_filename: null,
 											display_name: '2026-03-25 Weekly Ochiai',
 											section_id: 638607,
+											section_speaker: 'Yoichi%20Ochiai',
 											section_content: '<p>We&#39;re shifting from &quot;data oil&quot; to &quot;data soil.&quot;</p>',
-											speaker_name: 'Yoichi Ochiai'
+											speaker_name: 'Yoichi Ochiai',
+											photoURL: null
+										}
+									]
+								};
+							}
+							return { success: true, results: [] };
+						}
+
+						if (sql.includes('FROM speakers') && sql.includes('instr(lower(COALESCE(name')) {
+							if (args[0] === 'ochiai') {
+								return {
+									success: true,
+									results: [
+										{
+											id: 16224,
+											route_pathname: 'Yoichi%20Ochiai',
+											name: 'Yoichi Ochiai',
+											photoURL: null
 										}
 									]
 								};
@@ -217,6 +254,19 @@ describe('Worker routes', () => {
 				})
 			]
 		});
+	});
+
+	it('renders scoped speaker search results without stripping query params', async () => {
+		const redirected = await request('/search?q=ochiai&p=16224');
+		expect(redirected.res.status).toBe(302);
+		expect(redirected.res.headers.get('location')).toBe('https://example.com/search/?q=ochiai&p=16224');
+
+		const { res } = await request('/search/?q=ochiai&p=16224');
+		expect(res.status).toBe(200);
+		const html = await res.text();
+		expect(html).toContain('Search this person\'s speeches');
+		expect(html).toContain('2026-03-25 Weekly Ochiai');
+		expect(html).toContain('Yoichi Ochiai');
 	});
 
 	it('returns an RSS feed', async () => {

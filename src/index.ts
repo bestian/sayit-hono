@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
-import { CACHE_KEY_VERSION, deleteEdgeCache, readR2Cache, writeR2Cache } from './api/cache';
+import { CACHE_KEY_VERSION, deleteEdgeCache, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
 import { speakersIndex } from './api/speakers_index';
 import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
@@ -17,6 +17,7 @@ import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated
 import NestedSpeechView, { styles as NestedSpeechViewStyles } from './.generated/views/NestedSpeechView';
 import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from './.generated/views/SingleNestedSpeechView';
 import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generated/views/SingleSpeakerView';
+import SearchResultView, { styles as SearchResultViewStyles } from './.generated/views/SearchResultView';
 import SpeechesView, { styles as SpeechesViewStyles } from './.generated/views/SpeechesView';
 import SpeakersView, { styles as SpeakersViewStyles } from './.generated/views/SpeakersView';
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
@@ -29,6 +30,7 @@ import {
 	headForNestedSpeech,
 	headForNestedSpeechDetail,
 	headForSpeeches,
+	headForSearch,
 	headForSpeakers,
 	headForHome
 } from './ssr/heads';
@@ -50,6 +52,13 @@ const app = new Hono<{ Bindings: WorkerEnv }>();
 
 const EDGE_TTL_SECONDS = 60;
 const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}`;
+const SEARCH_API_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
+const SEARCH_HTML_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
+const SEARCH_MIN_QUERY_LENGTH = 2;
+const SEARCH_MAX_QUERY_LENGTH = 80;
+const SEARCH_DEFAULT_PAGE_SIZE = 20;
+const SEARCH_MAX_PAGE_SIZE = 50;
+const SEARCH_SPEAKER_LIMIT = 10;
 const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></script>';
 const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers);e=document.getElementById('sayit-stat-sections');if(e)e.textContent=fmt(s.sections)}).catch(function(){})})()</script>`;
 const NAMED_ENTITIES: Record<string, string> = {
@@ -70,6 +79,7 @@ const excludedPaths = [
 	'og',
 	'rss.xml',
 	'feed.xml',
+	'search',
 	'favicon.ico',
 	'robots.txt',
 	'static',
@@ -111,6 +121,8 @@ function buildCanonicalPageUrl(requestUrl: string): string | null {
 			canonicalPath = '/speeches/';
 		} else if (pathname === '/speakers') {
 			canonicalPath = '/speakers/';
+		} else if (pathname === '/search') {
+			canonicalPath = '/search/';
 		}
 
 		if (
@@ -127,6 +139,8 @@ function buildCanonicalPageUrl(requestUrl: string): string | null {
 			canonicalSearch = '';
 		} else if (isSpeakerPagePath) {
 			canonicalSearch = normalizeSpeakerPageSearch(url);
+		} else if (pathname === '/search' || pathname === '/search/') {
+			canonicalSearch = search;
 		} else {
 			return null;
 		}
@@ -300,6 +314,39 @@ function toPlainText(html: string) {
 		.trim();
 }
 
+function escapeHtml(value: string) {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
+function tokenizeSearchQuery(value: string): string[] {
+	return value
+		.trim()
+		.split(/\s+/)
+		.map((part) => part.trim())
+		.filter(Boolean);
+}
+
+function escapeRegExp(value: string) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightSearchText(value: string, query: string): string {
+	const tokens = tokenizeSearchQuery(query);
+	if (!value || tokens.length === 0) return escapeHtml(value || '');
+
+	let highlighted = escapeHtml(value);
+	for (const token of tokens) {
+		const pattern = new RegExp(escapeRegExp(escapeHtml(token)), 'gi');
+		highlighted = highlighted.replace(pattern, (match) => `<em>${match}</em>`);
+	}
+	return highlighted;
+}
+
 function parseToArray(raw?: string | null): string[] {
 	if (!raw) return [];
 	const parsed = parseContent(raw);
@@ -404,6 +451,44 @@ type SearchResultRow = {
 	speaker_name?: string | null;
 };
 
+type SearchSpeakerRow = {
+	id: number;
+	route_pathname: string;
+	name: string;
+	photoURL: string | null;
+};
+
+type SearchSpeakerResult = {
+	route_pathname: string;
+	name: string;
+	photoURL: string | null;
+	snippet: string;
+};
+
+type SearchSectionResult = {
+	section_id: number;
+	filename: string;
+	nest_filename: string | null;
+	section_speaker: string | null;
+	speaker_name: string | null;
+	display_name: string;
+	photoURL: string | null;
+	snippet: string;
+};
+
+type SearchPageResult = {
+	query: string;
+	speakers: SearchSpeakerResult[];
+	sections: SearchSectionResult[];
+	page: number;
+	page_size: number;
+	total_pages: number;
+	total_sections: number;
+	pagination_pages: Array<number | 'ellipsis'>;
+	filteredSpeakerId?: number;
+	filteredSpeakerName?: string | null;
+};
+
 async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow | null> {
 	const result = await c.env.DB.prepare(
 		`SELECT filename, display_name, isNested, nest_filenames, nest_display_names
@@ -473,6 +558,211 @@ async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
 	}));
 }
 
+function normalizeSearchQuery(raw: string | null | undefined): string {
+	const value = (raw || '').trim().slice(0, SEARCH_MAX_QUERY_LENGTH);
+	return value;
+}
+
+async function runSearchQuery(
+	c: any,
+	{
+		query,
+		page = 1,
+		pageSize = SEARCH_DEFAULT_PAGE_SIZE,
+		speakerId
+	}: {
+		query: string;
+		page?: number;
+		pageSize?: number;
+		speakerId?: number;
+	}
+): Promise<SearchPageResult> {
+	const normalizedQuery = normalizeSearchQuery(query);
+	const safePageSize = Math.max(1, Math.min(SEARCH_MAX_PAGE_SIZE, Math.floor(pageSize || SEARCH_DEFAULT_PAGE_SIZE)));
+	const safePage = Math.max(1, Math.floor(page || 1));
+
+	let filteredSpeakerId: number | undefined;
+	let filteredSpeakerName: string | null = null;
+	let filteredSpeakerRoutePathname: string | null = null;
+	if (speakerId && Number.isFinite(speakerId) && speakerId > 0) {
+		const speakerRow = await c.env.DB.prepare(
+			'SELECT id, route_pathname, name FROM speakers WHERE id = ?'
+		)
+			.bind(Math.floor(speakerId))
+			.first() as { id: number; route_pathname: string; name: string } | null;
+		if (speakerRow?.route_pathname) {
+			filteredSpeakerId = Number(speakerRow.id);
+			filteredSpeakerRoutePathname = speakerRow.route_pathname;
+			filteredSpeakerName = speakerRow.name ?? null;
+		}
+	}
+
+	if (normalizedQuery.length < SEARCH_MIN_QUERY_LENGTH) {
+		return {
+			query: normalizedQuery,
+			speakers: [],
+			sections: [],
+			page: 1,
+			page_size: safePageSize,
+			total_pages: 1,
+			total_sections: 0,
+			pagination_pages: [1],
+			filteredSpeakerId,
+			filteredSpeakerName
+		};
+	}
+
+	const normalizedLowerQuery = normalizedQuery.toLowerCase();
+	const sectionFilterSql = filteredSpeakerRoutePathname ? 'AND sc.section_speaker = ?' : '';
+	const sectionFilterBindings = filteredSpeakerRoutePathname ? [filteredSpeakerRoutePathname] : [];
+
+	const [speakerResult, totalSectionsRow] = await Promise.all([
+		filteredSpeakerRoutePathname
+			? Promise.resolve({ success: true, results: [] as SearchSpeakerRow[] })
+			: c.env.DB.prepare(
+				`SELECT id, route_pathname, name, photoURL
+				FROM speakers
+				WHERE instr(lower(COALESCE(name, '')), ?) > 0
+				ORDER BY instr(lower(COALESCE(name, '')), ?), name ASC
+				LIMIT ?`
+			)
+				.bind(normalizedLowerQuery, normalizedLowerQuery, SEARCH_SPEAKER_LIMIT)
+				.all(),
+		c.env.DB.prepare(
+			`SELECT COUNT(*) AS count
+			FROM speech_content sc
+			LEFT JOIN speech_index si ON sc.filename = si.filename
+			LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+			WHERE (
+				instr(lower(COALESCE(si.display_name, '')), ?) > 0
+				OR instr(lower(COALESCE(sp.name, '')), ?) > 0
+				OR instr(lower(COALESCE(sc.section_content, '')), ?) > 0
+			) ${sectionFilterSql}`
+		)
+			.bind(normalizedLowerQuery, normalizedLowerQuery, normalizedLowerQuery, ...sectionFilterBindings)
+			.first() as Promise<{ count: number | string | null } | null>
+	]);
+
+	if (!speakerResult.success) {
+		throw new Error('Database query failed');
+	}
+
+	const totalSections = Number(totalSectionsRow?.count ?? 0);
+	const totalPages = Math.max(1, Math.ceil(totalSections / safePageSize));
+	const resolvedPage = Math.min(safePage, totalPages);
+	const offset = (resolvedPage - 1) * safePageSize;
+
+	const sectionResult = await c.env.DB.prepare(
+		`SELECT
+			sc.filename,
+			sc.nest_filename,
+			sc.section_id,
+			sc.section_speaker,
+			sc.section_content,
+			si.display_name,
+			sp.name AS speaker_name,
+			sp.photoURL
+		FROM speech_content sc
+		LEFT JOIN speech_index si ON sc.filename = si.filename
+		LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+		WHERE (
+			instr(lower(COALESCE(si.display_name, '')), ?) > 0
+			OR instr(lower(COALESCE(sp.name, '')), ?) > 0
+			OR instr(lower(COALESCE(sc.section_content, '')), ?) > 0
+		) ${sectionFilterSql}
+		ORDER BY
+			CASE
+				WHEN instr(lower(COALESCE(si.display_name, '')), ?) > 0 THEN 0
+				WHEN instr(lower(COALESCE(sp.name, '')), ?) > 0 THEN 1
+				ELSE 2
+			END,
+			sc.filename DESC,
+			sc.section_id ASC
+		LIMIT ? OFFSET ?`
+	)
+		.bind(
+			normalizedLowerQuery,
+			normalizedLowerQuery,
+			normalizedLowerQuery,
+			...sectionFilterBindings,
+			normalizedLowerQuery,
+			normalizedLowerQuery,
+			safePageSize,
+			offset
+		)
+		.all();
+
+	if (!sectionResult.success) {
+		throw new Error('Database query failed');
+	}
+
+	return {
+		query: normalizedQuery,
+		speakers: ((speakerResult.results ?? []) as SearchSpeakerRow[]).map((row: SearchSpeakerRow) => ({
+			route_pathname: row.route_pathname,
+			name: row.name,
+			photoURL: row.photoURL ?? null,
+			snippet: highlightSearchText(row.name ?? '', normalizedQuery)
+		})),
+		sections: ((sectionResult.results ?? []) as Array<SearchResultRow & { section_speaker?: string | null; photoURL?: string | null }>).map((row) => ({
+			section_id: Number(row.section_id),
+			filename: row.filename,
+			nest_filename: row.nest_filename ?? null,
+			section_speaker: row.section_speaker ?? null,
+			speaker_name: row.speaker_name ?? null,
+			display_name: row.display_name,
+			photoURL: row.photoURL ?? null,
+			snippet: highlightSearchText(
+				buildSearchSnippet(toPlainText(parseContent(row.section_content ?? '')), normalizedQuery),
+				normalizedQuery
+			)
+		})),
+		page: resolvedPage,
+		page_size: safePageSize,
+		total_pages: totalPages,
+		total_sections: totalSections,
+		pagination_pages: buildPaginationPages(resolvedPage, totalPages),
+		filteredSpeakerId,
+		filteredSpeakerName
+	};
+}
+
+async function renderSearchPage(c: any) {
+	const cacheKey = buildCacheKey(c.req.url);
+	const cached = await readEdgeCache(cacheKey);
+	if (cached) return cached;
+
+	const url = new URL(c.req.url);
+	const query = normalizeSearchQuery(url.searchParams.get('q'));
+	const pageParam = Number(url.searchParams.get('page') || '1');
+	const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
+	const speakerParam = Number(url.searchParams.get('p') || '');
+	const speakerId = Number.isFinite(speakerParam) && speakerParam > 0 ? Math.floor(speakerParam) : undefined;
+
+	let result: SearchPageResult;
+	try {
+		result = await runSearchQuery(c, { query, page, pageSize: SEARCH_DEFAULT_PAGE_SIZE, speakerId });
+	} catch (err) {
+		console.error('[search SSR] query failed', err);
+		return c.text('Internal Server Error', 500);
+	}
+
+	const styles = [SearchResultViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForSearch(result.query);
+	const html = await renderHtml(SearchResultView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: result,
+		scripts: PAGEFIND_SCRIPT
+	});
+
+	const response = c.html(html);
+	response.headers.set('Cache-Control', SEARCH_HTML_CACHE_CONTROL);
+	await writeEdgeCache(cacheKey, response.clone(), SEARCH_HTML_CACHE_CONTROL);
+	return response;
+}
+
 
 // /、/speeches、/speakers 由 SSR 路由提供，其餘靜態資源由 staticFirstMiddleware 嘗試從 ASSETS 提供
 
@@ -537,76 +827,40 @@ app.get('/api/speaker_detail/:route_pathname_with_json', (c) => speakerDetail(c)
 app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
 app.get('/api/search.json', async (c) => {
-	const query = (c.req.query('q') || '').trim();
-	if (!query) {
-		return c.json({ results: [] }, 200, {
-			'Cache-Control': 'public, max-age=30, s-maxage=30'
-		});
-	}
+	const cacheKey = buildCacheKey(c.req.url);
+	const cached = await readEdgeCache(cacheKey);
+	if (cached) return cached;
 
-	const requestedLimit = Number(c.req.query('limit') || 20);
+	const query = normalizeSearchQuery(c.req.query('q'));
+	const requestedLimit = Number(c.req.query('limit') || SEARCH_DEFAULT_PAGE_SIZE);
 	const limit = Number.isFinite(requestedLimit)
-		? Math.max(1, Math.min(50, Math.floor(requestedLimit)))
-		: 20;
-	const scanLimit = Math.max(limit * 6, 60);
-	const normalizedQuery = query.toLowerCase();
+		? Math.max(1, Math.min(SEARCH_MAX_PAGE_SIZE, Math.floor(requestedLimit)))
+		: SEARCH_DEFAULT_PAGE_SIZE;
+	const speakerParam = Number(c.req.query('p') || '');
+	const speakerId = Number.isFinite(speakerParam) && speakerParam > 0 ? Math.floor(speakerParam) : undefined;
 
-	const result = await c.env.DB.prepare(
-		`SELECT
-			sc.filename,
-			sc.nest_filename,
-			si.display_name,
-			sc.section_id,
-			sc.section_content,
-			sp.name AS speaker_name
-		FROM speech_content sc
-		LEFT JOIN speech_index si ON sc.filename = si.filename
-		LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
-		WHERE
-			instr(lower(COALESCE(si.display_name, '')), ?) > 0
-			OR instr(lower(COALESCE(sp.name, '')), ?) > 0
-			OR instr(lower(COALESCE(sc.section_content, '')), ?) > 0
-		ORDER BY
-			CASE
-				WHEN instr(lower(COALESCE(si.display_name, '')), ?) > 0 THEN 0
-				WHEN instr(lower(COALESCE(sp.name, '')), ?) > 0 THEN 1
-				ELSE 2
-			END,
-			sc.filename DESC,
-			sc.section_id ASC
-		LIMIT ?`
-	)
-		.bind(normalizedQuery, normalizedQuery, normalizedQuery, normalizedQuery, normalizedQuery, scanLimit)
-		.all<SearchResultRow>();
-
-	if (!result.success) {
-		return c.text('Internal Server Error', 500);
-	}
-
-	const seen = new Set<string>();
-	const results = [];
-	for (const row of result.results ?? []) {
+	const searchResult = await runSearchQuery(c, { query, page: 1, pageSize: limit, speakerId });
+	const results = searchResult.sections.map((row) => {
 		const pageUrl = row.nest_filename
 			? `/${encodeURIComponent(row.filename)}/${encodeURIComponent(row.nest_filename)}`
 			: `/${encodeURIComponent(row.filename)}`;
-		if (seen.has(pageUrl)) continue;
-		seen.add(pageUrl);
-
-		const plain = toPlainText(parseContent(row.section_content ?? ''));
-		results.push({
+		return {
 			title: row.display_name,
-			url: row.section_id != null ? `${pageUrl}#s${row.section_id}` : pageUrl,
+			url: `${pageUrl}#s${row.section_id}`,
 			date: extractDate(row.display_name ?? ''),
 			speaker: row.speaker_name ?? '',
-			snippet: buildSearchSnippet(plain, query)
-		});
-		if (results.length >= limit) break;
-	}
-
-	return c.json({ results }, 200, {
-		'Cache-Control': 'public, max-age=60, s-maxage=300'
+			snippet: decodeHtmlEntities(row.snippet.replace(/<\/?em>/g, ''))
+		};
 	});
+
+	const response = c.json({ results }, 200, {
+		'Cache-Control': SEARCH_API_CACHE_CONTROL
+	});
+	await writeEdgeCache(cacheKey, response.clone(), SEARCH_API_CACHE_CONTROL);
+	return response;
 });
+app.get('/search', (c) => renderSearchPage(c));
+app.get('/search/', (c) => renderSearchPage(c));
 app.on(['GET', 'HEAD'], '/api/an/:path{[^/]+\\.an}', (c) => speechAn(c));
 app.get('/api/md/:path{[^/]+\\.md}', async (c) => {
 	const pathParam = c.req.param('path');

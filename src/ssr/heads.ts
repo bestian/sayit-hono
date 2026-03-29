@@ -57,6 +57,14 @@ export function headForSpeeches(): HeadSpec {
 	return { title: ' Speeches :: Sayit ', meta: [og(baseOgTitle), ogDescription(baseOgDescription), ...defaultImageMeta()] };
 }
 
+export function headForSearch(query: string): HeadSpec {
+	const safeQuery = query?.trim() || 'Search';
+	return {
+		title: ` Search: ${safeQuery} :: SayIt `,
+		meta: [og(`Search: ${safeQuery} :: SayIt`), ogDescription(baseOgDescription), ...defaultImageMeta()]
+	};
+}
+
 export function headForSingleSpeech(displayName: string, filename: string): HeadSpec {
 	const name = displayName ?? '';
 	return {
