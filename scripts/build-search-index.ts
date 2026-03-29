@@ -1,6 +1,9 @@
 import { readdir, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import path from 'node:path';
+
+const R2_BUCKETS = ['sayit-speech-cache', 'sayit-speech-cache-preview'] as const;
 
 /** Regex to detect speaker heading lines: 1-6 # followed by name ending in : or ： */
 const speakerLineRegExp = /^(#{1,6})\s*(.+?)\s*[:：]\s*$/;
@@ -189,6 +192,15 @@ interface Manifest {
 	[filename: string]: number; // mtime ms
 }
 
+function uploadFileToR2Buckets(key: string, filePath: string, contentType: string) {
+	for (const bucket of R2_BUCKETS) {
+		execSync(
+			`npx wrangler r2 object put ${bucket}/${key} --file "${filePath}" --content-type "${contentType}" --remote`,
+			{ stdio: 'inherit' }
+		);
+	}
+}
+
 async function buildSearchIndex() {
 	const transcriptDir = process.argv[2] || path.resolve('..', 'transcript');
 	const outputPath = path.resolve('www', 'search-index.json');
@@ -332,10 +344,7 @@ async function buildSearchIndex() {
 		await writeFile(dumpPath, JSON.stringify(dump));
 		console.log(`[build-search] Sections dump saved locally (${Object.keys(dump).length} speeches)`);
 		try {
-			const { execSync } = await import('node:child_process');
-			for (const bucket of ['sayit-speech-cache', 'sayit-speech-cache-preview']) {
-				execSync(`npx wrangler r2 object put ${bucket}/sections-dump.json --file "${dumpPath}" --content-type "application/json; charset=utf-8" --remote`, { stdio: 'inherit' });
-			}
+			uploadFileToR2Buckets('sections-dump.json', dumpPath, 'application/json; charset=utf-8');
 			console.log(`[build-search] Sections dump uploaded to R2 (prod + preview)`);
 		} catch (err) {
 			console.warn(`[build-search] R2 dump upload failed:`, err);
@@ -424,11 +433,8 @@ async function buildSearchIndex() {
 	console.log(`[build-search] Index written to ${outputPath} (${sizeMB} MB)`);
 
 	// Upload to R2 via wrangler, then remove from www/ (too large for static assets)
-	const { execSync } = await import('node:child_process');
 	try {
-		for (const bucket of ['sayit-speech-cache', 'sayit-speech-cache-preview']) {
-			execSync(`npx wrangler r2 object put ${bucket}/search-index.json --file "${outputPath}" --content-type "application/json; charset=utf-8" --remote`, { stdio: 'inherit' });
-		}
+		uploadFileToR2Buckets('search-index.json', outputPath, 'application/json; charset=utf-8');
 		console.log(`[build-search] Uploaded to R2 (prod + preview)`);
 	} catch (err) {
 		console.error(`[build-search] R2 upload failed:`, err);
@@ -445,8 +451,17 @@ async function buildSearchIndex() {
 		sections: allDocs.length,
 	};
 	const statsPath = path.resolve('www', 'stats.json');
-	await writeFile(statsPath, JSON.stringify(stats));
+	const statsJson = JSON.stringify(stats);
+	await writeFile(statsPath, statsJson);
 	console.log(`[build-search] Stats written to ${statsPath}:`, stats);
+
+	// Upload stats.json to R2 (served via Worker route, not ASSETS)
+	try {
+		uploadFileToR2Buckets('stats.json', statsPath, 'application/json; charset=utf-8');
+		console.log(`[build-search] stats.json uploaded to R2 (prod + preview)`);
+	} catch (err) {
+		console.error(`[build-search] stats.json R2 upload failed:`, err);
+	}
 }
 
 buildSearchIndex().catch((err) => {
