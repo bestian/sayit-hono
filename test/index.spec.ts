@@ -96,6 +96,25 @@ function createEnv() {
 							};
 						}
 
+						if (sql.includes('instr(lower(COALESCE(si.display_name') && sql.includes('FROM speech_content sc')) {
+							if (args[0] === 'ochiai') {
+								return {
+									success: true,
+									results: [
+										{
+											filename: '2026-03-25-weekly-ochiai',
+											nest_filename: null,
+											display_name: '2026-03-25 Weekly Ochiai',
+											section_id: 638607,
+											section_content: '<p>Conversation with Yoichi Ochiai.</p>',
+											speaker_name: 'Yoichi Ochiai'
+										}
+									]
+								};
+							}
+							return { success: true, results: [] };
+						}
+
 						if (sql.includes('FROM speech_content sc') && sql.includes('WHERE sc.filename = ?')) {
 							if (args[0] === '2026-03-24-demo-speech') {
 								return {
@@ -182,6 +201,21 @@ describe('Worker routes', () => {
 		expect(json).toEqual([
 			expect.objectContaining({ filename: 'demo.an', display_name: 'Demo Speech' })
 		]);
+	});
+
+	it('returns transcript search results from D1', async () => {
+		const { res } = await request('/api/search.json?q=ochiai');
+		expect(res.status).toBe(200);
+		const json = await res.json();
+		expect(json).toEqual({
+			results: [
+				expect.objectContaining({
+					title: '2026-03-25 Weekly Ochiai',
+					url: '/2026-03-25-weekly-ochiai#s638607',
+					speaker: 'Yoichi Ochiai'
+				})
+			]
+		});
 	});
 
 	it('returns an RSS feed', async () => {

@@ -31,6 +31,9 @@
 	function ensureWorker(shouldWarmup) {
 		if (worker) return;
 		worker = new Worker('/static/speeches/js/fuse-search.worker.js');
+		worker.addEventListener('error', function (event) {
+			console.error('Search worker crashed', event.message || event);
+		});
 		worker.addEventListener('message', function (e) {
 			var msg = e.data;
 			if (msg.requestId != null && pendingResolves[msg.requestId]) {
@@ -210,6 +213,7 @@
 			if (query !== currentQuery) return;
 
 			if (msg.type === 'error') {
+				console.error('Search worker failed', msg.message || 'unknown error');
 				renderError();
 				return;
 			}
@@ -262,7 +266,7 @@
 
 	input.addEventListener('focus', function () {
 		if (shortcutBadge) shortcutBadge.style.opacity = '0';
-		ensureWorker(shouldWarmupOnFocus());
+		ensureWorker(false);
 	});
 
 	input.addEventListener('blur', function () {

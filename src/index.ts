@@ -34,6 +34,7 @@ import {
 } from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
 import { normalizeSections } from './utils/sectionUtils';
+import { extractDate } from './search/docBuilder';
 import {
 	SEARCH_INDEX_BASELINE_BR_KEY,
 	SEARCH_INDEX_BASELINE_KEY,
@@ -279,6 +280,26 @@ function parseToArray(raw?: string | null): string[] {
 	return [];
 }
 
+function buildSearchSnippet(raw: string, query: string, radius = 80): string {
+	const text = raw.replace(/\s+/g, ' ').trim();
+	if (!text) return '';
+
+	const lowerText = text.toLowerCase();
+	const lowerQuery = query.toLowerCase();
+	const matchIndex = lowerText.indexOf(lowerQuery);
+
+	if (matchIndex < 0) {
+		return text.length <= radius * 2 ? text : `${text.slice(0, radius * 2).trimEnd()}...`;
+	}
+
+	const start = Math.max(0, matchIndex - Math.floor(radius / 2));
+	const end = Math.min(text.length, matchIndex + query.length + radius);
+	let snippet = text.slice(start, end).trim();
+	if (start > 0) snippet = `...${snippet}`;
+	if (end < text.length) snippet = `${snippet}...`;
+	return snippet;
+}
+
 async function loadSection(c: any, sectionId: number) {
 	const row = await c.env.DB.prepare(
 		`SELECT
@@ -339,6 +360,15 @@ type SpeakerListItem = {
 	route_pathname: string;
 	name: string;
 	photoURL: string | null;
+};
+
+type SearchResultRow = {
+	filename: string;
+	nest_filename?: string | null;
+	display_name: string;
+	section_id: number | string | null;
+	section_content: string | null;
+	speaker_name?: string | null;
 };
 
 async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow | null> {
@@ -473,6 +503,77 @@ app.get('/api/speakers_index.json', (c) => speakersIndex(c));
 app.get('/api/speaker_detail/:route_pathname_with_json', (c) => speakerDetail(c));
 app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
+app.get('/api/search.json', async (c) => {
+	const query = (c.req.query('q') || '').trim();
+	if (!query) {
+		return c.json({ results: [] }, 200, {
+			'Cache-Control': 'public, max-age=30, s-maxage=30'
+		});
+	}
+
+	const requestedLimit = Number(c.req.query('limit') || 20);
+	const limit = Number.isFinite(requestedLimit)
+		? Math.max(1, Math.min(50, Math.floor(requestedLimit)))
+		: 20;
+	const scanLimit = Math.max(limit * 6, 60);
+	const normalizedQuery = query.toLowerCase();
+
+	const result = await c.env.DB.prepare(
+		`SELECT
+			sc.filename,
+			sc.nest_filename,
+			si.display_name,
+			sc.section_id,
+			sc.section_content,
+			sp.name AS speaker_name
+		FROM speech_content sc
+		LEFT JOIN speech_index si ON sc.filename = si.filename
+		LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+		WHERE
+			instr(lower(COALESCE(si.display_name, '')), ?) > 0
+			OR instr(lower(COALESCE(sp.name, '')), ?) > 0
+			OR instr(lower(COALESCE(sc.section_content, '')), ?) > 0
+		ORDER BY
+			CASE
+				WHEN instr(lower(COALESCE(si.display_name, '')), ?) > 0 THEN 0
+				WHEN instr(lower(COALESCE(sp.name, '')), ?) > 0 THEN 1
+				ELSE 2
+			END,
+			sc.filename DESC,
+			sc.section_id ASC
+		LIMIT ?`
+	)
+		.bind(normalizedQuery, normalizedQuery, normalizedQuery, normalizedQuery, normalizedQuery, scanLimit)
+		.all<SearchResultRow>();
+
+	if (!result.success) {
+		return c.text('Internal Server Error', 500);
+	}
+
+	const seen = new Set<string>();
+	const results = [];
+	for (const row of result.results ?? []) {
+		const pageUrl = row.nest_filename
+			? `/${encodeURIComponent(row.filename)}/${encodeURIComponent(row.nest_filename)}`
+			: `/${encodeURIComponent(row.filename)}`;
+		if (seen.has(pageUrl)) continue;
+		seen.add(pageUrl);
+
+		const plain = toPlainText(parseContent(row.section_content ?? ''));
+		results.push({
+			title: row.display_name,
+			url: row.section_id != null ? `${pageUrl}#s${row.section_id}` : pageUrl,
+			date: extractDate(row.display_name ?? ''),
+			speaker: row.speaker_name ?? '',
+			snippet: buildSearchSnippet(plain, query)
+		});
+		if (results.length >= limit) break;
+	}
+
+	return c.json({ results }, 200, {
+		'Cache-Control': 'public, max-age=60, s-maxage=300'
+	});
+});
 app.on(['GET', 'HEAD'], '/api/an/:path{[^/]+\\.an}', (c) => speechAn(c));
 app.get('/api/md/:path{[^/]+\\.md}', async (c) => {
 	const pathParam = c.req.param('path');
