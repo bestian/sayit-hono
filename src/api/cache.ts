@@ -1,7 +1,9 @@
+import { CACHE_KEY_VERSION } from '../cacheKeyVersion';
+
 const DEFAULT_CACHE_CONTROL = 'public, max-age=3600';
 
 // Bump when cached HTML format changes to invalidate stale edge/R2 entries.
-export const CACHE_KEY_VERSION = 'v7';
+export { CACHE_KEY_VERSION };
 
 function normalizeEdgeCacheKey(cacheKey: string): string {
 	try {
