@@ -3,6 +3,11 @@ import { getCorsHeaders } from './cors';
 import type { ApiEnv } from './types';
 import { marked } from 'marked';
 import { CACHE_KEY_VERSION, deleteEdgeCache, deleteR2Cache } from './cache';
+import {
+	markSpeechDeletedInSearch,
+	syncSearchStats,
+	writeSearchOverlayForSpeech
+} from '../search/runtime';
 
 const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
 
@@ -545,6 +550,30 @@ async function invalidateListPageCaches(
 	);
 }
 
+async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: string) {
+	const results = await Promise.allSettled([
+		writeSearchOverlayForSpeech(c, filename),
+		syncSearchStats(c)
+	]);
+	for (const result of results) {
+		if (result.status === 'rejected') {
+			console.error('[upload_markdown] search upsert sync error', result.reason);
+		}
+	}
+}
+
+async function syncSearchArtifactsAfterDelete(c: Context<ApiEnv>, filename: string) {
+	const results = await Promise.allSettled([
+		markSpeechDeletedInSearch(c.env.SPEECH_CACHE, filename),
+		syncSearchStats(c)
+	]);
+	for (const result of results) {
+		if (result.status === 'rejected') {
+			console.error('[upload_markdown] search delete sync error', result.reason);
+		}
+	}
+}
+
 /** 上傳 Markdown API：支援 POST（新增）、PATCH（更新）、DELETE（刪除），需 Bearer token 驗證 */
 export async function uploadMarkdown(c: Context<ApiEnv>) {
 	const origin = c.req.header('Origin') ?? null;
@@ -649,6 +678,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				await invalidateSpeechCaches(c, filename);
 				await invalidateSpeakerCaches(c, speakerRoutePathnames);
 				await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
+				await syncSearchArtifactsAfterDelete(c, filename);
 
 				return c.json(
 					{
@@ -806,6 +836,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			}
 			await invalidateSpeakerCaches(c, speakerRoutePathnames);
 			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
+			await syncSearchArtifactsAfterUpsert(c, filename);
 
 			return c.json(
 				{ success: true, filename, sectionsCount: normalized.length, ...(altFilename ? { alternate_filename: altFilename } : {}) },
@@ -1088,6 +1119,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			}
 			await invalidateSpeakerCaches(c, finalImpactedSpeakers);
 			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
+			await syncSearchArtifactsAfterUpsert(c, filename);
 
 			return c.json(
 				{

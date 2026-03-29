@@ -3,7 +3,7 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"deploy": "npm run build:views && wrangler deploy",
+		"deploy": "npm run deploy:search",
 		"deploy:assets": "npm run build:views && npm run build:assets && wrangler deploy",
 		"deploy:search": "npm run build:views && npm run build:assets && npm run build:search && wrangler deploy",
 		"dev": "npm run build:views && wrangler dev --remote",

@@ -1,6 +1,7 @@
 {
 	"compilerOptions": {
 		"target": "ES2022",
+		"lib": ["es2024", "dom", "dom.iterable", "webworker"],
 		"module": "ESNext",
 		"moduleResolution": "Node",
 		"allowSyntheticDefaultImports": true,
@@ -12,5 +13,5 @@
 		"strict": true,
 		"skipLibCheck": true
 	},
-  "include": ["./**/*.ts", "../src/**/*.ts"]
+	"include": ["./**/*.ts", "../src/search/**/*.ts", "../worker-configuration.d.ts"]
 }

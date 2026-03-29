@@ -31,6 +31,7 @@ function createEnv() {
 				const entry = r2Store.get(key);
 				if (!entry) return null;
 				return {
+					body: entry.body,
 					size: entry.body.length,
 					httpEtag: null,
 					httpMetadata: {
@@ -53,8 +54,8 @@ function createEnv() {
 			}
 		},
 		DB: {
-			prepare: (sql: string) => ({
-				bind: (...args: unknown[]) => ({
+			prepare: (sql: string) => {
+				const run = (args: unknown[]) => ({
 					first: async () => {
 						if (sql.includes('FROM speech_index WHERE filename = ?')) {
 							if (args[0] === '2026-03-24-demo-speech') {
@@ -131,12 +132,13 @@ function createEnv() {
 							results: [{ filename: 'demo.an', display_name: 'Demo Speech' }]
 						};
 					}
-				}),
-				all: async () => ({
-					success: true,
-					results: [{ filename: 'demo.an', display_name: 'Demo Speech' }]
-				})
-			})
+				});
+				return {
+					bind: (...args: unknown[]) => run(args),
+					first: async () => run([]).first(),
+					all: async () => run([]).all()
+				};
+			}
 		}
 	};
 }
@@ -177,7 +179,9 @@ describe('Worker routes', () => {
 		const { res } = await request('/api/speech_index.json');
 		expect(res.status).toBe(200);
 		const json = await res.json();
-		expect(json).toEqual([{ filename: 'demo.an', display_name: 'Demo Speech' }]);
+		expect(json).toEqual([
+			expect.objectContaining({ filename: 'demo.an', display_name: 'Demo Speech' })
+		]);
 	});
 
 	it('returns an RSS feed', async () => {
