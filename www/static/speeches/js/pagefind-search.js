@@ -66,6 +66,13 @@
 		return div.innerHTML;
 	}
 
+	function decodeHtmlEntities(str) {
+		if (!str || typeof str !== 'string' || str.indexOf('&') === -1) return str || '';
+		var textarea = document.createElement('textarea');
+		textarea.innerHTML = str;
+		return textarea.value;
+	}
+
 	function showResults() {
 		results.hidden = false;
 		if (speechList) speechList.style.display = 'none';
@@ -109,10 +116,10 @@
 	}
 
 	function renderResultItem(data) {
-		var title = data.title || data.url;
+		var title = decodeHtmlEntities(data.title || data.url);
 		var date = data.date || '';
-		var speaker = data.speaker || '';
-		var snippet = data.snippet || '';
+		var speaker = decodeHtmlEntities(data.speaker || '');
+		var snippet = decodeHtmlEntities(data.snippet || '');
 
 		var displayTitle = date ? title.replace(new RegExp('^' + date + '\\s*'), '') : title;
 

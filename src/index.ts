@@ -52,6 +52,14 @@ const EDGE_TTL_SECONDS = 60;
 const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}`;
 const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></script>';
 const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers);e=document.getElementById('sayit-stat-sections');if(e)e.textContent=fmt(s.sections)}).catch(function(){})})()</script>`;
+const NAMED_ENTITIES: Record<string, string> = {
+	amp: '&',
+	lt: '<',
+	gt: '>',
+	quot: '"',
+	apos: "'",
+	nbsp: ' '
+};
 
 const excludedPaths = [
 	'api',
@@ -263,8 +271,33 @@ function parseContent(raw?: string | null) {
 	}
 }
 
+function decodeHtmlEntities(value: string) {
+	return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {
+		if (entity[0] === '#') {
+			const isHex = entity[1]?.toLowerCase() === 'x';
+			const raw = isHex ? entity.slice(2) : entity.slice(1);
+			const parsed = Number.parseInt(raw, isHex ? 16 : 10);
+			if (!Number.isFinite(parsed) || parsed < 0 || parsed > 0x10ffff) {
+				return match;
+			}
+			return String.fromCodePoint(parsed);
+		}
+
+		return NAMED_ENTITIES[entity] ?? match;
+	});
+}
+
 function toPlainText(html: string) {
-	return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+	return decodeHtmlEntities(
+		html
+			.replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+			.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+			.replace(/<br\s*\/?>/gi, ' ')
+			.replace(/<\/(p|div|section|article|li|blockquote|h[1-6]|tr|td|th)>/gi, ' ')
+			.replace(/<[^>]+>/g, ' ')
+	)
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 function parseToArray(raw?: string | null): string[] {
