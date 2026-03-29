@@ -106,7 +106,7 @@ function createEnv() {
 											nest_filename: null,
 											display_name: '2026-03-25 Weekly Ochiai',
 											section_id: 638607,
-											section_content: '<p>Conversation with Yoichi Ochiai.</p>',
+											section_content: '<p>We&#39;re shifting from &quot;data oil&quot; to &quot;data soil.&quot;</p>',
 											speaker_name: 'Yoichi Ochiai'
 										}
 									]
@@ -212,7 +212,8 @@ describe('Worker routes', () => {
 				expect.objectContaining({
 					title: '2026-03-25 Weekly Ochiai',
 					url: '/2026-03-25-weekly-ochiai#s638607',
-					speaker: 'Yoichi Ochiai'
+					speaker: 'Yoichi Ochiai',
+					snippet: 'We\'re shifting from "data oil" to "data soil."'
 				})
 			]
 		});
