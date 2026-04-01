@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
 import { CACHE_KEY_VERSION, deleteEdgeCache, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
+import { OLD_CACHE_VERSIONS } from './cacheKeyVersion';
 import { speakersIndex } from './api/speakers_index';
 import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
@@ -996,6 +997,31 @@ app.post('/api/purge_cache', async (c) => {
 	return c.json({ deleted });
 });
 
+app.post('/api/cleanup_old_cache', async (c) => {
+	const authHeader = c.req.header('Authorization');
+	if (!authHeader?.startsWith('Bearer ')) return c.text('Forbidden', 403);
+	const token = authHeader.slice(7);
+	if (!token || (token !== c.env.AUDREYT_TRANSCRIPT_TOKEN && token !== c.env.BESTIAN_TRANSCRIPT_TOKEN)) {
+		return c.text('Forbidden', 403);
+	}
+
+	const bucket = c.env.SPEECH_CACHE;
+	let deleted = 0;
+	for (const oldVersion of OLD_CACHE_VERSIONS) {
+		let cursor: string | undefined;
+		do {
+			const list = await bucket.list({ prefix: `${oldVersion}/`, cursor, limit: 500 });
+			const keys = list.objects.map((o: { key: string }) => o.key);
+			if (keys.length > 0) {
+				await Promise.all(keys.map((key) => deleteEdgeCache(key)));
+				await bucket.delete(keys);
+				deleted += keys.length;
+			}
+			cursor = list.truncated ? list.cursor : undefined;
+		} while (cursor);
+	}
+	return c.json({ deleted, cleaned: OLD_CACHE_VERSIONS });
+});
 
 async function renderHomePage(c: any) {
 	const styles = [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
