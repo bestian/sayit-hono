@@ -1,18 +1,26 @@
-import satori from 'satori';
-import { Resvg, initWasm } from '@resvg/resvg-wasm';
+import satori, { init as initSatori } from 'satori/standalone';
+import { Resvg, initWasm as initResvg } from '@resvg/resvg-wasm';
 // @ts-ignore — wrangler resolves .wasm imports to WebAssembly.Module
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
+// @ts-ignore — wrangler resolves .wasm imports to WebAssembly.Module
+import yogaWasm from 'satori/yoga.wasm';
 
-let wasmInitialized = false;
+let wasmInitPromise: Promise<void> | null = null;
 
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
 
 async function ensureWasm() {
-	if (!wasmInitialized) {
-		await initWasm(resvgWasm);
-		wasmInitialized = true;
+	if (!wasmInitPromise) {
+		wasmInitPromise = Promise.all([
+			initSatori(yogaWasm),
+			initResvg(resvgWasm),
+		]).then(() => undefined).catch((error) => {
+			wasmInitPromise = null;
+			throw error;
+		});
 	}
+	await wasmInitPromise;
 }
 
 async function fetchFont(text: string, weight: number): Promise<ArrayBuffer> {
