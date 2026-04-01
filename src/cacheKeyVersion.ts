@@ -1,1 +1,1 @@
-export const CACHE_KEY_VERSION = 'v8';
+export const CACHE_KEY_VERSION = 'v9';
