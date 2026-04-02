@@ -1005,22 +1005,24 @@ app.post('/api/cleanup_old_cache', async (c) => {
 		return c.text('Forbidden', 403);
 	}
 
+	const url = new URL(c.req.url);
+	const versionParam = url.searchParams.get('version');
+	const versions = versionParam ? [versionParam] : OLD_CACHE_VERSIONS;
+
 	const bucket = c.env.SPEECH_CACHE;
 	let deleted = 0;
-	for (const oldVersion of OLD_CACHE_VERSIONS) {
-		let cursor: string | undefined;
-		do {
-			const list = await bucket.list({ prefix: `${oldVersion}/`, cursor, limit: 500 });
-			const keys = list.objects.map((o: { key: string }) => o.key);
-			if (keys.length > 0) {
-				await Promise.all(keys.map((key) => deleteEdgeCache(key)));
-				await bucket.delete(keys);
-				deleted += keys.length;
-			}
-			cursor = list.truncated ? list.cursor : undefined;
-		} while (cursor);
+	for (const oldVersion of versions) {
+		const list = await bucket.list({ prefix: `${oldVersion}/`, limit: 500 });
+		const keys = list.objects.map((o: { key: string }) => o.key);
+		if (keys.length > 0) {
+			await bucket.delete(keys);
+			deleted += keys.length;
+		}
+		if (list.truncated) {
+			return c.json({ deleted, version: oldVersion, more: true });
+		}
 	}
-	return c.json({ deleted, cleaned: OLD_CACHE_VERSIONS });
+	return c.json({ deleted, cleaned: versions, more: false });
 });
 
 async function renderHomePage(c: any) {
