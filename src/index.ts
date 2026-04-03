@@ -903,7 +903,9 @@ app.get('/og/speech/:section_id{\\d+\\.png}', async (c) => {
 
 	try {
 		const { generateQuoteOgImage } = await loadOgModule();
-		const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle, section.photoURL ?? null);
+		const origin = new URL(c.req.url).origin;
+			const avatarUrl = section.photoURL ? new URL(section.photoURL, origin).href : null;
+			const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle, avatarUrl);
 		await c.env.SPEECH_CACHE.put(cacheKey, png, {
 			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
 		});
