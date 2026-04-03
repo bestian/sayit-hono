@@ -41,19 +41,6 @@ function truncate(text: string, maxLen: number): string {
 	return text.slice(0, maxLen).replace(/\s+\S*$/, '') + '…';
 }
 
-async function fetchAvatarDataUri(url: string): Promise<string | null> {
-	try {
-		const res = await fetch(url);
-		if (!res.ok) return null;
-		const ct = res.headers.get('content-type') || 'image/png';
-		const buf = new Uint8Array(await res.arrayBuffer());
-		let bin = '';
-		for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-		return `data:${ct};base64,${btoa(bin)}`;
-	} catch {
-		return null;
-	}
-}
 
 function avatarElement(dataUri: string, size: number) {
 	const ring = size + 6;
@@ -376,9 +363,8 @@ export async function generateQuoteOgImage(
 	quoteHtml: string,
 	speakerName: string | null,
 	speechTitle: string,
-	avatarUrl: string | null = null
+	avatarDataUri: string | null = null
 ): Promise<Uint8Array> {
-	const avatarDataUri = avatarUrl ? await fetchAvatarDataUri(avatarUrl) : null;
 	const plainText = quoteHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 	const displayQuote = truncate(plainText, 120);
 	const allText = ['ARCHIVE.TW', displayQuote, speakerName ?? '', speechTitle, '\u2014'].join('');
