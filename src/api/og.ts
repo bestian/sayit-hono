@@ -248,7 +248,7 @@ function buildQuoteElement(
 	const maxLen = 120;
 	const displayQuote = truncate(quoteText, maxLen);
 	const len = displayQuote.length;
-	const fontSize = len > 80 ? 32 : len > 50 ? 38 : len > 30 ? 44 : len > 15 ? 56 : len > 6 ? 72 : 96;
+	const fontSize = len > 80 ? 38 : len > 50 ? 44 : len > 30 ? 52 : len > 15 ? 64 : len > 6 ? 80 : 96;
 
 	return {
 		type: 'div',
@@ -258,7 +258,7 @@ function buildQuoteElement(
 				flexDirection: 'column',
 				width: '100%',
 				height: '100%',
-				padding: '50px 80px 80px',
+				padding: '60px 72px 72px',
 				background: '#0f1729',
 				fontFamily: 'Noto Sans TC',
 				color: '#f5f0e8',
@@ -271,7 +271,7 @@ function buildQuoteElement(
 				{
 					type: 'div',
 					props: {
-						style: { display: 'flex', flex: 1, alignItems: 'center', paddingRight: '40px' },
+						style: { display: 'flex', flex: 1, alignItems: 'flex-start', paddingRight: '40px' },
 						children: {
 							type: 'span',
 							props: {
