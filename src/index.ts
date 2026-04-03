@@ -904,16 +904,20 @@ app.get('/og/speech/:section_id{\\d+\\.png}', async (c) => {
 	try {
 		const { generateQuoteOgImage } = await loadOgModule();
 		let avatarDataUri: string | null = null;
+		console.log('[og/speech] photoURL:', section.photoURL);
 		if (section.photoURL) {
 			try {
 				const assetUrl = new URL(section.photoURL, 'https://placeholder.host').pathname;
+				console.log('[og/speech] fetching asset:', assetUrl);
 				const res = await c.env.ASSETS.fetch(new Request(`https://placeholder.host${assetUrl}`));
+				console.log('[og/speech] asset response:', res.status, res.headers.get('content-type'));
 				if (res.ok) {
 					const ct = res.headers.get('content-type') || 'image/jpeg';
 					const buf = new Uint8Array(await res.arrayBuffer());
 					let bin = '';
 					for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
 					avatarDataUri = `data:${ct};base64,${btoa(bin)}`;
+					console.log('[og/speech] avatar data URI length:', avatarDataUri.length);
 				}
 			} catch (e) {
 				console.error('[og/speech] avatar fetch error', e);
@@ -1044,7 +1048,7 @@ app.post('/api/cleanup_old_cache', async (c) => {
 				break;
 			}
 
-			await Promise.all(keys.map((key) => deleteEdgeCache(key)));
+			await Promise.all(keys.map((key) => deleteEdgeCache(key, { silent: true })));
 			await bucket.delete(keys);
 			deleted += keys.length;
 			deletedForPrefix += keys.length;
