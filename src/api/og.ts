@@ -248,7 +248,7 @@ function buildQuoteElement(
 	const maxLen = 120;
 	const displayQuote = truncate(quoteText, maxLen);
 	const len = displayQuote.length;
-	const fontSize = len > 80 ? 38 : len > 50 ? 44 : len > 30 ? 52 : len > 15 ? 64 : len > 6 ? 80 : 96;
+	const fontSize = len > 80 ? 42 : len > 50 ? 50 : len > 30 ? 58 : len > 15 ? 72 : len > 6 ? 88 : 104;
 
 	return {
 		type: 'div',
@@ -271,7 +271,7 @@ function buildQuoteElement(
 				{
 					type: 'div',
 					props: {
-						style: { display: 'flex', flex: 1, alignItems: 'flex-start', paddingRight: '40px' },
+						style: { display: 'flex', flex: 1, alignItems: 'flex-start' },
 						children: {
 							type: 'span',
 							props: {
