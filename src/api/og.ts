@@ -41,6 +41,52 @@ function truncate(text: string, maxLen: number): string {
 	return text.slice(0, maxLen).replace(/\s+\S*$/, '') + '…';
 }
 
+async function fetchAvatarDataUri(url: string): Promise<string | null> {
+	try {
+		const res = await fetch(url);
+		if (!res.ok) return null;
+		const ct = res.headers.get('content-type') || 'image/png';
+		const buf = new Uint8Array(await res.arrayBuffer());
+		let bin = '';
+		for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+		return `data:${ct};base64,${btoa(bin)}`;
+	} catch {
+		return null;
+	}
+}
+
+function avatarElement(dataUri: string, size: number) {
+	const ring = size + 6;
+	return {
+		type: 'div',
+		props: {
+			style: {
+				display: 'flex',
+				alignItems: 'center',
+				justifyContent: 'center',
+				width: `${ring}px`,
+				height: `${ring}px`,
+				borderRadius: '50%',
+				background: '#d4a44a',
+				flexShrink: 0,
+			},
+			children: {
+				type: 'img',
+				props: {
+					src: dataUri,
+					width: size,
+					height: size,
+					style: {
+						width: `${size}px`,
+						height: `${size}px`,
+						borderRadius: '50%',
+					},
+				},
+			},
+		},
+	};
+}
+
 // Shared background layers: arc, rings, ambient light
 function backgroundLayers() {
 	return [
@@ -209,7 +255,8 @@ function buildSpeechElement(title: string, date: string | null, speakers: string
 function buildQuoteElement(
 	quoteText: string,
 	speakerName: string | null,
-	speechTitle: string
+	speechTitle: string,
+	avatarDataUri: string | null
 ) {
 	const maxLen = 120;
 	const displayQuote = truncate(quoteText, maxLen);
@@ -259,22 +306,31 @@ function buildQuoteElement(
 				{
 					type: 'div',
 					props: {
-						style: { display: 'flex', flexDirection: 'column', gap: '6px' },
+						style: { display: 'flex', alignItems: 'center', gap: '16px' },
 						children: [
-							speakerName
-								? {
-										type: 'span',
-										props: {
-											style: { fontSize: 22, color: '#d4a44a', fontWeight: 400 },
-											children: `\u2014 ${speakerName}`,
-										},
-									}
-								: null,
+							avatarDataUri ? avatarElement(avatarDataUri, 52) : null,
 							{
-								type: 'span',
+								type: 'div',
 								props: {
-									style: { fontSize: 16, color: 'rgba(245,240,232,0.3)', fontWeight: 400, letterSpacing: '0.5px' },
-									children: speechTitle,
+									style: { display: 'flex', flexDirection: 'column', gap: '4px' },
+									children: [
+										speakerName
+											? {
+													type: 'span',
+													props: {
+														style: { fontSize: 22, color: '#d4a44a', fontWeight: 400 },
+														children: avatarDataUri ? speakerName : `\u2014 ${speakerName}`,
+													},
+												}
+											: null,
+										{
+											type: 'span',
+											props: {
+												style: { fontSize: 16, color: 'rgba(245,240,232,0.3)', fontWeight: 400, letterSpacing: '0.5px' },
+												children: speechTitle,
+											},
+										},
+									].filter(Boolean),
 								},
 							},
 						].filter(Boolean),
@@ -327,11 +383,13 @@ export async function generateOgImage(
 export async function generateQuoteOgImage(
 	quoteHtml: string,
 	speakerName: string | null,
-	speechTitle: string
+	speechTitle: string,
+	avatarUrl: string | null = null
 ): Promise<Uint8Array> {
+	const avatarDataUri = avatarUrl ? await fetchAvatarDataUri(avatarUrl) : null;
 	const plainText = quoteHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 	const displayQuote = truncate(plainText, 120);
 	const allText = ['ARCHIVE.TW', displayQuote, speakerName ?? '', speechTitle, '\u2014'].join('');
-	const element = buildQuoteElement(plainText, speakerName, speechTitle);
+	const element = buildQuoteElement(plainText, speakerName, speechTitle, avatarDataUri);
 	return renderElement(element, allText);
 }
