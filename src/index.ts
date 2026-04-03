@@ -903,9 +903,23 @@ app.get('/og/speech/:section_id{\\d+\\.png}', async (c) => {
 
 	try {
 		const { generateQuoteOgImage } = await loadOgModule();
-		const origin = new URL(c.req.url).origin;
-			const avatarUrl = section.photoURL ? new URL(section.photoURL, origin).href : null;
-			const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle, avatarUrl);
+		let avatarDataUri: string | null = null;
+		if (section.photoURL) {
+			try {
+				const assetUrl = new URL(section.photoURL, 'https://placeholder.host').pathname;
+				const res = await c.env.ASSETS.fetch(new Request(`https://placeholder.host${assetUrl}`));
+				if (res.ok) {
+					const ct = res.headers.get('content-type') || 'image/jpeg';
+					const buf = new Uint8Array(await res.arrayBuffer());
+					let bin = '';
+					for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+					avatarDataUri = `data:${ct};base64,${btoa(bin)}`;
+				}
+			} catch (e) {
+				console.error('[og/speech] avatar fetch error', e);
+			}
+		}
+		const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle, avatarDataUri);
 		await c.env.SPEECH_CACHE.put(cacheKey, png, {
 			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
 		});
