@@ -271,7 +271,7 @@ function buildQuoteElement(
 				flexDirection: 'column',
 				width: '100%',
 				height: '100%',
-				padding: '80px',
+				padding: '50px 80px 80px',
 				background: '#0f1729',
 				fontFamily: 'Noto Sans TC',
 				color: '#f5f0e8',
@@ -280,14 +280,6 @@ function buildQuoteElement(
 			},
 			children: [
 				...backgroundLayers(),
-				// Eyebrow
-				{
-					type: 'span',
-					props: {
-						style: { fontSize: 16, fontWeight: 400, color: 'rgba(245,240,232,0.38)', letterSpacing: '4px' },
-						children: 'ARCHIVE.TW',
-					},
-				},
 				// Quote text
 				{
 					type: 'div',
