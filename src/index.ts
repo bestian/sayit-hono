@@ -903,7 +903,7 @@ app.get('/og/speech/:section_id{\\d+\\.png}', async (c) => {
 
 	try {
 		const { generateQuoteOgImage } = await loadOgModule();
-		const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle);
+		const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle, section.photoURL ?? null);
 		await c.env.SPEECH_CACHE.put(cacheKey, png, {
 			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
 		});
@@ -1007,22 +1007,41 @@ app.post('/api/cleanup_old_cache', async (c) => {
 
 	const url = new URL(c.req.url);
 	const versionParam = url.searchParams.get('version');
-	const versions = versionParam ? [versionParam] : OLD_CACHE_VERSIONS;
+	const prefixParams = url.searchParams
+		.getAll('prefix')
+		.map((value) => value.trim())
+		.filter(Boolean);
+	const targets = prefixParams.length > 0
+		? prefixParams
+		: (versionParam ? [versionParam] : OLD_CACHE_VERSIONS).map((value) => `${value}/`);
 
 	const bucket = c.env.SPEECH_CACHE;
 	let deleted = 0;
-	for (const oldVersion of versions) {
-		const list = await bucket.list({ prefix: `${oldVersion}/`, limit: 500 });
-		const keys = list.objects.map((o: { key: string }) => o.key);
-		if (keys.length > 0) {
+	const LIST_LIMIT = 1000;
+	const MAX_DELETES_PER_REQUEST = 10000;
+	for (const prefix of targets) {
+		let deletedForPrefix = 0;
+		while (deletedForPrefix < MAX_DELETES_PER_REQUEST) {
+			const list = await bucket.list({ prefix, limit: LIST_LIMIT });
+			const keys = list.objects.map((o: { key: string }) => o.key);
+			if (keys.length === 0) {
+				break;
+			}
+
+			await Promise.all(keys.map((key) => deleteEdgeCache(key)));
 			await bucket.delete(keys);
 			deleted += keys.length;
-		}
-		if (list.truncated) {
-			return c.json({ deleted, version: oldVersion, more: true });
+			deletedForPrefix += keys.length;
+
+			if (!list.truncated) {
+				break;
+			}
+			if (deletedForPrefix >= MAX_DELETES_PER_REQUEST) {
+				return c.json({ deleted, prefix, more: true });
+			}
 		}
 	}
-	return c.json({ deleted, cleaned: versions, more: false });
+	return c.json({ deleted, cleaned: targets, more: false });
 });
 
 async function renderHomePage(c: any) {
