@@ -47,11 +47,13 @@ export async function writeEdgeCache(
 }
 
 /** 刪除 Edge Cache */
-export async function deleteEdgeCache(cacheKey: string) {
+export async function deleteEdgeCache(cacheKey: string, { silent = false }: { silent?: boolean } = {}) {
 	try {
 		const normalizedKey = normalizeEdgeCacheKey(cacheKey);
 		await caches.default.delete(normalizedKey);
-		console.log('[edge cache] deleted', cacheKey);
+		if (!silent) {
+			console.log('[edge cache] deleted', cacheKey);
+		}
 	} catch (err) {
 		console.error('[edge cache] delete error', cacheKey, err);
 	}

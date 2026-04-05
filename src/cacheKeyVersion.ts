@@ -1,4 +1,4 @@
-export const CACHE_KEY_VERSION = 'v14';
+export const CACHE_KEY_VERSION = 'v15';
 
 // Previous versions to clean up on deploy. Update when bumping CACHE_KEY_VERSION.
-export const OLD_CACHE_VERSIONS = ['v5', 'v6', 'v7', 'v8', 'v9', 'v10', 'v11', 'v12', 'v13'];
+export const OLD_CACHE_VERSIONS = ['v5', 'v6', 'v7', 'v8', 'v9', 'v10', 'v11', 'v12', 'v13', 'v14'];

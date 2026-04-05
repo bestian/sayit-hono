@@ -16,6 +16,8 @@ function createEnv() {
 
 	return {
 		__r2Store: r2Store,
+		AUDREYT_TRANSCRIPT_TOKEN: 'test-audrey',
+		BESTIAN_TRANSCRIPT_TOKEN: 'test-bestian',
 		ASSETS: {
 			// 僅對已知靜態路徑回傳 200，其餘回傳 404
 			fetch: (url: string) => {
@@ -51,6 +53,22 @@ function createEnv() {
 					cacheControl: options?.httpMetadata?.cacheControl,
 					contentType: options?.httpMetadata?.contentType
 				});
+			},
+			delete: async (keys: string | string[]) => {
+				for (const key of Array.isArray(keys) ? keys : [keys]) {
+					r2Store.delete(key);
+				}
+			},
+			list: async ({ prefix = '', cursor, limit = 500 }: { prefix?: string; cursor?: string; limit?: number }) => {
+				const matchingKeys = Array.from(r2Store.keys()).filter((key) => key.startsWith(prefix));
+				const start = cursor ? Number(cursor) || 0 : 0;
+				const slice = matchingKeys.slice(start, start + limit);
+				const nextCursor = start + slice.length;
+				return {
+					objects: slice.map((key) => ({ key })),
+					truncated: nextCursor < matchingKeys.length,
+					cursor: `${nextCursor}`
+				};
 			}
 		},
 		DB: {
@@ -199,8 +217,8 @@ function createEnv() {
 	};
 }
 
-async function request(path: string, env = createEnv()) {
-	const req = new IncomingRequest(`https://example.com${path}`);
+async function request(path: string, env = createEnv(), init?: RequestInit<IncomingRequestCfProperties>) {
+	const req = new IncomingRequest(`https://example.com${path}`, init);
 	const ctx = createExecutionContext();
 	const res = await worker.fetch(req, env, ctx);
 	return { res, ctx };
@@ -301,5 +319,33 @@ describe('Worker routes', () => {
 		expect(keys).toContain(`${CACHE_KEY_VERSION}/example.com/2026-03-24-demo-speech`);
 		expect(keys).not.toContain(`${CACHE_KEY_VERSION}/example.com/2026-03-24-demo-speech?x`);
 		expect(keys.filter((key) => key.includes('2026-03-24-demo-speech'))).toHaveLength(1);
+	});
+
+	it('cleans legacy cache objects by prefix', async () => {
+		const env = createEnv();
+		(env as any).__r2Store.set('archive.tw/2026-03-24-demo-speech', { body: 'old' });
+		(env as any).__r2Store.set('archive.tw/2026-03-24-demo-speech?bust', { body: 'old-bust' });
+		(env as any).__r2Store.set('archive.tw/another-speech', { body: 'keep' });
+
+		const { res } = await request(
+			`/api/cleanup_old_cache?prefix=${encodeURIComponent('archive.tw/2026-03-24-demo-speech')}`,
+			env,
+			{
+				method: 'POST',
+				headers: {
+					Authorization: 'Bearer test-audrey'
+				}
+			}
+		);
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({
+			deleted: 2,
+			cleaned: ['archive.tw/2026-03-24-demo-speech'],
+			more: false
+		});
+		expect((env as any).__r2Store.has('archive.tw/2026-03-24-demo-speech')).toBe(false);
+		expect((env as any).__r2Store.has('archive.tw/2026-03-24-demo-speech?bust')).toBe(false);
+		expect((env as any).__r2Store.has('archive.tw/another-speech')).toBe(true);
 	});
 });
