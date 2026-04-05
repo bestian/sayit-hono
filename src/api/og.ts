@@ -275,7 +275,7 @@ function buildQuoteElement(
 						children: {
 							type: 'span',
 							props: {
-								style: { fontSize, fontWeight: 500, lineHeight: 1.55, color: '#f5f0e8', letterSpacing: fontSize <= 36 ? '0.03em' : undefined },
+								style: { fontSize, fontWeight: 500, lineHeight: 1.55, color: '#f5f0e8', ...(fontSize <= 36 ? { letterSpacing: '0.03em' } : {}) },
 								children: displayQuote,
 							},
 						},
