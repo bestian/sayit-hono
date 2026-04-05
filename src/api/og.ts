@@ -245,10 +245,10 @@ function buildQuoteElement(
 	speechTitle: string,
 	avatarDataUri: string | null
 ) {
-	const maxLen = 120;
+	const maxLen = 300;
 	const displayQuote = truncate(quoteText, maxLen);
 	const len = displayQuote.length;
-	const fontSize = len > 80 ? 42 : len > 50 ? 50 : len > 30 ? 58 : len > 15 ? 72 : len > 6 ? 88 : 104;
+	const fontSize = len > 200 ? 32 : len > 150 ? 36 : len > 80 ? 42 : len > 50 ? 50 : len > 30 ? 58 : len > 15 ? 72 : len > 6 ? 88 : 104;
 
 	return {
 		type: 'div',
@@ -275,7 +275,7 @@ function buildQuoteElement(
 						children: {
 							type: 'span',
 							props: {
-								style: { fontSize, fontWeight: 400, lineHeight: 1.55, color: '#f5f0e8' },
+								style: { fontSize, fontWeight: 500, lineHeight: 1.55, color: '#f5f0e8', letterSpacing: fontSize <= 36 ? '0.03em' : undefined },
 								children: displayQuote,
 							},
 						},
@@ -320,21 +320,20 @@ function buildQuoteElement(
 	};
 }
 
-async function renderElement(element: any, allText: string): Promise<Uint8Array> {
+async function renderElement(element: any, allText: string, fontWeights: number[] = [400, 700]): Promise<Uint8Array> {
 	await ensureWasm();
 
-	const [fontRegular, fontBold] = await Promise.all([
-		fetchFont(allText, 400),
-		fetchFont(allText, 700),
-	]);
+	const fontBuffers = await Promise.all(fontWeights.map((w) => fetchFont(allText, w)));
 
 	const svg = await satori(element as any, {
 		width: OG_WIDTH,
 		height: OG_HEIGHT,
-		fonts: [
-			{ name: 'Noto Sans TC', data: fontRegular, weight: 400 as const, style: 'normal' as const },
-			{ name: 'Noto Sans TC', data: fontBold, weight: 700 as const, style: 'normal' as const },
-		],
+		fonts: fontBuffers.map((data, i) => ({
+			name: 'Noto Sans TC',
+			data,
+			weight: fontWeights[i] as 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900,
+			style: 'normal' as const,
+		})),
 	});
 
 	const resvg = new Resvg(svg, {
@@ -366,8 +365,8 @@ export async function generateQuoteOgImage(
 	avatarDataUri: string | null = null
 ): Promise<Uint8Array> {
 	const plainText = quoteHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-	const displayQuote = truncate(plainText, 120);
+	const displayQuote = truncate(plainText, 300);
 	const allText = ['ARCHIVE.TW', displayQuote, speakerName ?? '', speechTitle, '\u2014'].join('');
 	const element = buildQuoteElement(plainText, speakerName, speechTitle, avatarDataUri);
-	return renderElement(element, allText);
+	return renderElement(element, allText, [400, 500]);
 }

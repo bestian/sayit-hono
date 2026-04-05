@@ -1023,6 +1023,7 @@ app.post('/api/cleanup_old_cache', async (c) => {
 
 	const url = new URL(c.req.url);
 	const versionParam = url.searchParams.get('version');
+	const maxDeletesParam = Number(url.searchParams.get('max_deletes') ?? '');
 	const prefixParams = url.searchParams
 		.getAll('prefix')
 		.map((value) => value.trim())
@@ -1034,8 +1035,12 @@ app.post('/api/cleanup_old_cache', async (c) => {
 	const bucket = c.env.SPEECH_CACHE;
 	let deleted = 0;
 	const LIST_LIMIT = 1000;
-	const MAX_DELETES_PER_REQUEST = 10000;
+	const MAX_DELETES_PER_REQUEST =
+		Number.isFinite(maxDeletesParam) && maxDeletesParam > 0
+			? Math.min(Math.floor(maxDeletesParam), 100000)
+			: 100000;
 	for (const prefix of targets) {
+		const shouldDeleteEdge = !/^v\d+\//.test(prefix);
 		let deletedForPrefix = 0;
 		while (deletedForPrefix < MAX_DELETES_PER_REQUEST) {
 			const list = await bucket.list({ prefix, limit: LIST_LIMIT });
@@ -1044,7 +1049,9 @@ app.post('/api/cleanup_old_cache', async (c) => {
 				break;
 			}
 
-			await Promise.all(keys.map((key) => deleteEdgeCache(key, { silent: true })));
+			if (shouldDeleteEdge) {
+				await Promise.all(keys.map((key) => deleteEdgeCache(key, { silent: true })));
+			}
 			await bucket.delete(keys);
 			deleted += keys.length;
 			deletedForPrefix += keys.length;
