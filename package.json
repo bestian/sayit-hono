@@ -4,9 +4,10 @@
 	"private": true,
 	"scripts": {
 		"deploy": "npm run deploy:search",
-		"deploy:assets": "npm run build:views && npm run build:assets && wrangler deploy",
-		"deploy:search": "npm run build:views && npm run build:assets && npm run build:search && wrangler deploy",
+		"deploy:assets": "npm run build:cache-version && npm run build:views && npm run build:assets && wrangler deploy",
+		"deploy:search": "npm run build:cache-version && npm run build:views && npm run build:assets && npm run build:search && wrangler deploy",
 		"dev": "npm run build:views && wrangler dev --remote",
+		"build:cache-version": "tsx --tsconfig scripts/tsconfig.json scripts/generate-cache-version.ts",
 		"start": "npm run dev",
 		"build:views": "tsx --tsconfig scripts/tsconfig.json scripts/build-views.ts",
 		"build:assets": "tsx --tsconfig scripts/tsconfig.json scripts/build-assets.ts",
