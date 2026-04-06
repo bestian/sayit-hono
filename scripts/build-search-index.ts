@@ -92,11 +92,23 @@ async function fetchSections(
 }
 
 function uploadFileToR2Buckets(key: string, filePath: string, contentType: string) {
+	const MAX_RETRIES = 3;
 	for (const bucket of R2_BUCKETS) {
-		execSync(
-			`npx wrangler r2 object put ${bucket}/${key} --file "${filePath}" --content-type "${contentType}" --remote`,
-			{ stdio: 'inherit' }
-		);
+		const cmd = `npx wrangler r2 object put ${bucket}/${key} --file "${filePath}" --content-type "${contentType}" --remote`;
+		for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+			try {
+				execSync(cmd, { stdio: 'inherit' });
+				break;
+			} catch (err) {
+				if (attempt < MAX_RETRIES) {
+					const delay = attempt * 2;
+					console.warn(`[build-search] R2 upload attempt ${attempt}/${MAX_RETRIES} failed for ${bucket}/${key}, retrying in ${delay}s...`);
+					execSync(`sleep ${delay}`);
+				} else {
+					throw err;
+				}
+			}
+		}
 	}
 }
 
