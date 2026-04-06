@@ -429,20 +429,29 @@ const THEME_STYLES = `<style>
       transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
     }
 
-    .sayit-search__result {
+    .sayit-search__result-group {
       border-bottom-color: var(--sayit-border);
-    }
-
-    .sayit-search__result:hover {
-      background: rgba(255, 255, 255, 0.04);
     }
 
     .sayit-search__result-title {
       color: var(--sayit-text);
     }
 
-    .sayit-search__result:hover .sayit-search__result-title {
+    .sayit-search__result-title:hover {
       color: var(--sayit-accent-strong);
+    }
+
+    .sayit-search__result-section {
+      border-left-color: var(--sayit-border-strong);
+    }
+
+    .sayit-search__result-section:hover {
+      border-left-color: var(--sayit-accent);
+      background: rgba(127, 214, 176, 0.08);
+    }
+
+    .sayit-search__result-speaker {
+      color: var(--sayit-text-dim);
     }
 
     .sayit-search__result-excerpt,

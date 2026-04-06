@@ -157,35 +157,29 @@
 	letter-spacing: 0.01em;
 }
 
-.sayit-search__result {
-	display: block;
+.sayit-search__result-group {
 	padding: 0.85em 0.5em;
 	margin: 0 -0.5em;
 	border-bottom: 1px solid #eeedea;
-	text-decoration: none;
-	color: inherit;
 	border-radius: 4px;
-	transition: background 0.15s ease;
 }
 
-.sayit-search__result:last-of-type {
+.sayit-search__result-group:last-child {
 	border-bottom: none;
 }
 
-.sayit-search__result:hover {
-	background: #f5f4f0;
-}
-
 .sayit-search__result-title {
+	display: block;
 	font-size: 1em;
 	font-weight: 500;
 	color: #2c2c2c;
 	line-height: 1.45;
 	margin: 0;
 	word-break: break-word;
+	text-decoration: none;
 }
 
-.sayit-search__result:hover .sayit-search__result-title {
+.sayit-search__result-title:hover {
 	color: #3a7d5c;
 }
 
@@ -200,8 +194,31 @@
 	font-weight: 400;
 }
 
+.sayit-search__result-section {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+	margin-top: 0.35em;
+	padding: 0.3em 0.6em;
+	border-left: 2px solid #e0ddd6;
+	border-radius: 0 3px 3px 0;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.sayit-search__result-section:hover {
+	border-left-color: #3a7d5c;
+	background: #f5f4f0;
+}
+
+.sayit-search__result-speaker {
+	display: block;
+	font-size: 0.78em;
+	color: #a09888;
+	font-weight: 400;
+	margin-bottom: 0.1em;
+}
+
 .sayit-search__result-excerpt {
-	margin-top: 0.3em;
 	font-size: 0.88em;
 	line-height: 1.65;
 	color: #5a5650;
