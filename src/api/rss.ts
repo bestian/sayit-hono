@@ -177,12 +177,8 @@ ${itemXml}
 
 
 function buildCacheKey(url: string): string {
-	try {
-		const u = new URL(url);
-		return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${u.search}`;
-	} catch {
-		return `${CACHE_KEY_VERSION}/${url.replace(/^https?:\/\//, '')}`;
-	}
+	const u = new URL(url);
+	return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${u.search}`;
 }
 
 export async function rssFeed(c: Context<ApiEnv>) {

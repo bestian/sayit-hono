@@ -5,7 +5,6 @@ import type { ApiEnv } from './types';
 
 const SPEECH_API_PREFIX = '/api/an/';
 const SPEECH_FILE_EXTENSION = '.an';
-const PERSON_ONTOLOGY_PREFIX = '/ontology/person/13657c62c311/';
 
 /** 判斷 key 是否為純數字（section_id），如 "629603.an" -> true */
 export function isNumericAnKey(key: string): boolean {
@@ -28,15 +27,13 @@ function escapeAmp(s: string): string {
 	return s.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#)/g, '&amp;');
 }
 
-/** 從多個 section 生成完整演講的 .an */
+/** 從多個 section 生成完整演講的 .an — 呼叫端保證 sections 非空 */
 function generateFullSpeechAn(sections: Array<{
 	section_speaker: string | null;
 	section_content: string | null;
 	display_name: string | null;
 	name: string | null;
 }>): string {
-	if (sections.length === 0) return '';
-
 	const heading = sections[0]?.display_name ? escapeXml(sections[0].display_name) : '';
 	const seenSpeakers = new Map<string, string>();
 	for (const s of sections) {
@@ -149,21 +146,6 @@ function escapeXml(s: string): string {
 		.replace(/'/g, '&apos;');
 }
 
-function getSpeechFilename(pathname: string): string | null {
-	if (!pathname || pathname === '/') return null;
-	if (!pathname.startsWith(SPEECH_API_PREFIX)) return null;
-
-	try {
-		const decoded = decodeURIComponent(pathname);
-		if (!decoded.endsWith(SPEECH_FILE_EXTENSION)) return null;
-		const keyWithExt = decoded.slice(SPEECH_API_PREFIX.length);
-		if (!keyWithExt) return null;
-		return keyWithExt.slice(0, -SPEECH_FILE_EXTENSION.length);
-	} catch {
-		return null;
-	}
-}
-
 /** 從 path 解析出 .an 的 object key（含副檔名），供 speechAn 使用 */
 function getSpeechObjectKey(path: string): string | null {
 	if (!path || path === '/') return null;
@@ -176,88 +158,6 @@ function getSpeechObjectKey(path: string): string | null {
 	} catch {
 		return null;
 	}
-}
-
-function xmlEscape(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&apos;');
-}
-
-function normalizeContent(raw?: string | null): string {
-	if (!raw) return '';
-	try {
-		const parsed = JSON.parse(raw);
-		if (typeof parsed === 'string') return parsed;
-		return raw;
-	} catch {
-		return raw;
-	}
-}
-
-function sanitizeHtmlForXml(html: string): string {
-	// XML 不支援 &nbsp;，轉成數值實體；保留其他標籤與已合法的實體
-	return html.replace(/&(nbsp|#160);/gi, '&#160;');
-}
-
-function safeDecode(value: string): string {
-	try {
-		return decodeURIComponent(value);
-	} catch {
-		return value;
-	}
-}
-
-type SectionRow = {
-	section_id: number;
-	section_content: string | null;
-	section_speaker: string | null;
-	display_name: string | null;
-	speaker_name: string | null;
-	filename: string;
-};
-
-function buildAkomaNtosoXml(
-	heading: string,
-	persons: Array<{ id: string; showAs: string }>,
-	speeches: Array<{ by: string; content: string }>
-) {
-	const personNodes = persons
-		.map(
-			(p) =>
-				`        <TLCPerson href="${PERSON_ONTOLOGY_PREFIX}${xmlEscape(p.id)}" id="${xmlEscape(p.id)}" showAs="${xmlEscape(p.showAs)}"/>`
-		)
-		.join('\n');
-
-	const speechNodes = speeches
-		.map((s) => {
-			const body = (s.content ?? '').trim();
-			if (!s.by) {
-				return `        <narrative>\n${body}\n        </narrative>`;
-			}
-			return `        <speech by="#${xmlEscape(s.by)}">\n${body}\n        </speech>`;
-		})
-		.join('\n\n');
-
-	return `<akomaNtoso>
-  <debate>
-    <meta>
-      <references>
-${personNodes}
-      </references>
-    </meta>
-    <debateBody>
-      <debateSection>
-        <heading>${xmlEscape(heading)}</heading>
-
-${speechNodes}
-      </debateSection>
-    </debateBody>
-  </debate>
-</akomaNtoso>`;
 }
 
 /** 依 R2 object key 提供 .an 檔案，供 /api/an/* 與 /speech/:id.an 共用

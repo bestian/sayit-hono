@@ -10,6 +10,8 @@ import { speechAn, serveAnByKey } from './api/an';
 import { serveMdByKey } from './api/md';
 import { uploadMarkdown } from './api/upload_markdown';
 import { rssFeed } from './api/rss';
+import { handleOgImage, handleOgSpeechImage } from './api/og_routes';
+import { ogLoader } from './api/og_loader';
 import type { ApiEnv } from './api/types';
 import HomeView, { styles as HomeViewStyles } from './.generated/views/HomeView';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
@@ -102,60 +104,56 @@ function normalizeSpeakerPageSearch(url: URL): string {
 }
 
 function buildCanonicalPageUrl(requestUrl: string): string | null {
-	try {
-		const url = new URL(requestUrl);
-		const { pathname, search } = url;
-		const segments = pathname.split('/').filter(Boolean);
-		const lastSegment = segments[segments.length - 1] ?? '';
-		const isTopLevelSpeechPath = segments.length === 1 && !isExcludedPath(segments[0] ?? '') && !lastSegment.includes('.');
-		const isNestedSpeechPath = segments.length === 2 && !isExcludedPath(segments[0] ?? '') && !lastSegment.includes('.');
-		const isSectionPagePath = segments.length === 2 && segments[0] === 'speech' && /^\d+$/.test(segments[1] ?? '');
-		const isSpeakerPagePath = segments.length === 2 && segments[0] === 'speaker';
+	const url = new URL(requestUrl);
+	const { pathname, search } = url;
+	const segments = pathname.split('/').filter(Boolean);
+	const lastSegment = segments[segments.length - 1] ?? '';
+	const isTopLevelSpeechPath = segments.length === 1 && !isExcludedPath(segments[0] ?? '') && !lastSegment.includes('.');
+	const isNestedSpeechPath = segments.length === 2 && !isExcludedPath(segments[0] ?? '') && !lastSegment.includes('.');
+	const isSectionPagePath = segments.length === 2 && segments[0] === 'speech' && /^\d+$/.test(segments[1] ?? '');
+	const isSpeakerPagePath = segments.length === 2 && segments[0] === 'speaker';
 
-		let canonicalPath = pathname;
-		let canonicalSearch = search;
+	let canonicalPath = pathname;
+	let canonicalSearch = search;
 
-		if (pathname === '/index.html') {
-			canonicalPath = '/';
-		} else if (pathname === '/speeches') {
-			canonicalPath = '/speeches/';
-		} else if (pathname === '/speakers') {
-			canonicalPath = '/speakers/';
-		} else if (pathname === '/search') {
-			canonicalPath = '/search/';
-		}
+	if (pathname === '/index.html') {
+		canonicalPath = '/';
+	} else if (pathname === '/speeches') {
+		canonicalPath = '/speeches/';
+	} else if (pathname === '/speakers') {
+		canonicalPath = '/speakers/';
+	} else if (pathname === '/search') {
+		canonicalPath = '/search/';
+	}
 
-		if (
-			pathname === '/' ||
-			pathname === '/index.html' ||
-			pathname === '/speeches' ||
-			pathname === '/speeches/' ||
-			pathname === '/speakers' ||
-			pathname === '/speakers/' ||
-			isTopLevelSpeechPath ||
-			isNestedSpeechPath ||
-			isSectionPagePath
-		) {
-			canonicalSearch = '';
-		} else if (isSpeakerPagePath) {
-			canonicalSearch = normalizeSpeakerPageSearch(url);
-		} else if (pathname === '/search' || pathname === '/search/') {
-			canonicalSearch = search;
-		} else {
-			return null;
-		}
-
-		if (canonicalPath === pathname && canonicalSearch === search) {
-			return null;
-		}
-
-		const canonicalUrl = new URL(url.toString());
-		canonicalUrl.pathname = canonicalPath;
-		canonicalUrl.search = canonicalSearch;
-		return canonicalUrl.toString();
-	} catch {
+	if (
+		pathname === '/' ||
+		pathname === '/index.html' ||
+		pathname === '/speeches' ||
+		pathname === '/speeches/' ||
+		pathname === '/speakers' ||
+		pathname === '/speakers/' ||
+		isTopLevelSpeechPath ||
+		isNestedSpeechPath ||
+		isSectionPagePath
+	) {
+		canonicalSearch = '';
+	} else if (isSpeakerPagePath) {
+		canonicalSearch = normalizeSpeakerPageSearch(url);
+	} else if (pathname === '/search' || pathname === '/search/') {
+		canonicalSearch = search;
+	} else {
 		return null;
 	}
+
+	if (canonicalPath === pathname && canonicalSearch === search) {
+		return null;
+	}
+
+	const canonicalUrl = new URL(url.toString());
+	canonicalUrl.pathname = canonicalPath;
+	canonicalUrl.search = canonicalSearch;
+	return canonicalUrl.toString();
 }
 
 async function canonicalHtmlPageMiddleware(c: any, next: () => Promise<void>) {
@@ -180,22 +178,13 @@ app.use('*', staticFirstMiddleware);
 
 
 function buildCacheKey(url: string, { includeSearch = true }: { includeSearch?: boolean } = {}): string {
-	try {
-		const u = new URL(url);
-		return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${includeSearch ? u.search : ''}`;
-	} catch {
-		// fallback: strip protocol manually
-		const stripped = url.replace(/^https?:\/\//, '');
-		return includeSearch ? `${CACHE_KEY_VERSION}/${stripped}` : `${CACHE_KEY_VERSION}/${stripped.split('?')[0]}`;
-	}
+	const u = new URL(url);
+	return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${includeSearch ? u.search : ''}`;
 }
 
 function withCacheHeaders(response: Response): Response {
 	const res = new Response(response.body, response);
 	res.headers.set('Cache-Control', DEFAULT_HTML_CACHE_CONTROL);
-	if (!res.headers.has('Content-Type')) {
-		res.headers.set('Content-Type', 'text/html; charset=utf-8');
-	}
 	return res;
 }
 
@@ -233,10 +222,6 @@ async function serveBucketJson(
 	}
 
 	return new Response(object.body, { headers });
-}
-
-async function loadOgModule() {
-	return import('./api/og');
 }
 
 /** 向 Cloudflare 靜態資源 (ASSETS) 要求檔案，path 可指定子路徑，未指定則用請求 URL */
@@ -349,15 +334,10 @@ function highlightSearchText(value: string, query: string): string {
 
 function parseToArray(raw?: string | null): string[] {
 	if (!raw) return [];
-	const parsed = parseContent(raw);
-	if (Array.isArray(parsed)) return parsed.map((v) => `${v}`.trim()).filter(Boolean);
-	if (typeof parsed === 'string') {
-		return parsed
-			.split(',')
-			.map((v) => v.trim())
-			.filter(Boolean);
-	}
-	return [];
+	return parseContent(raw)
+		.split(',')
+		.map((v) => v.trim())
+		.filter(Boolean);
 }
 
 function buildSearchSnippet(raw: string, query: string, radius = 80): string {
@@ -794,9 +774,7 @@ app.get('/search-index-manifest.json', async (c) => {
 });
 
 app.get('/search-updates/:path{[^/]+\\.json}', async (c) => {
-	const pathParam = c.req.param('path');
-	if (!pathParam) return c.text('Not found', 404);
-	const response = await serveBucketJson(c, `${SEARCH_UPDATES_PREFIX}/${pathParam}`, {
+	const response = await serveBucketJson(c, `${SEARCH_UPDATES_PREFIX}/${c.req.param('path')}`, {
 		cacheControl: 'public, max-age=3600, s-maxage=86400'
 	});
 	return response ?? c.text('Not found', 404);
@@ -859,15 +837,10 @@ app.get('/api/search.json', async (c) => {
 	await writeEdgeCache(cacheKey, response.clone(), SEARCH_API_CACHE_CONTROL);
 	return response;
 });
-app.get('/search', (c) => renderSearchPage(c));
+// /search is redirected to /search/ by the canonical-URL middleware.
 app.get('/search/', (c) => renderSearchPage(c));
 app.on(['GET', 'HEAD'], '/api/an/:path{[^/]+\\.an}', (c) => speechAn(c));
-app.get('/api/md/:path{[^/]+\\.md}', async (c) => {
-	const pathParam = c.req.param('path');
-	const key = pathParam ? decodeURIComponent(pathParam) : null;
-	if (!key) return c.text('Not found', 404);
-	return serveMdByKey(c, key);
-});
+app.get('/api/md/:path{[^/]+\\.md}', async (c) => serveMdByKey(c, decodeURIComponent(c.req.param('path'))));
 app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.patch('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.delete('/api/upload_markdown', (c) => uploadMarkdown(c));
@@ -875,118 +848,10 @@ app.on(['GET', 'HEAD'], '/rss.xml', (c) => rssFeed(c));
 app.on(['GET', 'HEAD'], '/feed.xml', (c) => rssFeed(c));
 
 // OG image for single-quote (section) pages — must be before /og/* wildcard
-app.get('/og/speech/:section_id{\\d+\\.png}', async (c) => {
-	const sectionId = Number(c.req.param('section_id').replace(/\.png$/, ''));
-	if (!Number.isInteger(sectionId)) return c.text('Not Found', 404);
-
-	const cacheKey = `${CACHE_KEY_VERSION}/og/speech/${sectionId}.png`;
-	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
-	if (cached) {
-		return new Response(cached.body, {
-			headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
-		});
-	}
-
-	let section: any;
-	try {
-		section = await loadSection(c, sectionId);
-	} catch (err) {
-		console.error('[og/speech] DB error', err);
-		return c.text('Internal Server Error', 500);
-	}
-	if (!section) return c.text('Not Found', 404);
-
-	const sectionHtml = parseContent(section.section_content ?? '');
-	const speakerName = section.name ?? null;
-	const speechTitle = section.display_name ?? section.filename ?? '';
-
-	try {
-		const { generateQuoteOgImage } = await loadOgModule();
-		let avatarDataUri: string | null = null;
-		if (section.photoURL) {
-			try {
-				const assetUrl = new URL(section.photoURL, 'https://placeholder.host').pathname;
-				const res = await c.env.ASSETS.fetch(new Request(`https://placeholder.host${assetUrl}`));
-				if (res.ok) {
-					const ct = res.headers.get('content-type') || 'image/jpeg';
-					const buf = new Uint8Array(await res.arrayBuffer());
-					let bin = '';
-					for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-					avatarDataUri = `data:${ct};base64,${btoa(bin)}`;
-				}
-			} catch (e) {
-				console.error('[og/speech] avatar fetch error', e);
-			}
-		}
-		const png = await generateQuoteOgImage(sectionHtml, speakerName, speechTitle, avatarDataUri);
-		await c.env.SPEECH_CACHE.put(cacheKey, png, {
-			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
-		});
-		return new Response(png, {
-			headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
-		});
-	} catch (err) {
-		console.error('[og/speech] generation error', err);
-		return c.text('OG image generation failed', 500);
-	}
-});
+app.get('/og/speech/:section_id{\\d+\\.png}', (c) => handleOgSpeechImage(c, ogLoader));
 
 // Dynamic OG image for speech pages
-app.get('/og/*', async (c) => {
-	const pathname = new URL(c.req.url).pathname;
-	const raw = pathname.replace(/^\/og\//, '').replace(/\.png$/, '');
-	const filename = decodeURIComponent(raw);
-	if (!filename) return c.text('Not Found', 404);
-
-	const cacheKey = `${CACHE_KEY_VERSION}/og/${filename}.png`;
-	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
-	if (cached) {
-		return new Response(cached.body, {
-			headers: {
-				'Content-Type': 'image/png',
-				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-			},
-		});
-	}
-
-	const speechMeta = await loadSpeechMeta(c, filename);
-	if (!speechMeta) return c.text('Not Found', 404);
-
-	let speakers: string[] = [];
-	try {
-		const result = await c.env.DB.prepare(
-			`SELECT sp.name, MIN(sc.section_id) AS first_appearance
-			 FROM speech_content sc
-			 JOIN speakers sp ON sc.section_speaker = sp.route_pathname
-			 WHERE sc.filename = ? AND sp.name IS NOT NULL
-			 GROUP BY sp.name
-			 ORDER BY first_appearance
-			 LIMIT 5`
-		)
-			.bind(filename)
-			.all();
-		speakers = result.results.map((r: any) => r.name).filter(Boolean);
-	} catch (err) {
-		console.error('[og] speakers query error', err);
-	}
-
-	try {
-		const { generateOgImage } = await loadOgModule();
-		const png = await generateOgImage(c.env, filename, speechMeta.display_name, speakers);
-		await c.env.SPEECH_CACHE.put(cacheKey, png, {
-			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
-		});
-		return new Response(png, {
-			headers: {
-				'Content-Type': 'image/png',
-				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-			},
-		});
-	} catch (err) {
-		console.error('[og] generation error', err);
-		return c.text('OG image generation failed', 500);
-	}
-});
+app.get('/og/*', (c) => handleOgImage(c, ogLoader));
 
 app.post('/api/purge_cache', async (c) => {
 	const authHeader = c.req.header('Authorization');
@@ -1124,12 +989,11 @@ async function renderSpeakersPage(c: any) {
 	return response;
 }
 
-app.get('/speeches', (c) => c.redirect('/speeches/', 302));
+// /speeches → /speeches/, /speakers → /speakers/, /index.html → / are all redirected
+// by the canonical-URL middleware before these handlers run.
 app.get('/speeches/', (c) => renderSpeechesPage(c));
-app.get('/speakers', (c) => c.redirect('/speakers/', 302));
 app.get('/speakers/', (c) => renderSpeakersPage(c));
 app.get('/', (c) => renderHomePage(c));
-app.get('/index.html', (c) => renderHomePage(c));
 
 // /speech/:section_id -> .md/.an 轉專用處理，否則為動態段落頁
 app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
@@ -1193,9 +1057,6 @@ app.get('/speaker/:route_pathname', async (c) => {
 
 	const routePathname = encodeURIComponent(c.req.param('route_pathname'));
 	console.log(routePathname);
-	if (!routePathname) {
-		return c.text('Bad Request', 400);
-	}
 
 	let speaker: any;
 	let sections: Section[];
@@ -1321,7 +1182,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 	const encodedFilename = c.req.param('filename');
 	const encodedNestFilename = c.req.param('nest_filename');
 
-	if (!encodedFilename || !encodedNestFilename || isExcludedPath(encodedFilename)) {
+	if (isExcludedPath(encodedFilename)) {
 		return c.text('Not Found', 404);
 	}
 
@@ -1462,9 +1323,6 @@ app.get('/:filename', async (c) => {
 
 	console.log('SSR Single Speech filename', c.req.param('filename'));
 	const encodedFilename = c.req.param('filename');
-	if (!encodedFilename) {
-		return c.text('Not Found', 404);
-	}
 
 	if (isExcludedPath(encodedFilename)) {
 		return c.text('Not Found', 404);

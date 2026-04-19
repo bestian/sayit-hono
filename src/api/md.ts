@@ -58,11 +58,6 @@ function extractSpeechParagraphs(inner: string): string[] {
 		paragraphs.push(tail);
 	}
 
-	// 若完全沒有匹配到 <p>，仍保留整段（例如純 <svg>...</svg>）
-	if (paragraphs.length === 0 && hasMeaningfulSpeechContent(inner)) {
-		paragraphs.push(inner.trim());
-	}
-
 	return paragraphs;
 }
 

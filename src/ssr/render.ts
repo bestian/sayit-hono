@@ -835,8 +835,7 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
 	const inlineStyles = styles?.trim() ? `<style>${styles}</style>` : '';
 	const metaTags = renderMeta(head);
 	const linkTags = renderLinks(head);
-	const scriptParts = [SHARE_SCRIPT, scripts?.trim() ? scripts : ''].filter(Boolean);
-	const extraScripts = scriptParts.length > 0 ? `  ${scriptParts.join('\n  ')}` : '';
+	const extraScripts = `  ${[SHARE_SCRIPT, scripts?.trim() ?? ''].filter(Boolean).join('\n  ')}`;
 
 	return `<!DOCTYPE html>
 <html class="no-touch" lang="zh-Hant">
