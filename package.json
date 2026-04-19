@@ -13,7 +13,9 @@
 		"build:assets": "tsx --tsconfig scripts/tsconfig.json scripts/build-assets.ts",
 		"build:search": "tsx --tsconfig scripts/tsconfig.json scripts/build-search-index.ts",
 		"preview:assets": "npm run build:assets && python3 -m http.server 4173 -d www",
-		"test": "vitest",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
