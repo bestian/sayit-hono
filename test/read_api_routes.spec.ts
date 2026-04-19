@@ -149,26 +149,33 @@ describe('GET /api/speech_index.json', () => {
 							nest_filenames: '["a","b","c"]',
 							nest_display_names: '["Alpha"]'
 						},
-						{
-							filename: 'nested-number',
-							display_name: 'Number',
-							isNested: 1,
-							nest_filenames: 42,
-							nest_display_names: ['X']
-						}
-					]
-				};
-			}
+							{
+								filename: 'nested-number',
+								display_name: 'Number',
+								isNested: 1,
+								nest_filenames: 42,
+								nest_display_names: ['X']
+							},
+							{
+								filename: 'nested-whitespace',
+								display_name: 'Whitespace',
+								isNested: 1,
+								nest_filenames: '   ',
+								nest_display_names: '   '
+							}
+						]
+					};
+				}
 			return { success: true, results: [] };
 		});
 
-		const { res } = await request('/api/speech_index.json', env);
-		expect(res.status).toBe(200);
-		const json = (await res.json()) as any[];
-		expect(json).toHaveLength(5);
-		expect(json[0].nest).toEqual([]);
-		expect(json[1].nest).toEqual([
-			{ filename: 'a', display_name: 'Alpha' },
+			const { res } = await request('/api/speech_index.json', env);
+			expect(res.status).toBe(200);
+			const json = (await res.json()) as any[];
+			expect(json).toHaveLength(6);
+			expect(json[0].nest).toEqual([]);
+			expect(json[1].nest).toEqual([
+				{ filename: 'a', display_name: 'Alpha' },
 			{ filename: 'b', display_name: 'Beta' }
 		]);
 		expect(json[2].nest).toEqual([
@@ -177,10 +184,13 @@ describe('GET /api/speech_index.json', () => {
 			{ filename: 'c', display_name: 'Gamma' },
 			{ filename: 'd', display_name: 'Delta' }
 		]);
-		expect(json[3].nest[2]).toEqual({ filename: 'c', display_name: 'c' });
-		expect(json[4].nest).toEqual([]);
-		expect(json[4].nest_display_names).toEqual(['X']);
-	});
+			expect(json[3].nest[2]).toEqual({ filename: 'c', display_name: 'c' });
+			expect(json[4].nest).toEqual([]);
+			expect(json[4].nest_display_names).toEqual(['X']);
+			expect(json[5].nest).toEqual([]);
+			expect(json[5].nest_filenames).toEqual([]);
+			expect(json[5].nest_display_names).toEqual([]);
+		});
 
 	it('returns 500 when DB reports failure', async () => {
 		const env = createReadEnv((sql) => {

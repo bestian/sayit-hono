@@ -179,6 +179,25 @@ describe('handleOgSpeechImage', () => {
 		expect(generator).toHaveBeenCalledWith('<p>Hello quote</p>', null, '2026-demo', null);
 	});
 
+	it('treats null section_content as an empty string', async () => {
+		const { ctx } = makeContext({
+			url: 'https://example.com/og/speech/42.png',
+			params: { section_id: '42.png' },
+			resolver: (sql, args) => {
+				if (sql.includes('FROM speech_content a') && args[0] === 42) {
+					return {
+						success: true,
+						results: [{ ...sectionRow, section_content: null }]
+					};
+				}
+				return { success: true, results: [] };
+			}
+		});
+		const generator = vi.fn(async () => new Uint8Array([0x89]));
+		await handleOgSpeechImage(ctx, createFakeGenerators({ generateQuoteOgImage: generator }));
+		expect(generator).toHaveBeenCalledWith('', 'Audrey', 'Demo', null);
+	});
+
 	it('returns 500 when the generator throws', async () => {
 		const { ctx } = makeContext({
 			url: 'https://example.com/og/speech/42.png',

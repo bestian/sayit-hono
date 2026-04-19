@@ -94,6 +94,66 @@ describe('buildSearchSnippet middle-of-text match', () => {
 		const body2 = (await res.json()) as any;
 		expect(body2.results[0].snippet).toContain('...');
 	});
+
+	it('returns an empty snippet when the section text trims down to nothing', async () => {
+		const env = makeEnv((sql) => {
+			if (sql.includes('FROM speech_content sc')
+				&& sql.includes('LEFT JOIN speech_index si')
+				&& sql.includes('ORDER BY')) {
+				return {
+					success: true,
+					results: [{
+						filename: 'blank-snippet',
+						nest_filename: null,
+						display_name: 'Blank Snippet',
+						section_id: 2,
+						section_speaker: null,
+						section_content: '   ',
+						speaker_name: null,
+						photoURL: null
+					}]
+				};
+			}
+			if (sql.includes('SELECT COUNT(*) AS count') && sql.includes('FROM speech_content sc')) {
+				return { success: true, results: [{ count: 1 }] };
+			}
+			return { success: true, results: [] };
+		});
+		const { res } = await request('/api/search.json?q=needle', env);
+		const body = (await res.json()) as any;
+		expect(body.results[0].snippet).toBe('');
+	});
+
+	it('appends ... when the match is near the start but the snippet is truncated on the right', async () => {
+		const body = `<p>needle ${'after '.repeat(80)}</p>`;
+		const env = makeEnv((sql) => {
+			if (sql.includes('FROM speech_content sc')
+				&& sql.includes('LEFT JOIN speech_index si')
+				&& sql.includes('ORDER BY')) {
+				return {
+					success: true,
+					results: [{
+						filename: 'right-truncated',
+						nest_filename: null,
+						display_name: 'Right Truncated',
+						section_id: 3,
+						section_speaker: null,
+						section_content: body,
+						speaker_name: null,
+						photoURL: null
+					}]
+				};
+			}
+			if (sql.includes('SELECT COUNT(*) AS count') && sql.includes('FROM speech_content sc')) {
+				return { success: true, results: [{ count: 1 }] };
+			}
+			return { success: true, results: [] };
+		});
+		const { res } = await request('/api/search.json?q=needle', env);
+		const payload = (await res.json()) as any;
+		expect(payload.results[0].snippet).toMatch(/\.\.\.$/);
+		expect(payload.results[0].snippet.startsWith('...')).toBe(false);
+	});
 });
 
 describe('serveBucketJson header branches', () => {
