@@ -64,6 +64,26 @@ async function request(path: string, env: ReturnType<typeof createRssEnv>, init?
 }
 
 describe('/rss.xml', () => {
+	it('serves an edge-cached body before checking R2 or DB', async () => {
+		const cacheKey = `https://edge-cache.local/${CACHE_KEY_VERSION}/example.com/rss.xml`;
+		const env = createRssEnv(() => ({ success: true, results: [] }));
+		await caches.default.put(
+			cacheKey,
+			new Response('<rss>edge-cached</rss>', {
+				headers: {
+					'Cache-Control': 'public, max-age=60',
+					'Content-Type': 'application/rss+xml; charset=utf-8'
+				}
+			})
+		);
+
+		const { res } = await request('/rss.xml', env);
+		expect(res.status).toBe(200);
+		expect(await res.text()).toContain('edge-cached');
+
+		await caches.default.delete(cacheKey);
+	});
+
 	it('serves a cached R2 body and warms the edge cache', async () => {
 		const cacheKey = `${CACHE_KEY_VERSION}/example.com/rss.xml`;
 		const env = createRssEnv(() => ({ success: true, results: [] }), {
