@@ -282,7 +282,11 @@ function orderSectionsByLinks(rows: ExistingSection[]): ExistingSection[] {
 	}
 
 	if (ordered.length !== rows.length) {
-		const remains = rows.filter((r) => !visited.has(r.section_id)).sort((a, b) => a.section_id - b.section_id);
+		const remains: ExistingSection[] = [];
+		for (const row of rows) {
+			if (!visited.has(row.section_id)) remains.push(row);
+		}
+		remains.sort((a, b) => a.section_id - b.section_id);
 		ordered.push(...remains);
 	}
 
@@ -329,20 +333,12 @@ function appendInsertedSections(
 	baseIdHint: number | null,
 	usedIds: Set<number>
 ) {
-	if (newInserts.length === 0) return;
 	if (newInserts.length > 99) throw new Error('Too many inserted sections in a single gap (max 99)');
 
-	const fallbackBase = output.length > 0 ? output[output.length - 1].section_id : baseIdHint;
-	if (fallbackBase == null) throw new Error('Unable to assign ID for inserted sections without base section');
-
+	const fallbackBase = output.length > 0 ? output[output.length - 1].section_id : baseIdHint ?? 0;
 	let nextCandidate = isSubSectionId(fallbackBase) ? fallbackBase + 1 : fallbackBase * 100 + 1;
 	for (const insertSection of newInserts) {
-		let safety = 0;
-		while (usedIds.has(nextCandidate) && safety < 300) {
-			nextCandidate += 1;
-			safety += 1;
-		}
-		if (usedIds.has(nextCandidate)) throw new Error('Section ID allocation overflow for inserted sections');
+		while (usedIds.has(nextCandidate)) nextCandidate += 1;
 		usedIds.add(nextCandidate);
 		output.push({ ...insertSection, section_id: nextCandidate });
 		nextCandidate += 1;
@@ -449,35 +445,6 @@ function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[]
 }
 
 
-/** PATCH 用：先刪除此演講所有關聯，再依新解析出的講者列表重建 speech_speakers */
-async function rebuildSpeechSpeakerRelations(c: Context<ApiEnv>, filename: string, routePathnames: string[]) {
-	const batch: Parameters<typeof c.env.DB.batch>[0] = [
-		c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
-	];
-	for (const routePathname of routePathnames) {
-		batch.push(
-			c.env.DB.prepare(
-				'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
-			).bind(filename, routePathname)
-		);
-	}
-	await c.env.DB.batch(batch);
-}
-
-/** 若某講者已無任何 speech_speakers 關聯，則從 speakers 表刪除（孤兒講者） */
-async function pruneOrphanSpeakers(c: Context<ApiEnv>, routePathnames: string[]) {
-	if (routePathnames.length === 0) return;
-	const batch: Parameters<typeof c.env.DB.batch>[0] = [];
-	for (const routePathname of routePathnames) {
-		batch.push(
-			c.env.DB.prepare(
-				'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
-			).bind(routePathname, routePathname)
-		);
-	}
-	await c.env.DB.batch(batch);
-}
-
 // CF CDN auto-caches Worker responses based on Cache-Control, keyed by the real
 // request URL (e.g. https://archive.tw/speeches). The versioned R2 key we normally
 // invalidate doesn't reach that entry, so we also purge by real URL here.
@@ -523,7 +490,6 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 	const realPaths = new Set<string>(['/speakers']);
 
 	for (const routePathname of speakerRoutePathnames) {
-		if (!routePathname) continue;
 		keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${routePathname}`);
 		keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${encodeURIComponent(routePathname)}`);
 		realPaths.add(`/speaker/${routePathname}`);
@@ -788,12 +754,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			);
 
 			for (const routePathname of speakerRoutePathnames) {
-				let speakerName = routePathname;
-				try {
-					speakerName = decodeURIComponent(routePathname);
-				} catch {
-					speakerName = routePathname;
-				}
+				const speakerName = decodeURIComponent(routePathname);
 				metaBatch.push(
 					c.env.DB.prepare(
 						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
@@ -999,12 +960,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			// 2. 確保講者存在（冪等 upsert）
 			for (const routePathname of newSpeakerRoutePathnames) {
-				let speakerName = routePathname;
-				try {
-					speakerName = decodeURIComponent(routePathname);
-				} catch {
-					speakerName = routePathname;
-				}
+				const speakerName = decodeURIComponent(routePathname);
 				batchStatements.push(
 					c.env.DB.prepare(
 						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'

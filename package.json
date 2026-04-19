@@ -14,6 +14,7 @@
 		"build:search": "tsx --tsconfig scripts/tsconfig.json scripts/build-search-index.ts",
 		"preview:assets": "npm run build:assets && python3 -m http.server 4173 -d www",
 		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
 		"cf-typegen": "wrangler types"
@@ -21,6 +22,7 @@
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.19",
 		"@types/node": "^24.10.1",
+		"@vitest/coverage-istanbul": "^3.2.4",
 		"@vue/compiler-sfc": "^3.5.25",
 		"fuse.js": "^7.1.0",
 		"tsx": "^4.21.0",
