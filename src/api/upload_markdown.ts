@@ -478,6 +478,13 @@ async function pruneOrphanSpeakers(c: Context<ApiEnv>, routePathnames: string[])
 	await c.env.DB.batch(batch);
 }
 
+// CF CDN auto-caches Worker responses based on Cache-Control, keyed by the real
+// request URL (e.g. https://archive.tw/speeches). The versioned R2 key we normally
+// invalidate doesn't reach that entry, so we also purge by real URL here.
+function realUrlsForPaths(host: string, paths: Iterable<string>): string[] {
+	return Array.from(paths, (path) => `https://${host}${path.startsWith('/') ? path : `/${path}`}`);
+}
+
 /** 演講內容或 .an/.md 更新後，刪除 R2 上對應的快取 key */
 async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	const host = new URL(c.req.url).host;
@@ -488,6 +495,7 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 		`${CACHE_KEY_VERSION}/${host}/${filename}`,
 		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`
 	];
+	const realPaths = new Set<string>([`/${filename}`, `/${encodedFilename}`]);
 
 	// Also invalidate cached /speech/:section_id pages for this speech
 	try {
@@ -496,30 +504,36 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 		).bind(filename).all();
 		for (const row of result.results as any[]) {
 			keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${row.section_id}`);
+			realPaths.add(`/speech/${row.section_id}`);
 		}
 	} catch (err) {
 		console.error('[invalidate] section query error', err);
 	}
 
-	await Promise.allSettled(
-		keys.flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)])
-	);
+	await Promise.allSettled([
+		...keys.flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
+		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url))
+	]);
 }
 
 /** 講者或演講-講者關聯更新後，刪除 R2 上 speakers 列表與各講者頁快取 */
 async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]) {
 	const host = new URL(c.req.url).host;
 	const keys = new Set<string>([`${CACHE_KEY_VERSION}/${host}/speakers`]);
+	const realPaths = new Set<string>(['/speakers']);
 
 	for (const routePathname of speakerRoutePathnames) {
 		if (!routePathname) continue;
 		keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${routePathname}`);
 		keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${encodeURIComponent(routePathname)}`);
+		realPaths.add(`/speaker/${routePathname}`);
+		realPaths.add(`/speaker/${encodeURIComponent(routePathname)}`);
 	}
 
-	await Promise.allSettled(
-		Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)])
-	);
+	await Promise.allSettled([
+		...Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
+		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url))
+	]);
 }
 
 /** 失效列表頁快取：可選擇 speeches/speakers */
@@ -529,25 +543,35 @@ async function invalidateListPageCaches(
 ) {
 	const host = new URL(c.req.url).host;
 	const keys = new Set<string>();
+	const realPaths = new Set<string>();
 
 	if (home) {
 		keys.add(`${CACHE_KEY_VERSION}/${host}/`);
 		keys.add(`${CACHE_KEY_VERSION}/${host}/index.html`);
+		realPaths.add('/');
+		realPaths.add('/index.html');
 	}
 	if (speeches) {
 		keys.add(`${CACHE_KEY_VERSION}/${host}/speeches`);
 		keys.add(`${CACHE_KEY_VERSION}/${host}/speeches/`);
 		keys.add(`${CACHE_KEY_VERSION}/${host}/rss.xml`);
 		keys.add(`${CACHE_KEY_VERSION}/${host}/feed.xml`);
+		realPaths.add('/speeches');
+		realPaths.add('/speeches/');
+		realPaths.add('/rss.xml');
+		realPaths.add('/feed.xml');
 	}
 	if (speakers) {
 		keys.add(`${CACHE_KEY_VERSION}/${host}/speakers`);
 		keys.add(`${CACHE_KEY_VERSION}/${host}/speakers/`);
+		realPaths.add('/speakers');
+		realPaths.add('/speakers/');
 	}
 
-	await Promise.allSettled(
-		Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)])
-	);
+	await Promise.allSettled([
+		...Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
+		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url))
+	]);
 }
 
 async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: string) {
