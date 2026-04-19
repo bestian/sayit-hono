@@ -869,11 +869,10 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				.bind(filename)
 				.first<{ filename: string; alternate_filename?: string | null }>());
 			if (!existingSpeech) {
-				return c.json(
-					{ success: false, message: 'Filename not found in speech index', filename },
-					404,
-					corsHeadersWithMethods
-				);
+				// Upsert: auto-create speech_index entry so PATCH proceeds as an insert
+				await withRetry(() => c.env.DB.prepare(
+					'INSERT INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES (?, ?, 0, ?, ?)'
+				).bind(filename, filename, '', '').run());
 			}
 			const hasAlternateFilename = Object.prototype.hasOwnProperty.call(body, 'alternate_filename');
 			let nextAlternateFilename: string | null | undefined = undefined;
@@ -892,7 +891,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				return c.json({ error: 'alternate_filename cannot match filename' }, 400, corsHeadersWithMethods);
 			}
 			const currentAlternateFilename =
-				typeof existingSpeech.alternate_filename === 'string' && existingSpeech.alternate_filename.trim()
+				typeof existingSpeech?.alternate_filename === 'string' && existingSpeech.alternate_filename.trim()
 					? transformFilename(existingSpeech.alternate_filename.trim())
 					: null;
 			const desiredAlternateFilename =
