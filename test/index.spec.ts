@@ -321,31 +321,81 @@ describe('Worker routes', () => {
 		expect(keys.filter((key) => key.includes('2026-03-24-demo-speech'))).toHaveLength(1);
 	});
 
-	it('cleans legacy cache objects by prefix', async () => {
-		const env = createEnv();
-		(env as any).__r2Store.set('archive.tw/2026-03-24-demo-speech', { body: 'old' });
-		(env as any).__r2Store.set('archive.tw/2026-03-24-demo-speech?bust', { body: 'old-bust' });
-		(env as any).__r2Store.set('archive.tw/another-speech', { body: 'keep' });
+	describe('POST /api/cleanup_old_cache', () => {
+		it('sweeps keys outside current cache version and preserves current', async () => {
+			const env = createEnv();
+			(env as any).__r2Store.set(`${CACHE_KEY_VERSION}/example.com/keep-1`, { body: 'current' });
+			(env as any).__r2Store.set(`${CACHE_KEY_VERSION}/example.com/keep-2`, { body: 'current' });
+			(env as any).__r2Store.set('v-old1/example.com/legacy-1', { body: 'old' });
+			(env as any).__r2Store.set('v-old2/example.com/legacy-2', { body: 'old' });
+			(env as any).__r2Store.set('archive.tw/unversioned', { body: 'legacy' });
 
-		const { res } = await request(
-			`/api/cleanup_old_cache?prefix=${encodeURIComponent('archive.tw/2026-03-24-demo-speech')}`,
-			env,
-			{
+			const { res } = await request('/api/cleanup_old_cache', env, {
 				method: 'POST',
-				headers: {
-					Authorization: 'Bearer test-audrey'
-				}
-			}
-		);
+				headers: { Authorization: 'Bearer test-audrey' }
+			});
 
-		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({
-			deleted: 2,
-			cleaned: ['archive.tw/2026-03-24-demo-speech'],
-			more: false
+			expect(res.status).toBe(200);
+			expect(await res.json()).toEqual({ deleted: 3, more: false });
+			expect((env as any).__r2Store.has(`${CACHE_KEY_VERSION}/example.com/keep-1`)).toBe(true);
+			expect((env as any).__r2Store.has(`${CACHE_KEY_VERSION}/example.com/keep-2`)).toBe(true);
+			expect((env as any).__r2Store.has('v-old1/example.com/legacy-1')).toBe(false);
+			expect((env as any).__r2Store.has('v-old2/example.com/legacy-2')).toBe(false);
+			expect((env as any).__r2Store.has('archive.tw/unversioned')).toBe(false);
 		});
-		expect((env as any).__r2Store.has('archive.tw/2026-03-24-demo-speech')).toBe(false);
-		expect((env as any).__r2Store.has('archive.tw/2026-03-24-demo-speech?bust')).toBe(false);
-		expect((env as any).__r2Store.has('archive.tw/another-speech')).toBe(true);
+
+		it('returns more:true when max_deletes cap is hit', async () => {
+			const env = createEnv();
+			for (let i = 0; i < 5; i++) {
+				(env as any).__r2Store.set(`v-old/example.com/legacy-${i}`, { body: 'old' });
+			}
+
+			const { res } = await request('/api/cleanup_old_cache?max_deletes=2', env, {
+				method: 'POST',
+				headers: { Authorization: 'Bearer test-audrey' }
+			});
+
+			expect(res.status).toBe(200);
+			const body = (await res.json()) as { deleted: number; more: boolean };
+			expect(body.more).toBe(true);
+			expect(body.deleted).toBeGreaterThanOrEqual(2);
+		});
+
+		it('accepts bestian token', async () => {
+			const env = createEnv();
+			(env as any).__r2Store.set('v-old/example.com/legacy', { body: 'old' });
+
+			const { res } = await request('/api/cleanup_old_cache', env, {
+				method: 'POST',
+				headers: { Authorization: 'Bearer test-bestian' }
+			});
+
+			expect(res.status).toBe(200);
+			expect(await res.json()).toEqual({ deleted: 1, more: false });
+		});
+
+		it('rejects missing Authorization with 403', async () => {
+			const env = createEnv();
+			const { res } = await request('/api/cleanup_old_cache', env, { method: 'POST' });
+			expect(res.status).toBe(403);
+		});
+
+		it('rejects non-Bearer scheme with 403', async () => {
+			const env = createEnv();
+			const { res } = await request('/api/cleanup_old_cache', env, {
+				method: 'POST',
+				headers: { Authorization: 'Basic test-audrey' }
+			});
+			expect(res.status).toBe(403);
+		});
+
+		it('rejects unknown token with 403', async () => {
+			const env = createEnv();
+			const { res } = await request('/api/cleanup_old_cache', env, {
+				method: 'POST',
+				headers: { Authorization: 'Bearer wrong-token' }
+			});
+			expect(res.status).toBe(403);
+		});
 	});
 });
