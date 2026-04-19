@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
 import { CACHE_KEY_VERSION, deleteEdgeCache, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
-import { OLD_CACHE_VERSIONS } from './cacheKeyVersion';
 import { speakersIndex } from './api/speakers_index';
 import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
@@ -1022,49 +1021,32 @@ app.post('/api/cleanup_old_cache', async (c) => {
 	}
 
 	const url = new URL(c.req.url);
-	const versionParam = url.searchParams.get('version');
 	const maxDeletesParam = Number(url.searchParams.get('max_deletes') ?? '');
-	const prefixParams = url.searchParams
-		.getAll('prefix')
-		.map((value) => value.trim())
-		.filter(Boolean);
-	const targets = prefixParams.length > 0
-		? prefixParams
-		: (versionParam ? [versionParam] : OLD_CACHE_VERSIONS).map((value) => `${value}/`);
+	const currentPrefix = `${CACHE_KEY_VERSION}/`;
 
 	const bucket = c.env.SPEECH_CACHE;
 	let deleted = 0;
 	const LIST_LIMIT = 1000;
-	const MAX_DELETES_PER_REQUEST =
+	const MAX_DELETES =
 		Number.isFinite(maxDeletesParam) && maxDeletesParam > 0
 			? Math.min(Math.floor(maxDeletesParam), 100000)
 			: 100000;
-	for (const prefix of targets) {
-		const shouldDeleteEdge = !/^v\d+\//.test(prefix);
-		let deletedForPrefix = 0;
-		while (deletedForPrefix < MAX_DELETES_PER_REQUEST) {
-			const list = await bucket.list({ prefix, limit: LIST_LIMIT });
-			const keys = list.objects.map((o: { key: string }) => o.key);
-			if (keys.length === 0) {
-				break;
-			}
-
-			if (shouldDeleteEdge) {
-				await Promise.all(keys.map((key) => deleteEdgeCache(key, { silent: true })));
-			}
-			await bucket.delete(keys);
-			deleted += keys.length;
-			deletedForPrefix += keys.length;
-
-			if (!list.truncated) {
-				break;
-			}
-			if (deletedForPrefix >= MAX_DELETES_PER_REQUEST) {
-				return c.json({ deleted, prefix, more: true });
-			}
+	let cursor: string | undefined;
+	do {
+		const list = await bucket.list({ cursor, limit: LIST_LIMIT });
+		const toDelete = list.objects
+			.filter((o: { key: string }) => !o.key.startsWith(currentPrefix))
+			.map((o: { key: string }) => o.key);
+		if (toDelete.length > 0) {
+			await bucket.delete(toDelete);
+			deleted += toDelete.length;
 		}
-	}
-	return c.json({ deleted, cleaned: targets, more: false });
+		cursor = list.truncated ? list.cursor : undefined;
+		if (deleted >= MAX_DELETES) {
+			return c.json({ deleted, more: true });
+		}
+	} while (cursor);
+	return c.json({ deleted, more: false });
 });
 
 async function renderHomePage(c: any) {
