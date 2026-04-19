@@ -238,14 +238,20 @@ describe('syncSearchArtifacts error logging', () => {
 });
 
 describe('assignPatchedSections branches — many inserted sections', () => {
-	function makeCtx(oldSections: any[]): Context<ApiEnv> {
+	function makeCtx(
+		oldSections: any[],
+		requestBody: { filename: string; markdown: string } = {
+			filename: 'many-inserts',
+			markdown: '# Many\n## A:\nA\n\nB\n\nC\n\nD\n\nE'
+		}
+	): { ctx: Context<ApiEnv>; ops: any[] } {
 		const ops: any[] = [];
 		const resolver: Resolver = (sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
-				if (args[0] === 'many-inserts') {
+				if (args[0] === requestBody.filename) {
 					return {
 						success: true,
-						results: [{ filename: 'many-inserts', display_name: 'Many', isNested: 0, alternate_filename: null }]
+						results: [{ filename: requestBody.filename, display_name: 'Many', isNested: 0, alternate_filename: null }]
 					};
 				}
 				return { success: true, results: [] };
@@ -265,7 +271,7 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 			return { success: true, results: [] };
 		};
 
-		return {
+		const ctx = {
 			env: {
 				AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
 				BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
@@ -305,25 +311,44 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 				url: 'https://example.com/api/upload_markdown',
 				header: (name: string) => (name === 'Authorization' ? 'Bearer token-audrey' : null),
 				query: () => null,
-				json: async () => ({
-					filename: 'many-inserts',
-					markdown: '# Many\n## A:\nA\n\nB\n\nC\n\nD\n\nE'
-				})
+				json: async () => requestBody
 			},
 			json: (body: any, status = 200, headers: Record<string, string> = {}) =>
 				new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }),
 			text: (body: string, status = 200, headers: Record<string, string> = {}) =>
 				new Response(body, { status, headers })
 		} as unknown as Context<ApiEnv>;
+
+		return { ctx, ops };
 	}
 
 	it('threads new sections into a short old list (tail-insertion with no LCS matches)', async () => {
 		// Old list has 1 section with content that doesn't match new sections — LCS pairs is empty.
 		// appendInsertedSections runs via the tail path (line 419) with baseIdHint derived from output.
-		const ctx = makeCtx([
+		const { ctx } = makeCtx([
 			{ section_id: 500, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>totally-different-old-content</p>' }
 		]);
 		const res = await uploadMarkdown(ctx);
 		expect(res.status).toBe(200);
+	});
+
+	it('skips over an already-used generated section id inside an insertion gap', async () => {
+		const { ctx, ops } = makeCtx(
+			[
+				{ section_id: 1, previous_section_id: null, next_section_id: 101, section_speaker: 'A', section_content: '<p>anchor one</p>' },
+				{ section_id: 101, previous_section_id: 1, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor two</p>' }
+			],
+			{
+				filename: 'many-inserts',
+				markdown: '# Many\n## A:\nanchor one\n\ninserted between\n\nanchor two'
+			}
+		);
+		const res = await uploadMarkdown(ctx);
+		expect(res.status).toBe(200);
+
+		const insertedIds = ops
+			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
+			.map((stmt) => stmt.args[3]);
+		expect(insertedIds).toContain(102);
 	});
 });

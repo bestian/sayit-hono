@@ -156,20 +156,20 @@ describe('search branch coverage', () => {
 
 	it('renders the /search/ cached-body path (edge cache hit)', async () => {
 		const env = makeEnv(() => ({ success: true, results: [] }));
-		const edgeKey = `https://example.com/${CACHE_KEY_VERSION}/example.com/search/?q=cached`;
+		const edgeKey = `https://edge-cache.local/${CACHE_KEY_VERSION}/example.com/search/?q=cached`;
 		await caches.default.put(
-			`https://${CACHE_KEY_VERSION}/example.com/search/?q=cached`,
+			edgeKey,
 			new Response('CACHED-SEARCH', { headers: { 'Cache-Control': 'public, max-age=60', 'Content-Type': 'text/html' } })
 		);
 		const { res } = await request('/search/?q=cached', env);
-		expect([200, 304]).toContain(res.status);
-		await caches.default.delete(`https://${CACHE_KEY_VERSION}/example.com/search/?q=cached`);
-		void edgeKey;
+		expect(res.status).toBe(200);
+		expect(await res.text()).toBe('CACHED-SEARCH');
+		await caches.default.delete(edgeKey);
 	});
 
 	it('serves /api/search.json cached body (edge cache hit)', async () => {
 		const env = makeEnv(() => ({ success: true, results: [] }));
-		const key = `https://${CACHE_KEY_VERSION}/example.com/api/search.json?q=cached`;
+		const key = `https://edge-cache.local/${CACHE_KEY_VERSION}/example.com/api/search.json?q=cached`;
 		await caches.default.put(
 			key,
 			new Response(JSON.stringify({ results: ['CACHED'] }), {
@@ -178,6 +178,7 @@ describe('search branch coverage', () => {
 		);
 		const { res } = await request('/api/search.json?q=cached', env);
 		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ results: ['CACHED'] });
 		await caches.default.delete(key);
 	});
 });
@@ -389,6 +390,8 @@ describe('parseToArray input variants', () => {
 			return { success: true, results: [] };
 		});
 
+		// null-nest: parseToArray(null) hits the falsy early return before the route resolves.
+		expect((await request('/null-nest/x', env)).res.status).toBe(200);
 		// string-nest: parseContent('a,b') → throws → returns 'a,b' → typeof string → split by comma
 		expect((await request('/string-nest/a', env)).res.status).toBe(200);
 		// array-nest: parseContent('["n1","n2"]') → parsed array → map values
