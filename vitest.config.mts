@@ -20,10 +20,11 @@ export default defineWorkersConfig({
 				'src/api/types.ts',
 			],
 			thresholds: {
-				// CI fails if any included file dips below 100% lines/functions.
+				// CI fails if any included file dips below 100% statements/lines/functions.
 				// Statements/branches are intentionally loose: istanbul instruments every
 				// short-circuit (`??`, `||`, `?.`) as a branch; some of those are defensive
 				// paths against runtime-impossible inputs that we don't manufacture in tests.
+				statements: 100,
 				lines: 100,
 				functions: 100,
 				perFile: true,
