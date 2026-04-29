@@ -115,30 +115,68 @@
 			'</div>';
 	}
 
-	function renderResultItem(data) {
-		var title = decodeHtmlEntities(data.title || data.url);
-		var date = data.date || '';
-		var speaker = decodeHtmlEntities(data.speaker || '');
-		var snippet = decodeHtmlEntities(data.snippet || '');
+	function groupResults(items) {
+		var groups = [];
+		var groupMap = {};
+		for (var i = 0; i < items.length; i++) {
+			var item = items[i];
+			var baseUrl = (item.url || '').split('#')[0];
+			if (groupMap[baseUrl] != null) {
+				groups[groupMap[baseUrl]].sections.push(item);
+			} else {
+				groupMap[baseUrl] = groups.length;
+				groups.push({
+					title: item.title,
+					date: item.date,
+					url: baseUrl,
+					sections: [item]
+				});
+			}
+		}
+		return groups;
+	}
 
+	function renderGroupItem(group) {
+		var title = decodeHtmlEntities(group.title || group.url);
+		var date = group.date || '';
 		var displayTitle = date ? title.replace(new RegExp('^' + date + '\\s*'), '') : title;
+
+		// Collect unique speakers across sections
+		var speakersSeen = {};
+		var speakers = [];
+		for (var i = 0; i < group.sections.length; i++) {
+			var s = group.sections[i].speaker || '';
+			if (s && !speakersSeen[s]) {
+				speakersSeen[s] = true;
+				speakers.push(s);
+			}
+		}
 
 		var metaParts = [];
 		if (date) metaParts.push('<span>' + escapeHtml(date) + '</span>');
-		if (speaker) metaParts.push('<span>' + escapeHtml(speaker) + '</span>');
+		if (speakers.length > 0) metaParts.push('<span>' + escapeHtml(decodeHtmlEntities(speakers.join(', '))) + '</span>');
 
 		var html =
-			'<a href="' + escapeHtml(data.url) + '" class="sayit-search__result">' +
-			'<div class="sayit-search__result-title">' + escapeHtml(displayTitle) + '</div>' +
+			'<div class="sayit-search__result-group">' +
+			'<a href="' + escapeHtml(group.sections[0].url) + '" class="sayit-search__result-title">' + escapeHtml(displayTitle) + '</a>' +
 			(metaParts.length > 0
 				? '<div class="sayit-search__result-meta">' + metaParts.join('<span aria-hidden="true"> \u00b7 </span>') + '</div>'
 				: '');
 
-		if (snippet) {
-			html += '<div class="sayit-search__result-excerpt">' + escapeHtml(snippet) + '</div>';
+		for (var j = 0; j < group.sections.length; j++) {
+			var section = group.sections[j];
+			var snippet = decodeHtmlEntities(section.snippet || '');
+			var speaker = decodeHtmlEntities(section.speaker || '');
+			if (snippet) {
+				html +=
+					'<a href="' + escapeHtml(section.url) + '" class="sayit-search__result-section">' +
+					(speakers.length > 1 && speaker ? '<span class="sayit-search__result-speaker">' + escapeHtml(speaker) + '</span>' : '') +
+					'<span class="sayit-search__result-excerpt">' + escapeHtml(snippet) + '</span>' +
+					'</a>';
+			}
 		}
 
-		html += '</a>';
+		html += '</div>';
 		return html;
 	}
 
@@ -155,7 +193,7 @@
 		var container = document.getElementById('sayit-search-items');
 		if (container) {
 			for (var i = 0; i < nextSlice.length; i++) {
-				container.insertAdjacentHTML('beforeend', renderResultItem(nextSlice[i]));
+				container.insertAdjacentHTML('beforeend', renderGroupItem(nextSlice[i]));
 			}
 		}
 		displayedCount += nextSlice.length;
@@ -168,8 +206,8 @@
 		}
 	}
 
-	function renderResults(items, query, totalCount) {
-		if (items.length === 0) {
+	function renderResults(groups, query, totalCount) {
+		if (groups.length === 0) {
 			renderNoResults(query);
 			return;
 		}
@@ -183,8 +221,8 @@
 			'<div class="sayit-search__status">' + escapeHtml(countText) + '</div>' +
 			'<div id="sayit-search-items">';
 
-		for (var i = 0; i < items.length; i++) {
-			html += renderResultItem(items[i]);
+		for (var i = 0; i < groups.length; i++) {
+			html += renderGroupItem(groups[i]);
 		}
 
 		html += '</div>';
@@ -230,10 +268,11 @@
 				return;
 			}
 
-			currentSearchResults = msg.results;
-			var firstPage = msg.results.slice(0, PAGE_SIZE);
+			var groups = groupResults(msg.results);
+			currentSearchResults = groups;
+			var firstPage = groups.slice(0, PAGE_SIZE);
 			displayedCount = firstPage.length;
-			renderResults(firstPage, query, msg.results.length);
+			renderResults(firstPage, query, groups.length);
 		});
 	}
 
