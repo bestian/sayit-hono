@@ -23,12 +23,13 @@ async function ensureWasm() {
 	await wasmInitPromise;
 }
 
-async function fetchFont(text: string, weight: number): Promise<ArrayBuffer> {
+async function fetchFont(text: string, weight: number, family = 'Noto Sans TC'): Promise<ArrayBuffer> {
 	const chars = [...new Set(text)].join('');
-	const url = `https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@${weight}&text=${encodeURIComponent(chars)}`;
+	const familyParam = family.replace(/\s+/g, '+');
+	const url = `https://fonts.googleapis.com/css2?family=${familyParam}:wght@${weight}&text=${encodeURIComponent(chars)}`;
 	const css = await fetch(url).then((r) => r.text());
 	const fontUrl = css.match(/src:\s*url\(([^)]+)\)/)?.[1];
-	if (!fontUrl) throw new Error('Font URL not found in Google Fonts CSS');
+	if (!fontUrl) throw new Error(`Font URL not found in Google Fonts CSS for ${family} ${weight}`);
 	return fetch(fontUrl).then((r) => r.arrayBuffer());
 }
 
@@ -184,7 +185,7 @@ function buildSpeechElement(title: string, date: string | null, speakers: string
 				height: '100%',
 				padding: '80px',
 				background: '#0f1729',
-				fontFamily: 'Noto Sans TC',
+				fontFamily: 'Noto Serif TC',
 				color: '#f5f0e8',
 				position: 'relative',
 				overflow: 'hidden',
@@ -207,7 +208,7 @@ function buildSpeechElement(title: string, date: string | null, speakers: string
 						children: {
 							type: 'span',
 							props: {
-								style: { fontSize, fontWeight: 700, lineHeight: 1.2, color: '#f5f0e8' },
+								style: { fontSize, fontWeight: 900, lineHeight: 1.2, color: '#f5f0e8' },
 								children: title,
 							},
 						},
@@ -320,16 +321,21 @@ function buildQuoteElement(
 	};
 }
 
-async function renderElement(element: any, allText: string, fontWeights: number[] = [400, 700]): Promise<Uint8Array> {
+async function renderElement(
+	element: any,
+	allText: string,
+	fontWeights: number[] = [400, 700],
+	fontFamily = 'Noto Sans TC'
+): Promise<Uint8Array> {
 	await ensureWasm();
 
-	const fontBuffers = await Promise.all(fontWeights.map((w) => fetchFont(allText, w)));
+	const fontBuffers = await Promise.all(fontWeights.map((w) => fetchFont(allText, w, fontFamily)));
 
 	const svg = await satori(element as any, {
 		width: OG_WIDTH,
 		height: OG_HEIGHT,
 		fonts: fontBuffers.map((data, i) => ({
-			name: 'Noto Sans TC',
+			name: fontFamily,
 			data,
 			weight: fontWeights[i] as 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900,
 			style: 'normal' as const,
@@ -355,7 +361,7 @@ export async function generateOgImage(
 	const speakerText = speakers.join(' \u00b7 ');
 	const allText = ['ARCHIVE.TW', title, date ?? '', '\u00b7', ...speakers].join('');
 	const element = buildSpeechElement(title, date, speakers);
-	return renderElement(element, allText);
+	return renderElement(element, allText, [400, 900], 'Noto Serif TC');
 }
 
 export async function generateQuoteOgImage(
