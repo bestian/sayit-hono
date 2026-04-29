@@ -19,9 +19,19 @@ type SpeechIndexRow = {
 	alternate_filename?: string | null;
 };
 
+type OldSection = {
+	filename: string;
+	section_id: number;
+	previous_section_id: number | null;
+	next_section_id: number | null;
+	section_speaker: string | null;
+	section_content: string;
+};
+
 function createUploadEnv(options?: {
 	currentAlternateFilename?: string | null;
 	extraSpeechIndexRows?: SpeechIndexRow[];
+	oldSections?: OldSection[];
 }) {
 	const operations: PreparedStatement[] = [];
 	const deletedKeys: string[] = [];
@@ -40,7 +50,7 @@ function createUploadEnv(options?: {
 		...(options?.extraSpeechIndexRows ?? [])
 	];
 
-	const oldSections = [
+	const oldSections: OldSection[] = options?.oldSections ?? [
 		{
 			filename: 'demo-speech',
 			section_id: 100,
@@ -306,6 +316,116 @@ describe('upload_markdown PATCH', () => {
 				`${CACHE_KEY_VERSION}/example.com/speeches`
 			])
 		);
+	});
+
+	// Issue #68：含 <svg>/<iframe> 的段落不論內容差異一律配對為同段
+	it('preserves section_id for <svg> blocks even when inner content changes', async () => {
+		const env = createUploadEnv({
+			oldSections: [
+				{
+					filename: 'demo-speech',
+					section_id: 100,
+					previous_section_id: null,
+					next_section_id: 101,
+					section_speaker: null,
+					section_content: '<p>Alpha</p>'
+				},
+				{
+					filename: 'demo-speech',
+					section_id: 101,
+					previous_section_id: 100,
+					next_section_id: null,
+					section_speaker: null,
+					section_content: '<svg width="100"><text>OLD</text></svg>'
+				}
+			]
+		});
+
+		const body = [
+			'# Demo Speech',
+			'Alpha',
+			'',
+			'<svg width="200"><text>NEW</text></svg>'
+		].join('\n');
+
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({ filename: 'demo-speech', markdown: body })
+		});
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({
+			success: true,
+			filename: 'demo-speech',
+			sectionsCount: 2,
+			insertedCount: 0,
+			updatedCount: 2,
+			deletedCount: 0
+		});
+
+		const updates = env.__operations.filter((stmt) => stmt.sql.startsWith('UPDATE speech_content'));
+		expect(updates.map((stmt) => stmt.args[5])).toEqual([100, 101]);
+		const svgUpdate = updates.find((stmt) => stmt.args[5] === 101);
+		expect(svgUpdate?.args[3]).toContain('width="200"');
+		expect(svgUpdate?.args[3]).toContain('NEW');
+	});
+
+	it('preserves section_id for <iframe> blocks even when src changes', async () => {
+		const env = createUploadEnv({
+			oldSections: [
+				{
+					filename: 'demo-speech',
+					section_id: 100,
+					previous_section_id: null,
+					next_section_id: 101,
+					section_speaker: null,
+					section_content: '<p>Alpha</p>'
+				},
+				{
+					filename: 'demo-speech',
+					section_id: 101,
+					previous_section_id: 100,
+					next_section_id: null,
+					section_speaker: null,
+					section_content: '<iframe src="https://old.example.com"></iframe>'
+				}
+			]
+		});
+
+		const body = [
+			'# Demo Speech',
+			'Alpha',
+			'',
+			'<iframe src="https://new.example.com"></iframe>'
+		].join('\n');
+
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({ filename: 'demo-speech', markdown: body })
+		});
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({
+			success: true,
+			filename: 'demo-speech',
+			sectionsCount: 2,
+			insertedCount: 0,
+			updatedCount: 2,
+			deletedCount: 0
+		});
+
+		const updates = env.__operations.filter((stmt) => stmt.sql.startsWith('UPDATE speech_content'));
+		const iframeUpdate = updates.find((stmt) => stmt.args[5] === 101);
+		expect(iframeUpdate?.args[3]).toContain('https://new.example.com');
+		expect(iframeUpdate?.args[3]).not.toContain('old.example.com');
 	});
 });
 

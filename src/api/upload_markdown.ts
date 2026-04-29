@@ -216,6 +216,14 @@ function stripMarkdownTitleLine(markdown: string): string {
 
 /** 段落比對鍵：用於 LCS 判斷「同一段」是否相同（講者 + 內容） */
 function normalizeSectionComparableContent(input: string): string {
+	// Issue #68：含 <svg>...</svg> 或 <iframe>...</iframe> 的段落，無論內容是否相同
+	// 一律視為同段（給同 section_id），D1 內容仍以新值覆寫
+	if (/<svg\b[^>]*>[\s\S]*?<\/svg\s*>/i.test(input)) {
+		return '<svg>';
+	}
+	if (/<iframe\b[^>]*>[\s\S]*?<\/iframe\s*>/i.test(input)) {
+		return '<iframe>';
+	}
 	return input
 		// 先把常見換行型標記轉成空白，再移除其餘 HTML 標記
 		.replace(/<br\s*\/?>/gi, ' ')
