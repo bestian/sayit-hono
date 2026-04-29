@@ -244,6 +244,7 @@ async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 		|| pathname === '/search-index-manifest.json'
 		|| pathname === '/sections-dump.json'
 		|| pathname === '/stats.json'
+		|| pathname === '/version'
 	) return next();
 	if (
 		pathname === '/' ||
@@ -797,6 +798,10 @@ app.get('/sections-dump.json', async (c) => {
 		},
 	});
 });
+
+app.get('/version', (c) =>
+	c.json({ version: CACHE_KEY_VERSION }, 200, { 'Cache-Control': 'no-store' })
+);
 
 // D1 APIs
 app.get('/api/speech_index.json', (c) => speechIndex(c));
