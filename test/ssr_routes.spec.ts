@@ -367,13 +367,21 @@ describe('SSR /:filename', () => {
 		const html = await res.text();
 		expect(html).toContain('Flat');
 		expect(env.__r2Store.has(`${CACHE_KEY_VERSION}/example.com/2026-flat`)).toBe(true);
+		expect(html).toContain('<meta property="og:image" content="https://archive.tw/og/2026-flat.png">');
+		expect(html).toContain('<meta property="og:image:width" content="1200">');
+		expect(html).not.toMatch(/apple-touch-icon-152x152\.png/);
+		expect(html).not.toMatch(/https:\/\/sayit\.archive\.tw/);
 	});
 
 	it('renders a nested speech list page', async () => {
 		const env = createSsrEnv(flatResolver);
 		const { res } = await request('/2026-nested', env);
 		expect(res.status).toBe(200);
-		expect(await res.text()).toContain('Nested');
+		const html = await res.text();
+		expect(html).toContain('Nested');
+		expect(html).toContain('<meta property="og:image" content="https://archive.tw/og/2026-nested.png">');
+		expect(html).not.toMatch(/apple-touch-icon-152x152\.png/);
+		expect(html).not.toMatch(/https:\/\/sayit\.archive\.tw/);
 	});
 
 	it('returns 500 when speech meta lookup throws', async () => {
@@ -530,6 +538,9 @@ describe('SSR /:filename/:nest_filename', () => {
 		expect(res.status).toBe(200);
 		const html = await res.text();
 		expect(html).toContain('Alpha');
+		expect(html).toContain('<meta property="og:image" content="https://archive.tw/og/2026-nested.png">');
+		expect(html).not.toMatch(/apple-touch-icon-152x152\.png/);
+		expect(html).not.toMatch(/https:\/\/sayit\.archive\.tw/);
 	});
 
 	it('returns 500 when nested meta query throws', async () => {
@@ -630,6 +641,15 @@ describe('Static search/stats endpoints', () => {
 		const { res } = await request('/sections-dump.json', envHit);
 		expect(res.status).toBe(200);
 		expect(await res.text()).toContain('"id":1');
+	});
+
+	it('serves /version with CACHE_KEY_VERSION and no-store cache-control', async () => {
+		const env = createSsrEnv(() => ({ success: true, results: [] }));
+		const { res } = await request('/version', env);
+		expect(res.status).toBe(200);
+		expect(res.headers.get('Cache-Control')).toBe('no-store');
+		const body = (await res.json()) as { version: string };
+		expect(body.version).toBe(CACHE_KEY_VERSION);
 	});
 });
 
