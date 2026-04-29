@@ -187,10 +187,23 @@ function an2md(anXml: string): string {
 	const merged: string[] = [];
 	let prevShowAs: string | null = null;
 	for (const { showAs, content } of blocks) {
-		if (showAs === prevShowAs) {
+		if (showAs === 'Unknown') {
+			const quoted = content
+				.split('\n\n')
+				.map((p) =>
+					p
+						.split('\n')
+						.map((l) => (l.length === 0 ? '>' : `> ${l}`))
+						.join('\n')
+				)
+				.join('\n>\n');
+			merged.push(quoted);
+			prevShowAs = showAs;
+		} else if (showAs === prevShowAs) {
 			merged.push(content);
 		} else {
-			merged.push(`### ${showAs}: \n\n${content}`);
+			const colon = /\p{Script=Han}$/u.test(showAs) ? '：' : ': ';
+			merged.push(`### ${showAs}${colon}\n\n${content}`);
 			prevShowAs = showAs;
 		}
 	}
