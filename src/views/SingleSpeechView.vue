@@ -14,6 +14,15 @@ interface Section {
   name: string | null
 }
 
+interface SpeakerBlock {
+  id: number
+  speaker: string | null
+  name: string | null
+  photoURL: string | null
+  color: string
+  sections: Section[]
+}
+
 const props = defineProps<{
   sections: Section[]
   speechName: string
@@ -44,17 +53,38 @@ const getSpeechPageUrl = (sectionId: number) => `/speech/${sectionId}`
 
 const getSpeakerUrl = (sectionSpeaker: string) => `/speaker/${sectionSpeaker}`
 
-// 以 section_speaker（等同 route_pathname）決定顏色，與 SpeakersView 一致
-const colorForSpeaker = (section: Section): string =>
-	getSpeakerColor(section.section_speaker ?? section.name ?? '')
+// 把連續同一講者的 section 合併成一個 block：
+// 同一講者連續多段時 chrome 不再重複，sticky 範圍 = 整個 block，
+// 換講者時前一個 chrome 自然滑出。
+const speakerBlocks = computed<SpeakerBlock[]>(() => {
+	const blocks: SpeakerBlock[] = []
+	let current: SpeakerBlock | null = null
+	for (const section of displaySections.value) {
+		const speaker = section.section_speaker ?? null
+		if (current && current.speaker === speaker) {
+			current.sections.push(section)
+			continue
+		}
+		current = {
+			id: section.section_id,
+			speaker,
+			name: section.name,
+			photoURL: section.photoURL,
+			color: getSpeakerColor(speaker ?? section.name ?? ''),
+			sections: [section],
+		}
+		blocks.push(current)
+	}
+	return blocks
+})
 
-const borderStyle = (section: Section) =>
-	section.section_speaker ? { borderLeftColor: colorForSpeaker(section) } : {}
+const blockBorderStyle = (block: SpeakerBlock) =>
+	block.speaker ? { borderLeftColor: block.color } : {}
 
-const avatarStyle = (section: Section) => {
-	const color = getSpeakerColor(section.section_speaker ?? '')
-	return { borderColor: color, backgroundColor: color }
-}
+const blockAvatarStyle = (block: SpeakerBlock) => ({
+	borderColor: block.color,
+	backgroundColor: block.color,
+})
 
 const sanitizeHtmlContent = (html: string): string => {
 	// Remove script tags with various formats and replace with warning comment
@@ -92,28 +122,35 @@ const loading = false
 					<div class="page-content__row" v-if="!loading">
 						<div class="primary-content__unit">
 							<ul class="section-list">
-								<li v-for="section in displaySections" :key="section.section_id" :id="`s${section.section_id}`" :class="[
-									'speech',
-									'speech--',
-									'speech--border',
-									section.section_speaker ? 'speech--with-portrait' : ''
-								]" :style="borderStyle(section)">
-									<div class="speaker-portrait-wrapper" v-if="section.section_speaker">
-										<img :src="section.photoURL || '/static/speeches/i/a.png'"
-											:style="avatarStyle(section)"
-											:alt="section.name || ''"
+								<li
+									v-for="block in speakerBlocks"
+									:key="`block-${block.id}`"
+									:class="[
+										'speech',
+										'speech--',
+										'speech--border',
+										block.speaker ? 'speech--with-portrait speaker-block' : ''
+									]"
+									:style="blockBorderStyle(block)"
+								>
+									<div class="speaker-portrait-wrapper" v-if="block.speaker">
+										<img :src="block.photoURL || '/static/speeches/i/a.png'"
+											:style="blockAvatarStyle(block)"
+											:alt="block.name || ''"
 											class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium">
 									</div>
-									<div class="speech-wrapper">
-										<div class="speech__meta-data" v-if="section.section_speaker && section.name">
-											<span class="speech__meta-data__speaker-name">
-												<a :href="getSpeakerUrl(section.section_speaker)">
-													{{ section.name }}
-												</a>
-											</span>
-										</div>
-										<div class="speech__content" v-html="sanitizeHtmlContent(section.section_content)">
-										</div>
+									<div class="speech__meta-data" v-if="block.speaker && block.name">
+										<span class="speech__meta-data__speaker-name">
+											<a :href="getSpeakerUrl(block.speaker)">{{ block.name }}</a>
+										</span>
+									</div>
+									<div
+										v-for="section in block.sections"
+										:key="section.section_id"
+										:id="`s${section.section_id}`"
+										class="speech-wrapper speaker-block__section"
+									>
+										<div class="speech__content" v-html="sanitizeHtmlContent(section.section_content)"></div>
 										<div class="speech__links">
 											<a :href="getLinkInContextUrl(section)" title="Link in context">
 												<i class="speech-icon icon-link-in-context"></i><span lang="zh">前後文</span><span lang="en">Link in context</span>
@@ -140,21 +177,43 @@ const loading = false
 </template>
 
 <style scoped>
-/* 維持既有版面，僅在捲動快滑出視窗時把講者頭像與姓名 clip 在頂端。 */
-.speech--with-portrait .speaker-portrait-wrapper {
+/* 同一講者連續多段時，所有 sections 共享一個 li.speaker-block：
+   - 兩欄版面：左欄 avatar、右欄姓名與內容（mimic 原本的 .speech--with-portrait 視覺）
+   - chrome（avatar、姓名）sticky 在整個 block 範圍內，講者切換時自然滑出。 */
+.speaker-block {
+	display: grid;
+	grid-template-columns: 8.33% 1fr;
+	gap: 0 0.5em;
+}
+.speaker-block .speaker-portrait-wrapper {
+	grid-column: 1;
+	grid-row: 1 / span 99;
+	float: none;
 	position: sticky;
 	top: 0.5em;
+	align-self: start;
 	z-index: 4;
+	width: auto;
 }
-.speech--with-portrait .speech__meta-data {
+.speaker-block .speech__meta-data {
+	grid-column: 2;
+	grid-row: 1;
 	position: sticky;
 	top: 0;
 	z-index: 5;
+	margin: 0;
 	padding: 0.25em 0;
 	background: rgba(255, 255, 255, 0.94);
 }
+.speaker-block .speaker-block__section {
+	grid-column: 2;
+	scroll-margin-top: 4em;
+}
+.speaker-block .speaker-block__section + .speaker-block__section {
+	margin-top: 0.5em;
+}
 @media (prefers-color-scheme: dark) {
-	.speech--with-portrait .speech__meta-data {
+	.speaker-block .speech__meta-data {
 		background: rgba(13, 19, 29, 0.92);
 	}
 }
