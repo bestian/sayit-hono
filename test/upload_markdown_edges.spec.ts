@@ -352,3 +352,135 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		expect(insertedIds).toContain(102);
 	});
 });
+
+describe('PATCH treats svg / iframe blocks as match anchors (issue #68)', () => {
+	function speakerResolver(filename: string, oldSections: any[]): Resolver {
+		return (sql, args) => {
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				if (args[0] === filename) {
+					return { success: true, results: [{ filename, display_name: filename, isNested: 0, alternate_filename: null }] };
+				}
+				return { success: true, results: [] };
+			}
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return { success: true, results: oldSections };
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			if (sql.includes('SELECT DISTINCT section_speaker')) {
+				return { success: true, results: [{ section_speaker: 'A' }] };
+			}
+			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			return { success: true, results: [] };
+		};
+	}
+
+	it('preserves the svg section_id when prose is inserted before it and inner svg markup changes', async () => {
+		// Without #68: LCS only matches the intro; gap-pairing makes the new prose inherit the svg's
+		// old id, and the new svg is allocated a sub-id. With #68: svg is treated as an anchor in LCS,
+		// so the new prose gets the sub-id and the svg keeps its original section_id.
+		const oldSections = [
+			{ section_id: 100, previous_section_id: null, next_section_id: 200, section_speaker: 'A', section_content: '<p>Intro paragraph here.</p>' },
+			{ section_id: 200, previous_section_id: 100, next_section_id: null, section_speaker: 'A', section_content: '<svg viewBox="0 0 100 100"><title>Old Chart</title><circle/></svg>' }
+		];
+		const env = makeUploadEnv(speakerResolver('svg-anchor', oldSections));
+		const newMarkdown = [
+			'# svg-anchor',
+			'## A:',
+			'Intro paragraph here.',
+			'',
+			'Added explanation paragraph.',
+			'',
+			'<svg viewBox="0 0 200 200"><title>New Chart</title><rect/></svg>'
+		].join('\n');
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: 'svg-anchor', markdown: newMarkdown })
+		});
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as any;
+		expect(json).toMatchObject({
+			sectionsCount: 3,
+			insertedCount: 1,
+			updatedCount: 2,
+			deletedCount: 0
+		});
+
+		const updateOps = env.__operations.filter((s) => s.sql.startsWith('UPDATE speech_content'));
+		const svgUpdate = updateOps.find((s) => (s.args as any[])[5] === 200);
+		expect(svgUpdate).toBeDefined();
+		const svgContent = (svgUpdate!.args as any[])[3] as string;
+		expect(svgContent).toContain('<svg');
+		expect(svgContent).toContain('New Chart');
+
+		const insertOps = env.__operations.filter((s) => s.sql.startsWith('INSERT INTO speech_content'));
+		const explanationInsert = insertOps.find((s) => {
+			const content = (s.args as any[])[7];
+			return typeof content === 'string' && content.includes('Added explanation');
+		});
+		expect(explanationInsert).toBeDefined();
+		expect((explanationInsert!.args as any[])[3]).not.toBe(200);
+	});
+
+	it('preserves the iframe section_id when iframe src changes and an unrelated section is inserted', async () => {
+		const oldSections = [
+			{ section_id: 100, previous_section_id: null, next_section_id: 300, section_speaker: 'A', section_content: '<p>Lead-in sentence.</p>' },
+			{ section_id: 300, previous_section_id: 100, next_section_id: null, section_speaker: 'A', section_content: '<iframe src="https://old.example.com/embed/abc"></iframe>' }
+		];
+		const env = makeUploadEnv(speakerResolver('iframe-anchor', oldSections));
+		const newMarkdown = [
+			'# iframe-anchor',
+			'## A:',
+			'Lead-in sentence.',
+			'',
+			'A note added between.',
+			'',
+			'<iframe src="https://new.example.com/embed/xyz"></iframe>'
+		].join('\n');
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: 'iframe-anchor', markdown: newMarkdown })
+		});
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as any;
+		expect(json).toMatchObject({ sectionsCount: 3, insertedCount: 1, updatedCount: 2, deletedCount: 0 });
+
+		const updateOps = env.__operations.filter((s) => s.sql.startsWith('UPDATE speech_content'));
+		const iframeUpdate = updateOps.find((s) => (s.args as any[])[5] === 300);
+		expect(iframeUpdate).toBeDefined();
+		const iframeContent = (iframeUpdate!.args as any[])[3] as string;
+		expect(iframeContent).toContain('<iframe');
+		expect(iframeContent).toContain('new.example.com');
+	});
+
+	it('does NOT short-circuit when a section mixes iframe with surrounding prose', async () => {
+		// Mixed iframe+prose section: detectEmbeddedMediaTag finds the iframe but the
+		// remainder after stripping is non-empty, so it returns null and the matcher
+		// falls back to prose comparison. Single section → first-section special case
+		// still preserves the id; this test exercises the remainder!=="" branch.
+		const oldSections = [
+			{ section_id: 50, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>Old prose around an iframe: <iframe src="A"></iframe> done.</p>' }
+		];
+		const env = makeUploadEnv(speakerResolver('mixed-iframe', oldSections));
+		const newMarkdown = [
+			'# mixed-iframe',
+			'## A:',
+			'New prose around an iframe: <iframe src="B"></iframe> done.'
+		].join('\n');
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: 'mixed-iframe', markdown: newMarkdown })
+		});
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as any;
+		expect(json).toMatchObject({ sectionsCount: 1, updatedCount: 1, insertedCount: 0, deletedCount: 0 });
+		const updateOps = env.__operations.filter((s) => s.sql.startsWith('UPDATE speech_content'));
+		expect(updateOps.find((s) => (s.args as any[])[5] === 50)).toBeDefined();
+	});
+});
