@@ -138,3 +138,24 @@ const loading = false
 		<Footer />
 	</div>
 </template>
+
+<style scoped>
+/* 維持既有版面，僅在捲動快滑出視窗時把講者頭像與姓名 clip 在頂端。 */
+.speech--with-portrait .speaker-portrait-wrapper {
+	position: sticky;
+	top: 0.5em;
+	z-index: 4;
+}
+.speech--with-portrait .speech__meta-data {
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	padding: 0.25em 0;
+	background: rgba(255, 255, 255, 0.94);
+}
+@media (prefers-color-scheme: dark) {
+	.speech--with-portrait .speech__meta-data {
+		background: rgba(13, 19, 29, 0.92);
+	}
+}
+</style>
