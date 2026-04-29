@@ -242,7 +242,30 @@ function normalizeSectionComparableContent(input: string): string {
 		.trim();
 }
 
+/** 偵測段落是否「以 svg / iframe 嵌入區塊為主體」；若是，回傳該標籤名 */
+function detectEmbeddedMediaTag(input: string): 'svg' | 'iframe' | null {
+	let detected: 'svg' | 'iframe' | null = null;
+	let stripped = input;
+	for (const tag of ['svg', 'iframe'] as const) {
+		const re = new RegExp(`<\\s*${tag}\\b[^>]*>[\\s\\S]*?<\\s*/\\s*${tag}\\s*>`, 'gi');
+		const replaced = stripped.replace(re, ' ');
+		if (replaced !== stripped) {
+			detected ??= tag;
+			stripped = replaced;
+		}
+	}
+	if (!detected) return null;
+	// 只有「去掉媒體區塊與 HTML 標記後幾乎沒剩文字」才視為純嵌入段落，避免誤傷夾帶說明文字的段落
+	const remainder = stripped.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+	return remainder === '' ? detected : null;
+}
+
 function sectionMatchKey(section: { markdown: string; speaker: string | null }) {
+	// svg / iframe 區塊內部小幅變動（viewBox、src query）不應觸發 LCS 重排，直接以標籤類型作 key
+	const mediaTag = detectEmbeddedMediaTag(section.markdown);
+	if (mediaTag) {
+		return `${section.speaker ?? ''}\u0000__embedded_${mediaTag}__`;
+	}
 	return `${section.speaker ?? ''}\u0000${normalizeSectionComparableContent(section.markdown)}`;
 }
 
