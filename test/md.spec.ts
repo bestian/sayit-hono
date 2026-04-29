@@ -19,4 +19,31 @@ describe('md conversion', () => {
 		expect(md).not.toContain('&#39;');
 		expect(md).not.toContain('&apos;');
 	});
+
+	it('uses fullwidth ：for speaker names ending in Han characters', () => {
+		const md = __test__.an2md(`<akomaNtoso>
+			<TLCPerson id="p1" showAs="唐鳳"/>
+			<speech by="#p1"><p>大家好</p></speech>
+		</akomaNtoso>`);
+		expect(md).toContain('### 唐鳳：');
+		expect(md).not.toContain('### 唐鳳: ');
+	});
+
+	it('keeps halfwidth ": " for non-Han speaker names', () => {
+		const md = __test__.an2md(`<akomaNtoso>
+			<TLCPerson id="p1" showAs="TonyQ"/>
+			<speech by="#p1"><p>Hello</p></speech>
+		</akomaNtoso>`);
+		expect(md).toContain('### TonyQ: ');
+	});
+
+	it('renders Unknown speaker as blockquote without ### header', () => {
+		const md = __test__.an2md(`<akomaNtoso>
+			<TLCPerson id="u" showAs="Unknown"/>
+			<speech by="#u"><p>（開場簡報）</p><p>連結略</p></speech>
+		</akomaNtoso>`);
+		expect(md).not.toContain('### Unknown');
+		expect(md).toContain('> （開場簡報）');
+		expect(md).toContain('> 連結略');
+	});
 });
