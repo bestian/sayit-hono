@@ -249,6 +249,18 @@ describe('Worker routes', () => {
 		expect(res.headers.get('location')).toBe('https://example.com/speeches/');
 	});
 
+	it('renders speeches from D1 and writes a data-versioned R2 HTML cache', async () => {
+		const env = createEnv();
+		const { res } = await request('/speeches/', env);
+		expect(res.status).toBe(200);
+		expect(res.headers.get('Cache-Control')).toBe('no-store, no-cache, must-revalidate');
+		expect(await res.text()).toContain('Demo Speech');
+		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+		);
+		expect(speechCacheKeys).toHaveLength(1);
+	});
+
 	it('returns speech index from D1', async () => {
 		const { res } = await request('/api/speech_index.json');
 		expect(res.status).toBe(200);

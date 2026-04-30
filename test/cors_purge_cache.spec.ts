@@ -165,7 +165,7 @@ describe('Read route cache behavior', () => {
 		expect(html).toContain('cached response');
 	});
 
-	it('serves speeches list from R2 cache when pre-seeded', async () => {
+	it('does not serve speeches list from persistent R2 cache when pre-seeded', async () => {
 		const env = createSimpleEnv();
 		const cacheKey = `${CACHE_KEY_VERSION}/example.com/speeches/`;
 		env.__r2Store.set(cacheKey, {
@@ -177,6 +177,11 @@ describe('Read route cache behavior', () => {
 		const { res } = await request('/speeches/', env);
 		expect(res.status).toBe(200);
 		const html = await res.text();
-		expect(html).toContain('SPEECHES-SEEDED');
+		expect(html).not.toContain('SPEECHES-SEEDED');
+		expect(res.headers.get('Cache-Control')).toBe('no-store, no-cache, must-revalidate');
+		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+		);
+		expect(speechCacheKeys).toHaveLength(1);
 	});
 });

@@ -54,6 +54,7 @@ const app = new Hono<{ Bindings: WorkerEnv }>();
 
 const EDGE_TTL_SECONDS = 60;
 const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}`;
+const VOLATILE_HTML_CACHE_CONTROL = 'no-store, no-cache, must-revalidate';
 const SEARCH_API_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
 const SEARCH_HTML_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
 const SEARCH_MIN_QUERY_LENGTH = 2;
@@ -182,9 +183,9 @@ function buildCacheKey(url: string, { includeSearch = true }: { includeSearch?: 
 	return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${includeSearch ? u.search : ''}`;
 }
 
-function withCacheHeaders(response: Response): Response {
+function withCacheHeaders(response: Response, cacheControl = DEFAULT_HTML_CACHE_CONTROL): Response {
 	const res = new Response(response.body, response);
-	res.headers.set('Cache-Control', DEFAULT_HTML_CACHE_CONTROL);
+	res.headers.set('Cache-Control', cacheControl);
 	return res;
 }
 
@@ -520,6 +521,16 @@ async function loadSpeeches(c: any): Promise<SpeechListItem[]> {
 		filename: row.filename,
 		display_name: row.display_name
 	}));
+}
+
+async function buildSpeechListDataToken(speeches: SpeechListItem[]): Promise<string> {
+	const payload = speeches
+		.map((speech) => `${speech.filename}\u0000${speech.display_name}`)
+		.join('\u0001');
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+	const bytes = Array.from(new Uint8Array(digest.slice(0, 16)));
+	const hash = bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+	return `${speeches.length}-${hash}`;
 }
 
 async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
@@ -934,10 +945,6 @@ async function renderHomePage(c: any) {
 }
 
 async function renderSpeechesPage(c: any) {
-	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
-	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) return r2Cached;
-
 	let speeches: SpeechListItem[];
 	try {
 		speeches = await loadSpeeches(c);
@@ -945,6 +952,12 @@ async function renderSpeechesPage(c: any) {
 		console.error('[speeches SSR] DB error', err);
 		return c.text('Internal Server Error', 500);
 	}
+
+	const baseCacheKey = buildCacheKey(c.req.url, { includeSearch: false });
+	const dataToken = await buildSpeechListDataToken(speeches);
+	const cacheKey = `${baseCacheKey}data-${dataToken}`;
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) return r2Cached;
 
 	const styles = [SpeechesViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSpeeches();
@@ -957,7 +970,7 @@ async function renderSpeechesPage(c: any) {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response);
+	response = withCacheHeaders(response, VOLATILE_HTML_CACHE_CONTROL);
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	}
