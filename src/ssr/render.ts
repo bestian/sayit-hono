@@ -706,10 +706,20 @@ const THEME_STYLES = `<style>
      —— 對沒有 hover 的裝置才合理。 */
   @media (hover: hover) {
     .speech__links { display: none !important; }
-    .speech:hover .speech__links,
-    .speech:focus-within .speech__links,
-    .speech *:hover .speech__links,
-    .speech *:focus .speech__links { display: block !important; }
+
+    /* #104 同講者連續多段 (.speaker-block__section)：hover 該段才出現該段
+       的連結，不要讓整個 li 內所有段都跟著浮出來。 */
+    .speaker-block__section:hover .speech__links,
+    .speaker-block__section:focus-within .speech__links {
+      display: block !important;
+    }
+
+    /* 其他單段結構（SingleSpeakerView 等，一個 li.speech 對應一段）：
+       hover 整個 .speech 才浮現 —— 這時 li 裡本來就只有一組 .speech__links。 */
+    .speech:not(.speaker-block):hover .speech__links,
+    .speech:not(.speaker-block):focus-within .speech__links {
+      display: block !important;
+    }
   }
 </style>`;
 
