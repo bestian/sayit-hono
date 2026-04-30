@@ -92,6 +92,36 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 		expect(speechCacheKeys).toHaveLength(1);
 	});
 
+	it('serves preseeded R2 body when data-versioned key still matches', async () => {
+		const rows = [{ filename: '2026-a-demo', display_name: 'A Demo' }];
+		const env = makeEnv((sql) => {
+			if (sql.includes('SELECT filename, display_name FROM speech_index ORDER BY id ASC')) {
+				return { success: true, results: rows };
+			}
+			return { success: true, results: [] };
+		});
+
+		// 第一次呼叫填入 R2，cache key 由 dataToken 決定
+		const first = await request('/speeches/', env);
+		expect(first.res.status).toBe(200);
+		const [cacheKey] = Array.from(env.__r2Store.keys()).filter((key) =>
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+		);
+		expect(cacheKey).toBeDefined();
+
+		// 把同一把 key 改成 sentinel，第二次呼叫應該命中 R2 直接回傳
+		env.__r2Store.set(cacheKey!, {
+			body: '<!doctype html><title>cached</title><body>SPEECHES-FROM-R2</body>',
+			cacheControl: 'no-store, no-cache, must-revalidate',
+			contentType: 'text/html; charset=utf-8',
+			etag: null
+		});
+
+		const second = await request('/speeches/', env);
+		expect(second.res.status).toBe(200);
+		expect(await second.res.text()).toContain('SPEECHES-FROM-R2');
+	});
+
 	it('misses old speeches R2 HTML when the speech list data changes', async () => {
 		let rows = [{ filename: '2026-a-demo', display_name: 'A Demo' }];
 		const env = makeEnv((sql) => {
