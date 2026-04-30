@@ -11,10 +11,12 @@
 
 ## 開發
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
-`npm run dev` 會先把 `.vue` 編譯到 `src/.generated/views`，再啟動 `wrangler dev`。修改 `.vue` 後需重跑一次 `npm run dev` 或單獨執行 `npm run build:views` 讓編譯檔更新。
+本專案 package manager 統一用 **bun**（lockfile 為 `bun.lock`）；唯一例外是 `wrangler` 仍走 `npx wrangler …`，因為 bun runtime 已知會讓 `wrangler deploy` 在 async upload 完成前提早 exit。
+
+`bun run dev` 會先把 `.vue` 編譯到 `src/.generated/views`，再啟動 `wrangler dev`。修改 `.vue` 後需重跑一次 `bun run dev` 或單獨執行 `bun run build:views` 讓編譯檔更新。
 
 ## 清理快取(暫時)
 
@@ -45,26 +47,26 @@ npm run dev
 
 ## 靜態資源建置
 ```bash
-npm run build:assets
+bun run build:assets
 ```
 會把 `public/` 同步到 `www/`。若要近端預覽靜態檔：
 ```bash
-npm run preview:assets
+bun run preview:assets
 ```
 （等同 `python3 -m http.server 4173 -d www`）
 
 ### SSR 路由注意事項
 - 所有頁面皆為 SSR 路由，並搭配 R2/Edge 快取。
-- 部署或開發前，仍需先執行 `npm run build:views` 生成 `src/.generated/views` 供 Worker 匯入。
+- 部署或開發前，仍需先執行 `bun run build:views` 生成 `src/.generated/views` 供 Worker 匯入。
 
 ## 部署
 
-`npm run deploy` 預設已包含搜尋索引建置；若只想單獨重建搜尋資料，也可直接執行 `npm run build:search`。
+`bun run deploy` 預設已包含搜尋索引建置；若只想單獨重建搜尋資料，也可直接執行 `bun run build:search`。
 
 ### 搜尋索引建置（build:search）
 
 ```bash
-npm run build:search
+bun run build:search
 ```
 
 - **產出**：`scripts/build-search-index.ts` 會產生壓縮後的搜尋基線索引、即時 overlay manifest、以及首頁統計用的 `www/stats.json`。大型搜尋索引會上傳到 R2，部署時不直接塞進 ASSETS。
@@ -73,25 +75,25 @@ npm run build:search
 一鍵完成搜尋建置＋部署：
 
 ```bash
-npm run deploy
+bun run deploy
 ```
 
-等同 `npm run build:views && npm run build:assets && npm run build:search && wrangler deploy`。
+等同 `bun run build:views && bun run build:assets && bun run build:search && npx wrangler deploy`。
 
 ### 只更新 Worker / ASSETS
 
 ```bash
-npm run deploy:assets
+bun run deploy:assets
 ```
 
 只重建視圖與靜態資源，不重建搜尋索引；適合純版面或資產更新。
 
 ### 先建置資源再部署 Worker（ASSETS）
-若要在遠端或本地先跑完 `build:assets` 後，再像 `npm run deploy` 一樣更新 Worker 與 ASSETS：
+若要在遠端或本地先跑完 `build:assets` 後，再像 `bun run deploy` 一樣更新 Worker 與 ASSETS：
 ```bash
-npm run deploy:assets
+bun run deploy:assets
 ```
-等同 `npm run build:assets && wrangler deploy`：先產出 `www/`，再一併上傳 Worker 與靜態資源。CI 上可依序執行 `build:assets` 與 `wrangler deploy` 達到相同效果。
+等同 `bun run build:assets && npx wrangler deploy`：先產出 `www/`，再一併上傳 Worker 與靜態資源。CI 上可依序執行 `build:assets` 與 `npx wrangler deploy` 達到相同效果。
 
 
 

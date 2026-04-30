@@ -83,31 +83,35 @@ data/、files/、raw_*     # 演講原始資料與輸入輸出範本
 ### 安裝與啟動
 
 ```bash
-npm install
-npm run dev         # = build:views + wrangler dev --remote
+bun install
+bun run dev         # = build:views + wrangler dev --remote
 ```
 
-`wrangler dev --remote` 會連到實際的 Cloudflare 資源（D1、R2），所以本地也能存取真實資料。修改 `.vue` 後必須重新跑 `npm run build:views`（或 `npm run dev`）讓 `src/.generated/` 更新。
+> 本專案的 package manager 統一用 **bun**（lockfile 為 `bun.lock`）。
+> 唯一例外：`wrangler` 仍走 `npx wrangler …`，因為 bun runtime 有
+> 已知 bug 會讓 wrangler deploy 在 async upload 完成前提早 exit。
+
+`wrangler dev --remote` 會連到實際的 Cloudflare 資源（D1、R2），所以本地也能存取真實資料。修改 `.vue` 後必須重新跑 `bun run build:views`（或 `bun run dev`）讓 `src/.generated/` 更新。
 
 ### 常用指令
 
 | 指令 | 說明 |
 |------|------|
-| `npm run dev` | 開發伺服器（編譯 views + wrangler dev --remote） |
-| `npm run build:views` | 將 `src/views`、`src/components` 的 `.vue` 編譯到 `src/.generated/` |
-| `npm run build:assets` | 把 `public/` 同步到 `www/` |
-| `npm run build:search` | 重建搜尋基線索引、overlay manifest、`stats.json`，並上傳 R2 |
-| `npm run build:cache-version` | 重新產生 `src/cacheKeyVersion.ts`，做為快取 key 前綴 |
-| `npm run deploy` | 完整部署（cache version + views + assets + search + wrangler deploy） |
-| `npm run deploy:assets` | 不重建搜尋索引的部署（純前端 / 視圖修改用） |
-| `npm run preview:assets` | 用 `python3 -m http.server` 預覽 `www/` |
-| `npm run test` / `test:watch` / `test:coverage` | Vitest 測試（含覆蓋率） |
-| `npm run typecheck` | `tsc --noEmit` 全專案型別檢查 |
-| `npm run cf-typegen` | 由 `wrangler.jsonc` 產生 `worker-configuration.d.ts` |
+| `bun run dev` | 開發伺服器（編譯 views + wrangler dev --remote） |
+| `bun run build:views` | 將 `src/views`、`src/components` 的 `.vue` 編譯到 `src/.generated/` |
+| `bun run build:assets` | 把 `public/` 同步到 `www/` |
+| `bun run build:search` | 重建搜尋基線索引、overlay manifest、`stats.json`，並上傳 R2 |
+| `bun run build:cache-version` | 重新產生 `src/cacheKeyVersion.ts`，做為快取 key 前綴 |
+| `bun run deploy` | 完整部署（cache version + views + assets + search + wrangler deploy） |
+| `bun run deploy:assets` | 不重建搜尋索引的部署（純前端 / 視圖修改用） |
+| `bun run preview:assets` | 用 `python3 -m http.server` 預覽 `www/` |
+| `bun run test` / `test:watch` / `test:coverage` | Vitest 測試（含覆蓋率） |
+| `bun run typecheck` | `tsc --noEmit` 全專案型別檢查 |
+| `bun run cf-typegen` | 由 `wrangler.jsonc` 產生 `worker-configuration.d.ts` |
 
 ### 部署前必跑
 
-`npm run deploy` 已串好下列流程，自寫 CI 時請依序執行：
+`bun run deploy` 已串好下列流程，自寫 CI 時請依序執行：
 
 1. `build:cache-version`（產生 `cacheKeyVersion.ts`，使舊 R2/Edge cache 自動作廢）
 2. `build:views`（編譯 SFC 到 `src/.generated/`）
@@ -145,7 +149,7 @@ npm run dev         # = build:views + wrangler dev --remote
 
 - **沒有 vue-router、沒有 App.vue、沒有 client-side hydration**。`renderHtml()` 只跑 `renderToString`，HTML 出來就是最終樣子。
 - 每個頁面 = `src/views/<Name>View.vue`；共用元件放 `src/components/`。
-- `.vue` 不會被 Worker 直接 import；必須先 `npm run build:views` 編譯到 `src/.generated/`。`src/index.ts` 是從 `./.generated/views/...` import 的。
+- `.vue` 不會被 Worker 直接 import；必須先 `bun run build:views` 編譯到 `src/.generated/`。`src/index.ts` 是從 `./.generated/views/...` import 的。
 - 編譯產物加了 `// @ts-nocheck`，`src/.generated/` 不要手動編輯，也不要把它的修改 commit 上去（已在 `tsconfig.json` / `.gitignore` 控制）。
 - 樣式以 `<style scoped>` 為主，`scripts/build-views.ts` 會處理 scoped 編譯並輸出 `styles` 字串供 `renderHtml` 注入。
 
@@ -170,7 +174,7 @@ npm run dev         # = build:views + wrangler dev --remote
 ### TypeScript / 型別
 
 - 全專案 `tsc --noEmit` 必須通過。
-- 修改 `wrangler.jsonc` 後執行 `npm run cf-typegen` 重新產生 `worker-configuration.d.ts`。
+- 修改 `wrangler.jsonc` 後執行 `bun run cf-typegen` 重新產生 `worker-configuration.d.ts`。
 - 不要在 `src/.generated/` 內加型別宣告；那是輸出目錄。
 
 ## 風格與慣例
