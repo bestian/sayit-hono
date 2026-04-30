@@ -695,6 +695,22 @@ const THEME_STYLES = `<style>
       }
     }
   }
+
+  /* hover-capable 裝置（桌面 + 滑鼠 / 觸控板）才把 .speech__links 隱藏起來、
+     hover / focus 該段時才顯示。覆蓋 legacy speeches.css 的 .no-touch
+     .speech__links rule —— 那條 rule 倚賴 inline JS 把 <html> 從 no-touch
+     換成 touch / no-touch；macOS Safari 等瀏覽器在純桌面也會回報
+     'ontouchstart' in window === true，造成 <html class="touch">、舊規則
+     永遠不命中、連結變成永遠顯示。
+     純觸控裝置 (hover: hover) 為 false，這段不適用，連結維持永遠顯示
+     —— 對沒有 hover 的裝置才合理。 */
+  @media (hover: hover) {
+    .speech__links { display: none !important; }
+    .speech:hover .speech__links,
+    .speech:focus-within .speech__links,
+    .speech *:hover .speech__links,
+    .speech *:focus .speech__links { display: block !important; }
+  }
 </style>`;
 
 const SHARE_SCRIPT = `<script>
