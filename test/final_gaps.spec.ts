@@ -69,7 +69,7 @@ async function request(path: string, env: ReturnType<typeof makeEnv>, init?: Req
 }
 
 describe('/speeches/ render (happy path without R2 preseed)', () => {
-	it('renders HTML from DB and stores the rendered body to R2', async () => {
+	it('renders HTML from DB and stores it behind a data-versioned R2 key', async () => {
 		const env = makeEnv((sql) => {
 			if (sql.includes('SELECT filename, display_name FROM speech_index ORDER BY id ASC')) {
 				return {
@@ -85,7 +85,44 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 		const { res } = await request('/speeches/', env);
 		expect(res.status).toBe(200);
 		expect(await res.text()).toContain('A Demo');
-		expect(env.__r2Store.has(`${CACHE_KEY_VERSION}/example.com/speeches/`)).toBe(true);
+		expect(res.headers.get('Cache-Control')).toBe('no-store, no-cache, must-revalidate');
+		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+		);
+		expect(speechCacheKeys).toHaveLength(1);
+	});
+
+	it('misses old speeches R2 HTML when the speech list data changes', async () => {
+		let rows = [{ filename: '2026-a-demo', display_name: 'A Demo' }];
+		const env = makeEnv((sql) => {
+			if (sql.includes('SELECT filename, display_name FROM speech_index ORDER BY id ASC')) {
+				return { success: true, results: rows };
+			}
+			return { success: true, results: [] };
+		});
+
+		const first = await request('/speeches/', env);
+		expect(await first.res.text()).toContain('A Demo');
+		const [oldKey] = Array.from(env.__r2Store.keys()).filter((key) =>
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+		);
+		expect(oldKey).toBeDefined();
+		env.__r2Store.set(oldKey!, {
+			body: '<!doctype html><title>OLD</title><body>OLD-CACHED</body>',
+			cacheControl: 'no-store, no-cache, must-revalidate',
+			contentType: 'text/html; charset=utf-8',
+			etag: null
+		});
+
+		rows = [{ filename: '2026-b-demo', display_name: 'B Demo' }];
+		const second = await request('/speeches/', env);
+		const html = await second.res.text();
+		expect(html).toContain('B Demo');
+		expect(html).not.toContain('OLD-CACHED');
+		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+		);
+		expect(speechCacheKeys).toHaveLength(2);
 	});
 });
 
