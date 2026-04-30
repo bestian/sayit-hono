@@ -284,6 +284,10 @@
 	.speaker-block .speaker-block__section {
 		grid-column: 2;
 		scroll-margin-top: 4em;
+		/* 讓每段內的 .speech__links（position: absolute）錨在該段，而不是整個
+		   speaker-block li——否則同講者連續多段時，所有 .speech__links 會疊在
+		   block 最底部，只剩最後一段看得到 hover 連結。 */
+		position: relative;
 	}
 	.speaker-block .speaker-block__section + .speaker-block__section {
 		margin-top: 0.5em;
