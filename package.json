@@ -17,12 +17,13 @@
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage",
 		"test:watch": "vitest",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsgo --noEmit",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.71",
 		"@types/node": "^24.12.2",
+		"@typescript/native-preview": "^7.0.0-dev.20260429.1",
 		"@vitest/coverage-istanbul": "^3.2.4",
 		"@vue/compiler-sfc": "^3.5.33",
 		"fuse.js": "^7.3.0",
