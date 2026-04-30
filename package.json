@@ -22,7 +22,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.71",
-		"@types/node": "^24.12.2",
+		"@types/node": "^25",
 		"@typescript/native-preview": "^7.0.0-dev.20260429.1",
 		"@vitest/coverage-istanbul": "^3.2.4",
 		"@vue/compiler-sfc": "^3.5.33",
