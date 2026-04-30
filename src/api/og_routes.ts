@@ -70,7 +70,7 @@ async function encodeAvatar(c: Context<ApiEnv>, photoURL: string): Promise<strin
 
 /** /og/speech/:section_id.png — OG image for a single quoted section. */
 export async function handleOgSpeechImage(c: Context<ApiEnv>, loader: OgLoader) {
-	const sectionId = Number(c.req.param('section_id').replace(/\.png$/, ''));
+	const sectionId = Number((c.req.param('section_id') ?? '').replace(/\.png$/, ''));
 	if (!Number.isInteger(sectionId)) return c.text('Not Found', 404);
 
 	const cacheKey = `${CACHE_KEY_VERSION}/og/speech/${sectionId}.png`;
