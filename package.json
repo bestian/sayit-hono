@@ -4,9 +4,10 @@
 	"private": true,
 	"scripts": {
 		"deploy": "bun run deploy:search",
-		"deploy:assets": "bun run build:cache-version && bun run build:views && bun run build:assets && npx wrangler deploy && bun run verify:deploy",
-		"deploy:search": "bun run build:cache-version && bun run build:views && bun run build:assets && bun run build:search && npx wrangler deploy && bun run verify:deploy",
+		"deploy:assets": "bun run preflight:deploy && bun run build:cache-version && bun run build:views && bun run build:assets && npx wrangler deploy && bun run verify:deploy",
+		"deploy:search": "bun run preflight:deploy && bun run build:cache-version && bun run build:views && bun run build:assets && bun run build:search && npx wrangler deploy && bun run verify:deploy",
 		"dev": "bun run build:views && wrangler dev --remote",
+		"preflight:deploy": "tsx --tsconfig scripts/tsconfig.json scripts/preflight-deploy.ts",
 		"verify:deploy": "tsx --tsconfig scripts/tsconfig.json scripts/verify-deploy.ts",
 		"build:cache-version": "tsx --tsconfig scripts/tsconfig.json scripts/generate-cache-version.ts",
 		"start": "bun run dev",
