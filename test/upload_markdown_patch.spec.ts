@@ -21,12 +21,15 @@ function createUpsertEnv(options: {
 	existingFilename?: string;
 	/** Rows to return for the speech_index lookup */
 	speechIndexRows?: SpeechIndexRow[];
+	/** speech_redirects mapping: old_filename -> new_filename */
+	redirects?: Record<string, string>;
 } = {}) {
 	const operations: PreparedStatement[] = [];
 	const directStatements: PreparedStatement[] = [];
 	const deletedKeys: string[] = [];
 	const putObjects = new Map<string, string>();
 	const speechIndexRows: SpeechIndexRow[] = options.speechIndexRows ?? [];
+	const redirects: Record<string, string> = options.redirects ?? {};
 
 	function query(sql: string, args: unknown[]) {
 		if (sql.includes('FROM speech_index WHERE filename = ?')) {
@@ -61,6 +64,10 @@ function createUpsertEnv(options: {
 		}
 		if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
 			return { success: true, results: [] };
+		}
+		if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) {
+			const target = redirects[String(args[0])];
+			return { success: true, results: target ? [{ new_filename: target }] : [] };
 		}
 		throw new Error(`Unexpected query: ${sql}`);
 	}
@@ -151,6 +158,41 @@ describe('PATCH /api/upload_markdown — upsert when filename missing', () => {
 		const insertStmt = env.__directStatements.find((s) => s.sql.includes('INSERT INTO speech_index'));
 		expect(insertStmt).toBeDefined();
 		expect(insertStmt!.args).toEqual(['fresh-speech', 'fresh-speech', '', '']);
+	});
+
+	it('rewrites filename via speech_redirects when speech_index misses, and does not auto-create', async () => {
+		const env = createUpsertEnv({
+			redirects: { 'deprecated-filename': 'canonical-filename' },
+			speechIndexRows: [{
+				filename: 'canonical-filename',
+				display_name: 'Canonical',
+				isNested: 0,
+				nest_filenames: '',
+				nest_display_names: '',
+				alternate_filename: null
+			}]
+		});
+
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'deprecated-filename',
+				markdown: '# Canonical\nContent'
+			})
+		});
+
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as { success: boolean; filename: string };
+		expect(json.success).toBe(true);
+		// Response carries the canonical filename, not the deprecated one
+		expect(json.filename).toBe('canonical-filename');
+		// No INSERT INTO speech_index because the canonical row already exists
+		const insertStmt = env.__directStatements.find((s) => s.sql.includes('INSERT INTO speech_index'));
+		expect(insertStmt).toBeUndefined();
 	});
 
 	it('does NOT call the upsert insert when row already exists', async () => {

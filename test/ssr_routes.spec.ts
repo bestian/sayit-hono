@@ -689,3 +689,56 @@ describe('canonical middleware redirects', () => {
 		expect(res.headers.get('location')).toBe('https://example.com/search/?q=abc');
 	});
 });
+
+describe('speech_redirects 301 fallback', () => {
+	const buildResolver = (redirects: Record<string, string>): QueryResolver => (sql, args) => {
+		if (sql.includes('FROM speech_index WHERE filename = ?')) {
+			return { success: true, results: [] };
+		}
+		if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) {
+			const to = redirects[String(args[0])];
+			return { success: true, results: to ? [{ new_filename: to }] : [] };
+		}
+		return { success: true, results: [] };
+	};
+
+	it('301 redirects an unknown flat filename when a redirect exists', async () => {
+		const env = createSsrEnv(buildResolver({ 'old-filename': 'new-filename' }));
+		const { res } = await request('/old-filename', env);
+		expect(res.status).toBe(301);
+		expect(res.headers.get('location')).toBe('/new-filename');
+		expect(res.headers.get('cache-control')).toBe('public, max-age=86400');
+	});
+
+	it('preserves CJK characters via percent encoding', async () => {
+		const from = '2016-04-16-蕭富元、唐鳳、上官良治的討論紀錄';
+		const to = '2016-04-16-蕭富元唐鳳上官良治的討論紀錄';
+		const env = createSsrEnv(buildResolver({ [from]: to }));
+		const { res } = await request(`/${encodeURIComponent(from)}`, env);
+		expect(res.status).toBe(301);
+		expect(res.headers.get('location')).toBe(`/${encodeURIComponent(to)}`);
+	});
+
+	it('still 404s when no redirect row exists', async () => {
+		const env = createSsrEnv(buildResolver({}));
+		const { res } = await request('/never-existed', env);
+		expect(res.status).toBe(404);
+	});
+
+	it('forwards nested URL to the redirected parent, keeping the nest segment', async () => {
+		const env = createSsrEnv(buildResolver({ 'old-parent': 'new-parent' }));
+		const { res } = await request('/old-parent/chapter-1', env);
+		expect(res.status).toBe(301);
+		expect(res.headers.get('location')).toBe('/new-parent/chapter-1');
+	});
+
+	it('treats redirect query throw as a miss (404)', async () => {
+		const env = createSsrEnv((sql, args) => {
+			if (sql.includes('FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
+			if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) throw new Error('boom');
+			return { success: true, results: [] };
+		});
+		const { res } = await request('/anything', env);
+		expect(res.status).toBe(404);
+	});
+});
