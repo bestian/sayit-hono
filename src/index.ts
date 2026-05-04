@@ -482,6 +482,31 @@ async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow 
 	return result as SpeechIndexRow ?? null;
 }
 
+/**
+ * 查 speech_redirects：若 old_filename 命中，回傳要跳轉到的 new_filename。
+ * Route handler 應在 loadSpeechMeta 回 null 時、回 404 之前呼叫，命中則 301 到正規版本。
+ */
+async function loadSpeechRedirect(c: any, oldFilename: string): Promise<string | null> {
+	try {
+		const row = await c.env.DB.prepare(
+			'SELECT new_filename FROM speech_redirects WHERE old_filename = ?'
+		)
+			.bind(oldFilename)
+			.first();
+		const target = (row as { new_filename?: string } | null)?.new_filename;
+		return typeof target === 'string' && target.length > 0 ? target : null;
+	} catch (err) {
+		console.error('[speech redirect] DB error', err);
+		return null;
+	}
+}
+
+function buildSpeechRedirectResponse(c: any, location: string): Response {
+	const response = c.redirect(location, 301);
+	response.headers.set('Cache-Control', 'public, max-age=86400');
+	return response;
+}
+
 type AlternateInfo = { url: string; label: string; displayName: string; hreflang: string };
 
 async function loadAlternateInfo(c: any, filename: string): Promise<AlternateInfo | null> {
@@ -1221,7 +1246,18 @@ app.get('/:filename/:nest_filename', async (c) => {
 		return c.text('Internal Server Error', 500);
 	}
 
-	if (!speechMeta || !speechMeta.isNested) {
+	if (!speechMeta) {
+		const redirectTo = await loadSpeechRedirect(c, filename);
+		if (redirectTo) {
+			return buildSpeechRedirectResponse(
+				c,
+				`/${encodeURIComponent(redirectTo)}/${encodeURIComponent(nestFilename)}`
+			);
+		}
+		return c.text('Not Found', 404);
+	}
+
+	if (!speechMeta.isNested) {
 		return c.text('Not Found', 404);
 	}
 
@@ -1367,6 +1403,10 @@ app.get('/:filename', async (c) => {
 	}
 
 	if (!speechMeta) {
+		const redirectTo = await loadSpeechRedirect(c, filename);
+		if (redirectTo) {
+			return buildSpeechRedirectResponse(c, `/${encodeURIComponent(redirectTo)}`);
+		}
 		return c.text('Not Found', 404);
 	}
 
