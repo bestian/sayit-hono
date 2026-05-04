@@ -37,6 +37,23 @@ function transformFilename(input: string): string {
 	return replaced.slice(0, 50);
 }
 
+/**
+ * 若該 filename 已被合併到 canonical 版本（speech_redirects.old_filename 命中），
+ * 回傳 canonical 的 new_filename；否則回 null。
+ *
+ * 用途：POST / PATCH / DELETE 進來時，先試 speech_index 直接命中；沒命中再查
+ * 此函式，避免被合併掉的 deprecated filename 又被自動 upsert 出新一份重複。
+ */
+async function lookupRedirectTarget(c: any, filename: string): Promise<string | null> {
+	const row = await withRetry(() => c.env.DB.prepare(
+		'SELECT new_filename FROM speech_redirects WHERE old_filename = ?'
+	)
+		.bind(filename)
+		.first());
+	const target = (row as { new_filename?: string } | null)?.new_filename;
+	return typeof target === 'string' && target.length > 0 ? target : null;
+}
+
 type SpeakerMark = {
 	lineIndex: number;
 	speakerSlug: string | null;
@@ -637,8 +654,15 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				return c.json({ error: 'Filename cannot be empty' }, 400, corsHeadersWithMethods);
 			}
 
-			const filename = transformFilename(inputFilename);
+			let filename = transformFilename(inputFilename);
 			console.log('[upload_markdown] filename transform:', { input: inputFilename, output: filename });
+
+			// 若這個 filename 已被合併到 canonical，DELETE 改打 canonical
+			const canonicalFilename = await lookupRedirectTarget(c, filename);
+			if (canonicalFilename) {
+				console.log('[upload_markdown] DELETE redirect:', { from: filename, to: canonicalFilename });
+				filename = canonicalFilename;
+			}
 
 			// 先查講者清單，再一次 batch 完成所有刪除 + 孤兒清理
 				const linkedSpeakers = await withRetry(() => c.env.DB.prepare(
@@ -721,7 +745,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			if (!raw_filename || typeof raw_filename !== 'string') {
 				return c.json({ error: 'Missing or invalid filename field' }, 400, corsHeadersWithMethods);
 			}
-			const filename = transformFilename(raw_filename.trim());
+			let filename = transformFilename(raw_filename.trim());
 			const markdown = body.markdown as string;
 
 			if (!body.markdown || typeof body.markdown !== 'string') {
@@ -729,11 +753,25 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			}
 
 			// 冪等：若 speech_index 已有此 filename 則先刪除舊資料再重新寫入
-			const existing = await withRetry(() => c.env.DB.prepare(
+			let existing = await withRetry(() => c.env.DB.prepare(
 				'SELECT filename FROM speech_index WHERE filename = ?'
 			)
 				.bind(filename)
 				.first<{ filename: string }>());
+
+			if (!existing) {
+				// 若 filename 已被合併到 canonical，改 POST 到 canonical，避免重新生出重複列
+				const canonicalFilename = await lookupRedirectTarget(c, filename);
+				if (canonicalFilename) {
+					console.log('[upload_markdown] POST redirect:', { from: filename, to: canonicalFilename });
+					filename = canonicalFilename;
+					existing = await withRetry(() => c.env.DB.prepare(
+						'SELECT filename FROM speech_index WHERE filename = ?'
+					)
+						.bind(filename)
+						.first<{ filename: string }>());
+				}
+			}
 
 			if (existing) {
 				console.log('[upload_markdown] POST speech_index 已存在，先刪除舊資料:', filename);
@@ -869,13 +907,26 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				return c.json({ error: 'Missing or invalid markdown field' }, 400, corsHeadersWithMethods);
 			}
 
-			const filename = transformFilename(rawFilename.trim());
+			let filename = transformFilename(rawFilename.trim());
 			const markdown = body.markdown;
-			const existingSpeech = await withRetry(() => c.env.DB.prepare(
+			let existingSpeech = await withRetry(() => c.env.DB.prepare(
 				'SELECT filename, alternate_filename FROM speech_index WHERE filename = ?'
 			)
 				.bind(filename)
 				.first<{ filename: string; alternate_filename?: string | null }>());
+			if (!existingSpeech) {
+				// 若 filename 已被合併到 canonical，改 PATCH 到 canonical，避免重新生出重複列
+				const canonicalFilename = await lookupRedirectTarget(c, filename);
+				if (canonicalFilename) {
+					console.log('[upload_markdown] PATCH redirect:', { from: filename, to: canonicalFilename });
+					filename = canonicalFilename;
+					existingSpeech = await withRetry(() => c.env.DB.prepare(
+						'SELECT filename, alternate_filename FROM speech_index WHERE filename = ?'
+					)
+						.bind(filename)
+						.first<{ filename: string; alternate_filename?: string | null }>());
+				}
+			}
 			if (!existingSpeech) {
 				// Upsert: auto-create speech_index entry so PATCH proceeds as an insert
 				await withRetry(() => c.env.DB.prepare(

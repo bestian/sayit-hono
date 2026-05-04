@@ -7,10 +7,11 @@ const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 type PreparedStatement = { sql: string; args: unknown[] };
 
-function createPostEnv(options: { hasExistingFilename?: boolean } = {}) {
+function createPostEnv(options: { hasExistingFilename?: boolean; redirects?: Record<string, string> } = {}) {
 	const operations: PreparedStatement[] = [];
 	const deletedKeys: string[] = [];
 	const putObjects = new Map<string, string>();
+	const redirects: Record<string, string> = options.redirects ?? {};
 
 	function query(sql: string, args: unknown[]) {
 		if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) {
@@ -42,6 +43,10 @@ function createPostEnv(options: { hasExistingFilename?: boolean } = {}) {
 		}
 		if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
 			return { success: true, results: [] };
+		}
+		if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) {
+			const target = redirects[String(args[0])];
+			return { success: true, results: target ? [{ new_filename: target }] : [] };
 		}
 		throw new Error(`Unexpected query: ${sql}`);
 	}
@@ -152,6 +157,28 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 
 		const contentInserts = env.__operations.filter((s) => s.sql.startsWith('INSERT INTO speech_content'));
 		expect(contentInserts.length).toBeGreaterThan(0);
+	});
+
+	it('rewrites filename via speech_redirects when speech_index misses, treating canonical as the existing target', async () => {
+		const env = createPostEnv({
+			redirects: { 'deprecated-name': 'canonical-name' }
+		});
+
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({ filename: 'deprecated-name', markdown: '# Canonical\n## A:\nHi' })
+		});
+
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as { filename: string };
+		// All writes should target the canonical filename, not the deprecated one
+		expect(json.filename).toBe('canonical-name');
+		const indexInsert = env.__operations.find((s) => s.sql.startsWith('INSERT INTO speech_index'));
+		expect(indexInsert!.args[0]).toBe('canonical-name');
 	});
 
 	it('deletes prior rows before re-inserting when filename already exists (idempotent)', async () => {

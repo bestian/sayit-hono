@@ -7,11 +7,12 @@ const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 type PreparedStatement = { sql: string; args: unknown[] };
 
-function createDeleteEnv(options: { speakerRoutes?: string[] } = {}) {
+function createDeleteEnv(options: { speakerRoutes?: string[]; redirects?: Record<string, string> } = {}) {
 	const operations: PreparedStatement[] = [];
 	const deletedKeys: string[] = [];
 	const putObjects = new Map<string, string>();
 	const speakerRoutes = options.speakerRoutes ?? ['audrey-tang', 'bestian'];
+	const redirects: Record<string, string> = options.redirects ?? {};
 
 	function query(sql: string, args: unknown[]) {
 		if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
@@ -25,6 +26,10 @@ function createDeleteEnv(options: { speakerRoutes?: string[] } = {}) {
 		}
 		if (sql.includes('SELECT COUNT(*) AS count FROM speech_content')) {
 			return { success: true, results: [{ count: 0 }] };
+		}
+		if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) {
+			const target = redirects[String(args[0])];
+			return { success: true, results: target ? [{ new_filename: target }] : [] };
 		}
 		throw new Error(`Unexpected query: ${sql}`);
 	}
@@ -171,6 +176,25 @@ describe('DELETE /api/upload_markdown', () => {
 		});
 
 		expect(res.status).toBe(404);
+	});
+
+	it('rewrites filename via speech_redirects to the canonical target before deleting', async () => {
+		const env = createDeleteEnv({
+			speakerRoutes: ['audrey-tang'],
+			redirects: { 'deprecated-name': 'canonical-name' }
+		});
+
+		const { res } = await request('/api/upload_markdown?filename=deprecated-name', env, {
+			method: 'DELETE',
+			headers: { Authorization: 'Bearer token-audrey' }
+		});
+
+		expect(res.status).toBe(200);
+		// All DELETE statements should be against the canonical filename
+		const deleteContent = env.__operations.find((s) => s.sql.startsWith('DELETE FROM speech_content'));
+		expect(deleteContent!.args[0]).toBe('canonical-name');
+		const deleteIndex = env.__operations.find((s) => s.sql.startsWith('DELETE FROM speech_index'));
+		expect(deleteIndex!.args[0]).toBe('canonical-name');
 	});
 
 	it('returns 400 when filename query param is missing', async () => {
