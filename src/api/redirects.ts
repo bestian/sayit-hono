@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
+import { isAuthorizedFromHeader } from './auth';
 import type { ApiEnv } from './types';
 
 const corsMethods = 'GET, HEAD, OPTIONS, PUT';
@@ -74,14 +75,12 @@ export async function redirectsSync(c: Context<ApiEnv>) {
 		'Access-Control-Allow-Methods': corsMethods
 	};
 
-	const authHeader = c.req.header('Authorization');
-	if (!authHeader || !authHeader.startsWith('Bearer ')) {
-		return c.text('Forbidden', 400, corsHeadersWithMethods);
-	}
-	const token = authHeader.slice(7);
-	const audreytToken = c.env.AUDREYT_TRANSCRIPT_TOKEN;
-	const bestianToken = c.env.BESTIAN_TRANSCRIPT_TOKEN;
-	if (!token || (token !== audreytToken && token !== bestianToken)) {
+	const authorized = await isAuthorizedFromHeader(
+		c.req.header('Authorization'),
+		c.env.AUDREYT_TRANSCRIPT_TOKEN,
+		c.env.BESTIAN_TRANSCRIPT_TOKEN
+	);
+	if (!authorized) {
 		return c.text('Forbidden', 400, corsHeadersWithMethods);
 	}
 

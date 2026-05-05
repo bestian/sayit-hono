@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
+import { isAuthorizedFromHeader } from './auth';
 import type { ApiEnv } from './types';
 import { marked } from 'marked';
 import { CACHE_KEY_VERSION, deleteEdgeCache, deleteR2Cache } from './cache';
@@ -656,22 +657,12 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 	try {
 		// 驗證：必須帶 Authorization: Bearer <token>，且 token 為允許的其中一個
-		const authHeader = c.req.header('Authorization');
-
-		if (!authHeader) {
-			return c.text('Forbidden', 400, corsHeadersWithMethods);
-		}
-
-		if (!authHeader.startsWith('Bearer ')) {
-			return c.text('Forbidden', 400, corsHeadersWithMethods);
-		}
-
-		const token = authHeader.slice(7);
-
-		const audreytToken = c.env.AUDREYT_TRANSCRIPT_TOKEN;
-		const bestianToken = c.env.BESTIAN_TRANSCRIPT_TOKEN;
-
-		if (!token || (token !== audreytToken && token !== bestianToken)) {
+		const authorized = await isAuthorizedFromHeader(
+			c.req.header('Authorization'),
+			c.env.AUDREYT_TRANSCRIPT_TOKEN,
+			c.env.BESTIAN_TRANSCRIPT_TOKEN
+		);
+		if (!authorized) {
 			return c.text('Forbidden', 400, corsHeadersWithMethods);
 		}
 
