@@ -352,6 +352,116 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		expect(insertedIds).toContain(102);
 	});
 
+	it('falls back to globalMax+1 fresh IDs when the sub-section slot is fully blocked (overflow guard)', async () => {
+		// Old single section id 1 → sub-section slot is [101, 199] (99 ids).
+		// Mock the cross-filename query to return ALL 99 ids as taken, simulating the
+		// production case where another speech's contiguous range exhausts the entire
+		// [base*100+1, base*100+99] window. Without the fresh-ID fallback, nextCandidate
+		// would overflow past safeRangeMax (199) into the unguarded [200, …] range
+		// — and would hit "UNIQUE constraint failed: speech_content.section_id" if
+		// another speech happens to own those ids too.
+		// findMaxSectionId is mocked to 50000 so the fresh allocator should start at 50000.
+		const ops: any[] = [];
+		const requestBody = {
+			filename: 'overflow-fresh',
+			markdown: '# X\n## A:\nanchor\n\nins1\n\nins2\n\nins3'
+		};
+		const oldSections = [
+			{ section_id: 1, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor</p>' }
+		];
+		const fullyBlockedRange = Array.from({ length: 99 }, (_, i) => ({ section_id: 101 + i }));
+		const resolver: Resolver = (sql, args) => {
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				return { success: true, results: args[0] === requestBody.filename
+					? [{ filename: requestBody.filename, display_name: 'X', isNested: 0, alternate_filename: null }]
+					: []
+				};
+			}
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return { success: true, results: oldSections };
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			if (sql.includes('SELECT DISTINCT section_speaker')) {
+				return { success: true, results: [{ section_speaker: 'A' }] };
+			}
+			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
+				return { success: true, results: fullyBlockedRange };
+			}
+			if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
+				return { success: true, results: [{ max_id: 49999 }] };
+			}
+			return { success: true, results: [] };
+		};
+
+		const ctx = {
+			env: {
+				AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
+				BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
+				SPEECH_CACHE: {
+					get: async () => null,
+					put: async () => {},
+					delete: async () => true,
+					list: async () => ({ objects: [], truncated: false, cursor: '' })
+				},
+				DB: {
+					prepare: (sql: string) => {
+						const run = (args: unknown[]) => ({
+							sql,
+							args,
+							first: async () => resolver(sql, args).results[0] ?? null,
+							all: async () => {
+								const r = resolver(sql, args);
+								return { success: r.success ?? true, results: r.results };
+							},
+							run: async () => ({ success: true, meta: { changes: 1 } })
+						});
+						return {
+							bind: (...args: unknown[]) => run(args),
+							first: async () => run([]).first(),
+							all: async () => run([]).all(),
+							run: async () => run([]).run()
+						};
+					},
+					batch: async (stmts: any[]) => {
+						for (const s of stmts) ops.push(s);
+						return stmts.map(() => ({ meta: { changes: 1 } }));
+					}
+				}
+			},
+			req: {
+				method: 'PATCH',
+				url: 'https://example.com/api/upload_markdown',
+				header: (name: string) => (name === 'Authorization' ? 'Bearer token-audrey' : null),
+				query: () => null,
+				json: async () => requestBody
+			},
+			json: (body: any, status = 200, headers: Record<string, string> = {}) =>
+				new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }),
+			text: (body: string, status = 200, headers: Record<string, string> = {}) =>
+				new Response(body, { status, headers })
+		} as unknown as Context<ApiEnv>;
+
+		const res = await uploadMarkdown(ctx);
+		expect(res.status).toBe(200);
+
+		const insertedIds = ops
+			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
+			.map((stmt) => stmt.args[3]);
+		// All 3 newly-inserted sections must come from the fresh ID range (>= 50000),
+		// not the overflowed [200, …] range that would risk cross-speech UNIQUE PK collision.
+		expect(insertedIds.length).toBeGreaterThanOrEqual(3);
+		for (const id of insertedIds) {
+			expect(id).toBeGreaterThanOrEqual(50000);
+		}
+		// Specifically should be 50000, 50001, 50002 (sequential from freshIdStart).
+		expect(insertedIds.slice(0, 3)).toEqual([50000, 50001, 50002]);
+	});
+
 	it('skips over a sub-section id already used by ANOTHER speech (cross-filename UNIQUE PK guard)', async () => {
 		// Old section id 1 → first sub-id candidate would be 101. If another speech in
 		// speech_content already owns 101, the INSERT would otherwise hit

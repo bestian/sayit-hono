@@ -403,22 +403,44 @@ function buildLcsPairs(oldSections: SectionPayload[], newSections: SectionPayloa
 	return pairs.reverse();
 }
 
-/** 在 PATCH 時為「新插入的段落」分配 section_id（子段落用 base*100+1 遞增，最多 99 段） */
+/**
+ * PATCH 時為「新插入的段落」分配 section_id。
+ *
+ * 優先用 `base*100+N` 規則（讓子段落 ID 在 parent 附近，URL 比較有 locality）；
+ * 但如果該 sub-section slot `[base*100+1, base*100+99]` 撞滿（被 oldRows 自己用掉、
+ * 或被 loadConflictingSubSectionIds 預先標記為別篇 speech 佔走），nextCandidate 會
+ * `+= 1` 一路 overflow 出 `safeRangeMax`（= max(oldId)*100+99，也就是 query 覆蓋的
+ * 上界）；那邊一旦也被別篇 speech 佔走 → INSERT UNIQUE PK fail。
+ *
+ * Overflow 時改從 `freshIdRef.value`（globalMaxSectionId+1 起算）拿一個保證沒人用的 ID，
+ * 因為 fresh 區段一定 > 任何 existing section_id，跨 speech 不會撞。
+ */
 function appendInsertedSections(
 	output: PatchAssignedSection[],
 	newInserts: SectionPayload[],
 	baseIdHint: number | null,
-	usedIds: Set<number>
+	usedIds: Set<number>,
+	safeRangeMax: number,
+	freshIdRef: { value: number }
 ) {
 	if (newInserts.length > 99) throw new Error('Too many inserted sections in a single gap (max 99)');
 
 	const fallbackBase = output.length > 0 ? output[output.length - 1].section_id : baseIdHint ?? 0;
 	let nextCandidate = isSubSectionId(fallbackBase) ? fallbackBase + 1 : fallbackBase * 100 + 1;
+
+	const allocateFresh = (): number => {
+		while (usedIds.has(freshIdRef.value)) freshIdRef.value += 1;
+		const id = freshIdRef.value;
+		freshIdRef.value += 1;
+		return id;
+	};
+
 	for (const insertSection of newInserts) {
-		while (usedIds.has(nextCandidate)) nextCandidate += 1;
-		usedIds.add(nextCandidate);
-		output.push({ ...insertSection, section_id: nextCandidate });
-		nextCandidate += 1;
+		while (nextCandidate <= safeRangeMax && usedIds.has(nextCandidate)) nextCandidate += 1;
+		const chosenId = nextCandidate <= safeRangeMax ? nextCandidate : allocateFresh();
+		if (chosenId === nextCandidate) nextCandidate += 1;
+		usedIds.add(chosenId);
+		output.push({ ...insertSection, section_id: chosenId });
 	}
 }
 
@@ -426,7 +448,8 @@ function appendInsertedSections(
 function assignPatchedSections(
 	oldRows: ExistingSection[],
 	newSections: SectionPayload[],
-	extraBlockedIds: ReadonlySet<number> = new Set()
+	extraBlockedIds: ReadonlySet<number>,
+	freshIdStart: number
 ): PatchAssignedSection[] {
 	const oldSections: Array<SectionPayload & { section_id: number }> = oldRows.map((row) => ({
 		section_id: row.section_id,
@@ -437,6 +460,9 @@ function assignPatchedSections(
 	const output: PatchAssignedSection[] = [];
 	const usedIds = new Set<number>(oldRows.map((row) => row.section_id));
 	for (const blocked of extraBlockedIds) usedIds.add(blocked);
+	const oldIds = oldRows.map((row) => row.section_id);
+	const safeRangeMax = oldIds.length > 0 ? Math.max(...oldIds) * 100 + 99 : 0;
+	const freshIdRef = { value: freshIdStart };
 	let oldCursor = 0;
 	let newCursor = 0;
 
@@ -471,7 +497,7 @@ function assignPatchedSections(
 					: output.length > 0
 						? output[output.length - 1].section_id
 						: oldSections[0]?.section_id ?? null;
-			appendInsertedSections(output, newGap.slice(pairedCount), baseIdHint, usedIds);
+			appendInsertedSections(output, newGap.slice(pairedCount), baseIdHint, usedIds, safeRangeMax, freshIdRef);
 		}
 
 		output.push({ ...newSections[newMatchIdx], section_id: oldSections[oldMatchIdx].section_id });
@@ -494,7 +520,7 @@ function assignPatchedSections(
 				: output.length > 0
 					? output[output.length - 1].section_id
 					: oldSections[0]?.section_id ?? null;
-		appendInsertedSections(output, newTail.slice(tailPairCount), baseIdHint, usedIds);
+		appendInsertedSections(output, newTail.slice(tailPairCount), baseIdHint, usedIds, safeRangeMax, freshIdRef);
 	}
 
 	return output;
@@ -1029,8 +1055,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				}));
 			} else {
 				const blockedSubIds = await loadConflictingSubSectionIds(c, filename, oldSections);
+				// freshIdStart 用 globalMaxSectionId+1 起算；當 sub-section slot 撞滿、
+				// nextCandidate overflow 出 safeRangeMax 時 appendInsertedSections 會改用這裡的 ID。
+				const freshIdStart = await withRetry(() => findMaxSectionId(c));
 				try {
-					assignedPatched = assignPatchedSections(oldSections, sectionPayloads, blockedSubIds);
+					assignedPatched = assignPatchedSections(oldSections, sectionPayloads, blockedSubIds, freshIdStart);
 				} catch (err) {
 					const message = err instanceof Error ? err.message : 'Failed to assign section ids for PATCH';
 					return c.json({ success: false, message, filename }, 409, corsHeadersWithMethods);
