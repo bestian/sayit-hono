@@ -9,6 +9,7 @@ import { sectionDetail } from './api/section';
 import { speechAn, serveAnByKey } from './api/an';
 import { serveMdByKey } from './api/md';
 import { uploadMarkdown } from './api/upload_markdown';
+import { redirectsSync } from './api/redirects';
 import { rssFeed } from './api/rss';
 import { handleOgImage, handleOgSpeechImage } from './api/og_routes';
 import { ogLoader } from './api/og_loader';
@@ -885,6 +886,7 @@ app.get('/api/md/:path{[^/]+\\.md}', async (c) => serveMdByKey(c, decodeURICompo
 app.post('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.patch('/api/upload_markdown', (c) => uploadMarkdown(c));
 app.delete('/api/upload_markdown', (c) => uploadMarkdown(c));
+app.put('/api/redirects', (c) => redirectsSync(c));
 app.on(['GET', 'HEAD'], '/rss.xml', (c) => rssFeed(c));
 app.on(['GET', 'HEAD'], '/feed.xml', (c) => rssFeed(c));
 
