@@ -203,6 +203,42 @@ function assignSpeakersToSections(parsed: ParsedSection[], speakerMarks: Speaker
 	});
 }
 
+/**
+ * 預先抓出 PATCH 子段落分配 ID 時可能會撞到的「其他 speech 既有 section_id」。
+ *
+ * appendInsertedSections 用 `oldId * 100 + N` 規則挑下一個 section_id，原本只
+ * 檢查同一篇 speech 的 oldRows——若這個候選值剛好被別篇 speech 的某段落佔走
+ * (UNIQUE PK on speech_content.section_id)，INSERT 會在 D1 端炸 503。把
+ * 這個區間裡屬於其他 filename 的 section_id 一次撈出來，先丟進 usedIds，
+ * appendInsertedSections 內的 `while (usedIds.has(...))` 就會跳過衝突。
+ *
+ * 只覆蓋第一層子段落 [oldId*100+1, oldId*100+99]——足以解決實務上撞到的
+ * cross-speech 重號。第二層以上 (sub-sub) 的衝突極罕見，需要時再延伸。
+ */
+async function loadConflictingSubSectionIds(
+	c: Context<ApiEnv>,
+	currentFilename: string,
+	oldSections: ExistingSection[]
+): Promise<Set<number>> {
+	// 呼叫端保證 oldSections.length > 0（PATCH 內 length === 0 走另一條分支）。
+	const ids = oldSections.map((section) => section.section_id);
+	const lo = Math.min(...ids) * 100 + 1;
+	const hi = Math.max(...ids) * 100 + 99;
+
+	const result = await withRetry(() =>
+		c.env.DB.prepare(
+			'SELECT section_id FROM speech_content WHERE filename != ? AND section_id BETWEEN ? AND ?'
+		)
+			.bind(currentFilename, lo, hi)
+			.all<{ section_id: number }>()
+	);
+	const blocked = new Set<number>();
+	for (const row of result.results ?? []) {
+		blocked.add(Number(row.section_id));
+	}
+	return blocked;
+}
+
 async function findMaxSectionId(c: Context<ApiEnv>): Promise<number> {
 	// SQLite optimises MAX on INTEGER PRIMARY KEY to O(1) — no WHERE clause so
 	// the B-tree tail lookup is used instead of a full table scan.
@@ -386,7 +422,11 @@ function appendInsertedSections(
 }
 
 /** PATCH 用：以 LCS 對齊舊/新段落，能對上的沿用舊 section_id，多出來的新段落分配新 ID */
-function assignPatchedSections(oldRows: ExistingSection[], newSections: SectionPayload[]): PatchAssignedSection[] {
+function assignPatchedSections(
+	oldRows: ExistingSection[],
+	newSections: SectionPayload[],
+	extraBlockedIds: ReadonlySet<number> = new Set()
+): PatchAssignedSection[] {
 	const oldSections: Array<SectionPayload & { section_id: number }> = oldRows.map((row) => ({
 		section_id: row.section_id,
 		markdown: row.section_content,
@@ -395,6 +435,7 @@ function assignPatchedSections(oldRows: ExistingSection[], newSections: SectionP
 	}));
 	const output: PatchAssignedSection[] = [];
 	const usedIds = new Set<number>(oldRows.map((row) => row.section_id));
+	for (const blocked of extraBlockedIds) usedIds.add(blocked);
 	let oldCursor = 0;
 	let newCursor = 0;
 
@@ -996,8 +1037,9 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					section_id: baseSectionId + idx
 				}));
 			} else {
+				const blockedSubIds = await loadConflictingSubSectionIds(c, filename, oldSections);
 				try {
-					assignedPatched = assignPatchedSections(oldSections, sectionPayloads);
+					assignedPatched = assignPatchedSections(oldSections, sectionPayloads, blockedSubIds);
 				} catch (err) {
 					const message = err instanceof Error ? err.message : 'Failed to assign section ids for PATCH';
 					return c.json({ success: false, message, filename }, 409, corsHeadersWithMethods);
