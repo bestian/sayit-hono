@@ -10,6 +10,7 @@ import { speechAn, serveAnByKey } from './api/an';
 import { serveMdByKey } from './api/md';
 import { uploadMarkdown } from './api/upload_markdown';
 import { redirectsSync } from './api/redirects';
+import { isAuthorizedFromHeader } from './api/auth';
 import { rssFeed } from './api/rss';
 import { handleOgImage, handleOgSpeechImage } from './api/og_routes';
 import { ogLoader } from './api/og_loader';
@@ -897,12 +898,12 @@ app.get('/og/speech/:section_id{\\d+\\.png}', (c) => handleOgSpeechImage(c, ogLo
 app.get('/og/*', (c) => handleOgImage(c, ogLoader));
 
 app.post('/api/purge_cache', async (c) => {
-	const authHeader = c.req.header('Authorization');
-	if (!authHeader?.startsWith('Bearer ')) return c.text('Forbidden', 403);
-	const token = authHeader.slice(7);
-	if (!token || (token !== c.env.AUDREYT_TRANSCRIPT_TOKEN && token !== c.env.BESTIAN_TRANSCRIPT_TOKEN)) {
-		return c.text('Forbidden', 403);
-	}
+	const authorized = await isAuthorizedFromHeader(
+		c.req.header('Authorization'),
+		c.env.AUDREYT_TRANSCRIPT_TOKEN,
+		c.env.BESTIAN_TRANSCRIPT_TOKEN
+	);
+	if (!authorized) return c.text('Forbidden', 403);
 
 	const bucket = c.env.SPEECH_CACHE;
 	let deleted = 0;
@@ -921,12 +922,12 @@ app.post('/api/purge_cache', async (c) => {
 });
 
 app.post('/api/cleanup_old_cache', async (c) => {
-	const authHeader = c.req.header('Authorization');
-	if (!authHeader?.startsWith('Bearer ')) return c.text('Forbidden', 403);
-	const token = authHeader.slice(7);
-	if (!token || (token !== c.env.AUDREYT_TRANSCRIPT_TOKEN && token !== c.env.BESTIAN_TRANSCRIPT_TOKEN)) {
-		return c.text('Forbidden', 403);
-	}
+	const authorized = await isAuthorizedFromHeader(
+		c.req.header('Authorization'),
+		c.env.AUDREYT_TRANSCRIPT_TOKEN,
+		c.env.BESTIAN_TRANSCRIPT_TOKEN
+	);
+	if (!authorized) return c.text('Forbidden', 403);
 
 	const url = new URL(c.req.url);
 	const maxDeletesParam = Number(url.searchParams.get('max_deletes') ?? '');
