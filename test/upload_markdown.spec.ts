@@ -130,6 +130,9 @@ function createUploadEnv(options?: {
 		if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) {
 			return { success: true, results: [] };
 		}
+		if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
+			return { success: true, results: [] };
+		}
 		throw new Error(`Unexpected query: ${sql}`);
 	}
 

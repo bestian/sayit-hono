@@ -69,6 +69,9 @@ function createUpsertEnv(options: {
 			const target = redirects[String(args[0])];
 			return { success: true, results: target ? [{ new_filename: target }] : [] };
 		}
+		if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
+			return { success: true, results: [] };
+		}
 		throw new Error(`Unexpected query: ${sql}`);
 	}
 

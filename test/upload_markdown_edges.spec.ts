@@ -351,6 +351,105 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 			.map((stmt) => stmt.args[3]);
 		expect(insertedIds).toContain(102);
 	});
+
+	it('skips over a sub-section id already used by ANOTHER speech (cross-filename UNIQUE PK guard)', async () => {
+		// Old section id 1 → first sub-id candidate would be 101. If another speech in
+		// speech_content already owns 101, the INSERT would otherwise hit
+		// "UNIQUE constraint failed: speech_content.section_id". loadConflictingSubSectionIds
+		// should pre-fetch that 101 and append it to usedIds, so the inserter advances to 102.
+		const ops: any[] = [];
+		const requestBody = {
+			filename: 'cross-collision',
+			markdown: '# X\n## A:\nanchor one\n\ninserted between\n\nanchor two'
+		};
+		const oldSections = [
+			{ section_id: 1, previous_section_id: null, next_section_id: 200, section_speaker: 'A', section_content: '<p>anchor one</p>' },
+			{ section_id: 200, previous_section_id: 1, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor two</p>' }
+		];
+		const resolver: Resolver = (sql, args) => {
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				return { success: true, results: args[0] === requestBody.filename
+					? [{ filename: requestBody.filename, display_name: 'X', isNested: 0, alternate_filename: null }]
+					: []
+				};
+			}
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return { success: true, results: oldSections };
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			if (sql.includes('SELECT DISTINCT section_speaker')) {
+				return { success: true, results: [{ section_speaker: 'A' }] };
+			}
+			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
+				// Another speech already owns 101 in the candidate range.
+				return { success: true, results: [{ section_id: 101 }] };
+			}
+			return { success: true, results: [] };
+		};
+
+		const ctx = {
+			env: {
+				AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
+				BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
+				SPEECH_CACHE: {
+					get: async () => null,
+					put: async () => {},
+					delete: async () => true,
+					list: async () => ({ objects: [], truncated: false, cursor: '' })
+				},
+				DB: {
+					prepare: (sql: string) => {
+						const run = (args: unknown[]) => ({
+							sql,
+							args,
+							first: async () => resolver(sql, args).results[0] ?? null,
+							all: async () => {
+								const r = resolver(sql, args);
+								return { success: r.success ?? true, results: r.results };
+							},
+							run: async () => ({ success: true, meta: { changes: 1 } })
+						});
+						return {
+							bind: (...args: unknown[]) => run(args),
+							first: async () => run([]).first(),
+							all: async () => run([]).all(),
+							run: async () => run([]).run()
+						};
+					},
+					batch: async (stmts: any[]) => {
+						for (const s of stmts) ops.push(s);
+						return stmts.map(() => ({ meta: { changes: 1 } }));
+					}
+				}
+			},
+			req: {
+				method: 'PATCH',
+				url: 'https://example.com/api/upload_markdown',
+				header: (name: string) => (name === 'Authorization' ? 'Bearer token-audrey' : null),
+				query: () => null,
+				json: async () => requestBody
+			},
+			json: (body: any, status = 200, headers: Record<string, string> = {}) =>
+				new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }),
+			text: (body: string, status = 200, headers: Record<string, string> = {}) =>
+				new Response(body, { status, headers })
+		} as unknown as Context<ApiEnv>;
+
+		const res = await uploadMarkdown(ctx);
+		expect(res.status).toBe(200);
+
+		const insertedIds = ops
+			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
+			.map((stmt) => stmt.args[3]);
+		// 101 is blocked by another filename → inserter must skip to 102
+		expect(insertedIds).not.toContain(101);
+		expect(insertedIds).toContain(102);
+	});
 });
 
 describe('PATCH treats svg / iframe blocks as match anchors (issue #68)', () => {
