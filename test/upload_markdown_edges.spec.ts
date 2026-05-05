@@ -462,6 +462,114 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		expect(insertedIds.slice(0, 3)).toEqual([50000, 50001, 50002]);
 	});
 
+	it('allocateFresh skips freshIdRef.value when it collides with usedIds', async () => {
+		// 防禦性測試：當 freshIdRef.value（globalMax+1）剛好落在 usedIds 內時，
+		// allocateFresh 的 `while (usedIds.has(freshIdRef.value)) freshIdRef.value += 1`
+		// 必須跳過該 ID。實務上 DB 狀態一致時不會發生，但 inconsistency / race
+		// 仍可能讓 freshIdStart 撞上 oldRows.section_id，這支 while 是最後一道防線。
+		const ops: any[] = [];
+		const requestBody = {
+			filename: 'fresh-collision',
+			markdown: '# X\n## A:\nanchor\n\nins1\n\nins2'
+		};
+		// 老 section id = 1，所以 usedIds 起始 = {1}。
+		const oldSections = [
+			{ section_id: 1, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor</p>' }
+		];
+		// 把 sub-section slot [101, 199] 全部佔住，逼 nextCandidate 溢出 safeRangeMax(=199)。
+		const fullyBlockedRange = Array.from({ length: 99 }, (_, i) => ({ section_id: 101 + i }));
+		const resolver: Resolver = (sql, args) => {
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				return { success: true, results: args[0] === requestBody.filename
+					? [{ filename: requestBody.filename, display_name: 'X', isNested: 0, alternate_filename: null }]
+					: []
+				};
+			}
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return { success: true, results: oldSections };
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			if (sql.includes('SELECT DISTINCT section_speaker')) {
+				return { success: true, results: [{ section_speaker: 'A' }] };
+			}
+			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
+				return { success: true, results: fullyBlockedRange };
+			}
+			if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
+				// 故意讓 freshIdStart = 0+1 = 1 撞上 oldSections[0].section_id。
+				return { success: true, results: [{ max_id: 0 }] };
+			}
+			return { success: true, results: [] };
+		};
+
+		const ctx = {
+			env: {
+				AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
+				BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
+				SPEECH_CACHE: {
+					get: async () => null,
+					put: async () => {},
+					delete: async () => true,
+					list: async () => ({ objects: [], truncated: false, cursor: '' })
+				},
+				DB: {
+					prepare: (sql: string) => {
+						const run = (args: unknown[]) => ({
+							sql,
+							args,
+							first: async () => resolver(sql, args).results[0] ?? null,
+							all: async () => {
+								const r = resolver(sql, args);
+								return { success: r.success ?? true, results: r.results };
+							},
+							run: async () => ({ success: true, meta: { changes: 1 } })
+						});
+						return {
+							bind: (...args: unknown[]) => run(args),
+							first: async () => run([]).first(),
+							all: async () => run([]).all(),
+							run: async () => run([]).run()
+						};
+					},
+					batch: async (stmts: any[]) => {
+						for (const s of stmts) ops.push(s);
+						return stmts.map(() => ({ meta: { changes: 1 } }));
+					}
+				}
+			},
+			req: {
+				method: 'PATCH',
+				url: 'https://example.com/api/upload_markdown',
+				header: (name: string) => (name === 'Authorization' ? 'Bearer token-audrey' : null),
+				query: () => null,
+				json: async () => requestBody
+			},
+			json: (body: any, status = 200, headers: Record<string, string> = {}) =>
+				new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }),
+			text: (body: string, status = 200, headers: Record<string, string> = {}) =>
+				new Response(body, { status, headers })
+		} as unknown as Context<ApiEnv>;
+
+		const res = await uploadMarkdown(ctx);
+		expect(res.status).toBe(200);
+
+		const insertedIds = ops
+			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
+			.map((stmt) => stmt.args[3]);
+		// allocateFresh 第一次 freshIdRef.value=1 撞 usedIds 跳到 2；之後依序給 3, …
+		// 不能拿到 1（會撞 oldSections）也不能落在 [101,199]（被別篇 speech 佔走）。
+		expect(insertedIds).not.toContain(1);
+		for (const id of insertedIds) {
+			expect(id < 101 || id > 199).toBe(true);
+		}
+		expect(insertedIds).toContain(2);
+	});
+
 	it('skips over a sub-section id already used by ANOTHER speech (cross-filename UNIQUE PK guard)', async () => {
 		// Old section id 1 → first sub-id candidate would be 101. If another speech in
 		// speech_content already owns 101, the INSERT would otherwise hit
