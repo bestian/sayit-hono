@@ -45,20 +45,35 @@ function makeContext(options: {
 				}
 			} as unknown as Fetcher,
 			DB: {
-				prepare: (sql: string) => ({
-					bind: (...args: unknown[]) => ({
-						first: async () => options.resolver(sql, args).results[0] ?? null,
+				prepare: (sql: string) => {
+					// Defer the resolver call into a microtask so a `throw` inside the
+					// resolver becomes a Promise rejection only AFTER the SUT's `await`
+					// has attached itself as awaiter — see notes in og_cache.spec.ts.
+					const callResolver = (args: unknown[]) =>
+						new Promise<ReturnType<Resolver>>((resolve, reject) => {
+							queueMicrotask(() => {
+								try {
+									resolve(options.resolver(sql, args));
+								} catch (err) {
+									reject(err);
+								}
+							});
+						});
+					return {
+						bind: (...args: unknown[]) => ({
+							first: async () => (await callResolver(args)).results[0] ?? null,
+							all: async () => {
+								const r = await callResolver(args);
+								return { success: r.success ?? true, results: r.results };
+							}
+						}),
+						first: async () => (await callResolver([])).results[0] ?? null,
 						all: async () => {
-							const r = options.resolver(sql, args);
+							const r = await callResolver([]);
 							return { success: r.success ?? true, results: r.results };
 						}
-					}),
-					first: async () => options.resolver(sql, []).results[0] ?? null,
-					all: async () => {
-						const r = options.resolver(sql, []);
-						return { success: r.success ?? true, results: r.results };
-					}
-				})
+					};
+				}
 			}
 		},
 		text: (body: string, status = 200, headers: Record<string, string> = {}) =>

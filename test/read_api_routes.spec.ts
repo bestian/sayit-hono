@@ -41,13 +41,26 @@ function createReadEnv(resolver: QueryResolver) {
 		},
 		DB: {
 			prepare: (sql: string) => {
+				// Defer the resolver call into a microtask so a `throw` inside the
+				// resolver becomes a Promise rejection only AFTER the SUT's `await`
+				// has attached itself as awaiter — see notes in og_cache.spec.ts.
+				const callResolver = (args: unknown[]) =>
+					new Promise<ReturnType<QueryResolver>>((resolve, reject) => {
+						queueMicrotask(() => {
+							try {
+								resolve(resolver(sql, args));
+							} catch (err) {
+								reject(err);
+							}
+						});
+					});
 				const run = (args: unknown[]) => ({
 					first: async () => {
-						const out = resolver(sql, args);
+						const out = await callResolver(args);
 						return out?.results?.[0] ?? null;
 					},
 					all: async () => {
-						const out = resolver(sql, args);
+						const out = await callResolver(args);
 						if (out == null) return { success: false, results: [] };
 						return { success: out.success ?? true, results: out.results };
 					}

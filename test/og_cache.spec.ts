@@ -39,10 +39,25 @@ function createEnv(resolver: Resolver, preSeed: Record<string, { body: string; c
 		},
 		DB: {
 			prepare: (sql: string) => {
+				// Defer the resolver call into a microtask so a `throw` inside the resolver
+				// becomes a Promise rejection only AFTER the SUT's `await` has attached
+				// itself as awaiter. Without this, pool-workers 0.15 sees the throw as
+				// 'unhandledrejection' before the SUT's catch can run (cosmetic only —
+				// `dangerouslyIgnoreUnhandledErrors: true` keeps the run green).
+				const callResolver = (args: unknown[]) =>
+					new Promise<ReturnType<typeof resolver>>((resolve, reject) => {
+						queueMicrotask(() => {
+							try {
+								resolve(resolver(sql, args));
+							} catch (err) {
+								reject(err);
+							}
+						});
+					});
 				const run = (args: unknown[]) => ({
-					first: async () => resolver(sql, args).results[0] ?? null,
+					first: async () => (await callResolver(args)).results[0] ?? null,
 					all: async () => {
-						const r = resolver(sql, args);
+						const r = await callResolver(args);
 						return { success: r.success ?? true, results: r.results };
 					}
 				});
