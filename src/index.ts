@@ -562,7 +562,13 @@ async function buildSpeechListDataToken(speeches: SpeechListItem[]): Promise<str
 
 async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
 	const result = await c.env.DB.prepare(
-		'SELECT id, route_pathname, name, photoURL FROM speakers ORDER BY id ASC'
+		`SELECT id, route_pathname, name,
+			COALESCE(photoURL, (
+				SELECT s2.photoURL FROM speakers s2
+				WHERE s2.name = speakers.name AND s2.photoURL IS NOT NULL
+				ORDER BY s2.id ASC LIMIT 1
+			)) AS photoURL
+		FROM speakers ORDER BY id ASC`
 	).all();
 
 	if (!result.success) {
