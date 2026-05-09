@@ -1,8 +1,8 @@
 /**
  * 共用段落排序與正規化邏輯
- * - checkMonotonic: O(n) 檢查 section_id 是否嚴格遞增
+ * - checkMonotonic: O(n) 檢查陣列順序是否已對應 previous/next 鏈結（顯示順序）
  * - reorderSections: O(n) 依 previous/next 頭尾相接重排（取代原 O(n²) 實作）
- * - normalizeSections: 若已 monotonic 則直接回傳，否則重排
+ * - normalizeSections: 若已是顯示順序則直接回傳，否則重排
  */
 
 export interface SectionLike {
@@ -12,14 +12,21 @@ export interface SectionLike {
 }
 
 /**
- * 檢查 section_id 是否嚴格遞增（monotonic）
+ * 檢查陣列順序是否已對應 previous/next 鏈結（即「顯示順序」）。
+ *
+ * 注意：section_id 嚴格遞增 ≠ 顯示順序。PATCH 在既有演講中段插入新段落時，
+ * 新段落的 section_id 一定比周圍既有 ID 大（sub-section id = parent*100+N 或
+ * fresh id = globalMax+1），按 section_id ASC 取出時會被排到最尾端，但鏈結
+ * 上它應該在中段。所以這裡要檢查的是「相鄰兩列的 next_section_id / section_id
+ * 是否相連」，不是 ID 的大小關係。
  */
 export function checkMonotonic<T extends SectionLike>(sections: T[]): boolean {
 	if (sections.length <= 1) return true;
-	for (let i = 1; i < sections.length; i++) {
+	for (let i = 0; i < sections.length - 1; i++) {
 		const curr = sections[i];
-		const prev = sections[i - 1];
-		if (curr && prev && curr.section_id <= prev.section_id) return false;
+		const next = sections[i + 1];
+		if (!curr || !next) return false;
+		if (curr.next_section_id !== next.section_id) return false;
 	}
 	return true;
 }
