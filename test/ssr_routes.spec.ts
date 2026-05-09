@@ -88,7 +88,7 @@ async function request(path: string, env: ReturnType<typeof createSsrEnv>, init?
 
 describe('SSR /speakers', () => {
 	const resolver: QueryResolver = (sql) => {
-		if (sql.includes('SELECT id, route_pathname, name, photoURL FROM speakers')) {
+		if (sql.includes('FROM speakers ORDER BY id ASC')) {
 			return { success: true, results: [{ id: 1, route_pathname: 'audrey-tang', name: 'Audrey Tang', photoURL: null }] };
 		}
 		return { success: true, results: [] };

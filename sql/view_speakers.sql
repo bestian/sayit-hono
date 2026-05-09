@@ -25,7 +25,11 @@ SELECT
     s.id,
     s.route_pathname,
     s.name,
-    s.photoURL,
+    COALESCE(s.photoURL, (
+        SELECT s2.photoURL FROM speakers s2
+        WHERE s2.name = s.name AND s2.photoURL IS NOT NULL
+        ORDER BY s2.id ASC LIMIT 1
+    )) AS photoURL,
     COALESCE((
         SELECT COUNT(DISTINCT ss.speech_filename)
         FROM speech_speakers ss

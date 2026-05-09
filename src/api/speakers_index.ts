@@ -7,7 +7,15 @@ export async function speakersIndex(c: Context<ApiEnv>) {
 	const corsHeaders = getCorsHeaders(origin);
 
 	try {
-		const result = await c.env.DB.prepare('SELECT id, route_pathname, name, photoURL FROM speakers ORDER BY id ASC').all();
+		const result = await c.env.DB.prepare(
+			`SELECT id, route_pathname, name,
+				COALESCE(photoURL, (
+					SELECT s2.photoURL FROM speakers s2
+					WHERE s2.name = speakers.name AND s2.photoURL IS NOT NULL
+					ORDER BY s2.id ASC LIMIT 1
+				)) AS photoURL
+			FROM speakers ORDER BY id ASC`
+		).all();
 
 		if (!result.success) {
 			return c.json({ error: 'Database query failed' }, 500, corsHeaders);
