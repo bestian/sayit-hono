@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
 import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache, deleteEdgeCache, deleteR2Cache } from './cache';
+import { normalizeSections } from '../utils/sectionUtils';
 import type { ApiEnv } from './types';
 
 const SPEECH_API_PREFIX = '/api/an/';
@@ -244,8 +245,12 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 	}
 
 	// 從 DB 查 speech_content 即時生成 .an
+	// 帶上 section_id / previous_section_id / next_section_id 給 normalizeSections 重排：
+	// PATCH 中段插入時新段落 ID 會落在 globalMax+1，按 section_id ASC 撈會跑到最尾端，
+	// 顯示順序必須改用 previous/next 鏈結。
 	const result = await c.env.DB.prepare(
-		`SELECT sc.section_speaker, sc.section_content, si.display_name, sp.name
+		`SELECT sc.section_id, sc.previous_section_id, sc.next_section_id,
+		        sc.section_speaker, sc.section_content, si.display_name, sp.name
 		 FROM speech_content sc
 		 LEFT JOIN speech_index si ON sc.filename = si.filename
 		 LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
@@ -259,17 +264,25 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		return c.text('Speech not found', 404, corsHeaders);
 	}
 
-	const sections = (result.results as Array<{
-		section_speaker: string | null;
-		section_content: string | null;
-		display_name: string | null;
-		name: string | null;
-	}>).map((r) => ({
-		section_speaker: r.section_speaker,
-		section_content: r.section_content,
-		display_name: r.display_name,
-		name: r.name
-	}));
+	const sections = normalizeSections(
+		(result.results as Array<{
+			section_id: number;
+			previous_section_id: number | null;
+			next_section_id: number | null;
+			section_speaker: string | null;
+			section_content: string | null;
+			display_name: string | null;
+			name: string | null;
+		}>).map((r) => ({
+			section_id: Number(r.section_id),
+			previous_section_id: r.previous_section_id != null ? Number(r.previous_section_id) : null,
+			next_section_id: r.next_section_id != null ? Number(r.next_section_id) : null,
+			section_speaker: r.section_speaker,
+			section_content: r.section_content,
+			display_name: r.display_name,
+			name: r.name
+		}))
+	);
 
 	const generatedAn = generateFullSpeechAn(sections);
 
@@ -312,7 +325,8 @@ export async function getAnContentAsString(c: Context<ApiEnv>, objectKey: string
 
 	const filename = baseKey;
 	const result = await c.env.DB.prepare(
-		`SELECT sc.section_speaker, sc.section_content, si.display_name, sp.name
+		`SELECT sc.section_id, sc.previous_section_id, sc.next_section_id,
+		        sc.section_speaker, sc.section_content, si.display_name, sp.name
 		 FROM speech_content sc
 		 LEFT JOIN speech_index si ON sc.filename = si.filename
 		 LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
@@ -322,17 +336,25 @@ export async function getAnContentAsString(c: Context<ApiEnv>, objectKey: string
 		.bind(filename)
 		.all();
 	if (!result.success || (result.results as unknown[]).length === 0) return null;
-	const sections = (result.results as Array<{
-		section_speaker: string | null;
-		section_content: string | null;
-		display_name: string | null;
-		name: string | null;
-	}>).map((r) => ({
-		section_speaker: r.section_speaker,
-		section_content: r.section_content,
-		display_name: r.display_name,
-		name: r.name
-	}));
+	const sections = normalizeSections(
+		(result.results as Array<{
+			section_id: number;
+			previous_section_id: number | null;
+			next_section_id: number | null;
+			section_speaker: string | null;
+			section_content: string | null;
+			display_name: string | null;
+			name: string | null;
+		}>).map((r) => ({
+			section_id: Number(r.section_id),
+			previous_section_id: r.previous_section_id != null ? Number(r.previous_section_id) : null,
+			next_section_id: r.next_section_id != null ? Number(r.next_section_id) : null,
+			section_speaker: r.section_speaker,
+			section_content: r.section_content,
+			display_name: r.display_name,
+			name: r.name
+		}))
+	);
 	return generateFullSpeechAn(sections);
 }
 
