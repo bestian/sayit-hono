@@ -29,6 +29,10 @@ describe('sectionUtils', () => {
 			expect(checkMonotonic([mk(1, null, 2), mk(1, 1, 3)])).toBe(false);
 			expect(checkMonotonic([mk(2, null, 3), mk(1, 2, null)])).toBe(false);
 		});
+		it('稀疏陣列含 hole 時為 false（防禦性 null guard）', () => {
+			const sparse = [mk(1, null, 2), undefined, mk(3, 2, null)] as unknown as SectionLike[];
+			expect(checkMonotonic(sparse)).toBe(false);
+		});
 		it('section_id 遞增但鏈結順序不一致時為 false（PATCH 中段插入情境）', () => {
 			// section_id ASC = [10, 11, 12, 99]，但鏈結順序是 10 → 11 → 99 → 12
 			// 99 是後來 PATCH 插在 11 與 12 之間的新段落，section_id 大但顯示位置在中段
