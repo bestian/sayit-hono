@@ -95,7 +95,7 @@ export async function markSpeechDeletedInSearch(
 }
 
 export async function syncSearchStats(c: Context<ApiEnv>): Promise<void> {
-	const [speechesRow, speakersRow, sectionsRow] = await Promise.all([
+	const [sectionsRow, speakersRow, speechesRow] = await Promise.all([
 		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speech_index').first<CountRow>(),
 		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speakers').first<CountRow>(),
 		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speech_content').first<CountRow>()
