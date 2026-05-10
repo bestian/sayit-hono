@@ -35,9 +35,9 @@ function createBucket(initial: Record<string, string> = {}) {
 
 function createContext(bucket: any, countRows: { speeches?: number; speakers?: number; sections?: number } = {}) {
 	const firstFor = (sql: string) => {
-		if (sql.includes('FROM speech_index')) return { count: countRows.speeches ?? 3 };
+		if (sql.includes('FROM speech_index')) return { count: countRows.sections ?? 3 };
 		if (sql.includes('FROM speakers')) return { count: countRows.speakers ?? 2 };
-		if (sql.includes('FROM speech_content')) return { count: countRows.sections ?? 5 };
+		if (sql.includes('FROM speech_content')) return { count: countRows.speeches ?? 5 };
 		return null;
 	};
 	return {
