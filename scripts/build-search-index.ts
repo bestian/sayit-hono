@@ -112,6 +112,12 @@ function uploadFileToR2Buckets(key: string, filePath: string, contentType: strin
 	}
 }
 
+async function removeIfExists(filePath: string) {
+	try {
+		await unlink(filePath);
+	} catch {}
+}
+
 async function buildSearchIndex() {
 	const transcriptDir = process.argv[2] || path.resolve('..', 'transcript');
 	const outputPath = path.resolve('www', SEARCH_INDEX_BASELINE_KEY);
@@ -392,14 +398,17 @@ async function buildSearchIndex() {
 	const sizeMB = (Buffer.byteLength(jsonData) / 1024 / 1024).toFixed(1);
 	const brotliSizeMB = (brotliData.byteLength / 1024 / 1024).toFixed(1);
 	console.log(`[build-search] Index written to ${outputPath} (${sizeMB} MB raw, ${brotliSizeMB} MB br)`);
+	console.log(`[build-search] Stats written to ${statsPath}:`, stats);
 
 	if (!skipUpload) {
+		let uploadedToR2 = true;
 		try {
 			uploadFileToR2Buckets(SEARCH_INDEX_BASELINE_KEY, outputPath, 'application/json; charset=utf-8');
 			uploadFileToR2Buckets(SEARCH_INDEX_BASELINE_BR_KEY, outputBrPath, 'application/octet-stream');
 			uploadFileToR2Buckets(SEARCH_INDEX_MANIFEST_KEY, runtimeManifestPath, 'application/json; charset=utf-8');
 			console.log('[build-search] Uploaded search baseline + manifest to R2 (prod + preview)');
 		} catch (err) {
+			uploadedToR2 = false;
 			console.error('[build-search] R2 upload failed:', err);
 			console.log(`[build-search] Index kept at ${outputPath} for manual upload`);
 		}
@@ -408,18 +417,15 @@ async function buildSearchIndex() {
 			uploadFileToR2Buckets(SEARCH_STATS_KEY, statsPath, 'application/json; charset=utf-8');
 			console.log('[build-search] stats.json uploaded to R2 (prod + preview)');
 		} catch (err) {
+			uploadedToR2 = false;
 			console.error('[build-search] stats.json R2 upload failed:', err);
 		}
 
-		try {
-			await unlink(outputPath);
-		} catch {}
-		try {
-			await unlink(outputBrPath);
-		} catch {}
+		if (uploadedToR2) {
+			await Promise.all([outputPath, outputBrPath, runtimeManifestPath, statsPath].map(removeIfExists));
+			console.log('[build-search] Removed R2-served generated files from www/ before Wrangler asset upload');
+		}
 	}
-
-	console.log(`[build-search] Stats written to ${statsPath}:`, stats);
 }
 
 buildSearchIndex().catch((err) => {
