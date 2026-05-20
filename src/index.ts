@@ -65,6 +65,11 @@ const SEARCH_DEFAULT_PAGE_SIZE = 20;
 const SEARCH_MAX_PAGE_SIZE = 50;
 const SEARCH_SPEAKER_LIMIT = 10;
 const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js"></script>';
+const TWITTER_WIDGETS_SCRIPT = '<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>';
+
+function hasTwitterEmbed(contents: Array<string | null | undefined>): boolean {
+	return contents.some((c) => typeof c === 'string' && c.includes('twitter-tweet'));
+}
 const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers);e=document.getElementById('sayit-stat-sections');if(e)e.textContent=fmt(s.sections)}).catch(function(){})})()</script>`;
 const NAMED_ENTITIES: Record<string, string> = {
 	amp: '&',
@@ -1088,12 +1093,13 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 	const navigationScript = `<script>(function(){var box=document.getElementById('keyboard-shortcuts');if(!box)return;var prev=box.getAttribute('data-prev-url')||'';var next=box.getAttribute('data-next-url')||'';function editable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||tag==='select'||tag==='option'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(editable(document.activeElement))return;if(e.key==='j'){if(next){window.location.href=next;}}else if(e.key==='k'){if(prev){window.location.href=prev;}}});})();</script>`;
 
 	const head = headForSpeechContent(titleText, sectionId, sectionHtml);
+	const twitterScript = hasTwitterEmbed([section.section_content]) ? TWITTER_WIDGETS_SCRIPT : '';
 	const html = await renderHtml(SingleParagraphView, {
 		head,
 		styles,
 		components: { Navbar, Footer },
 		props: { section },
-		scripts: [navigationScript, PAGEFIND_SCRIPT].filter(Boolean).join('\n')
+		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
 	});
 
 	const response = withCacheHeaders(c.html(html));
@@ -1203,12 +1209,13 @@ app.get('/speaker/:route_pathname', async (c) => {
 	const styles = [SingleSpeakerViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSpeaker(speaker.route_pathname);
 
+	const twitterScript = hasTwitterEmbed((speaker.sections ?? []).map((s: any) => s.section_content)) ? TWITTER_WIDGETS_SCRIPT : '';
 	const html = await renderHtml(SingleSpeakerView, {
 		head,
 		styles,
 		components: { Navbar, Footer },
 		props: { initialSpeaker: speaker, routePathname: speaker.route_pathname },
-		scripts: ['<script src="/static/speeches/js/masonry.pkgd.min.js"></script>', PAGEFIND_SCRIPT].join('\n')
+		scripts: ['<script src="/static/speeches/js/masonry.pkgd.min.js"></script>', PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
 	});
 
 	let response = c.html(html);
@@ -1342,6 +1349,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 		? `<script>(function(){var prev=document.querySelector('[data-prev-btn]');var next=document.querySelector('[data-next-btn]');function isEditable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(isEditable(document.activeElement))return;if(e.key==='j'&&next&&next.getAttribute('href')){window.location.href=next.getAttribute('href');}if(e.key==='k'&&prev&&prev.getAttribute('href')){window.location.href=prev.getAttribute('href');}});})();</script>`
 		: undefined;
 
+	const twitterScript = hasTwitterEmbed(sections.map((s: any) => s.section_content)) ? TWITTER_WIDGETS_SCRIPT : '';
 	const html = await renderHtml(SingleNestedSpeechView, {
 		head,
 		styles,
@@ -1356,7 +1364,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 			alternateUrl: alternate?.url ?? null,
 			alternateLabel: alternate?.label ?? null
 		},
-		scripts: [navigationScript, PAGEFIND_SCRIPT].filter(Boolean).join('\n')
+		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
 	});
 
 	let response = c.html(html);
@@ -1564,12 +1572,13 @@ app.get('/:filename', async (c) => {
 		head.links = [{ rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 	}
 
+	const twitterScript = hasTwitterEmbed(sections.map((s) => s.section_content)) ? TWITTER_WIDGETS_SCRIPT : '';
 	const html = await renderHtml(SingleSpeechView, {
 		head,
 		styles,
 		components: { Navbar, Footer },
 		props: { sections, speechName: filename, displayName, alternateUrl: alternate?.url ?? null, alternateLabel: alternate?.label ?? null },
-		scripts: PAGEFIND_SCRIPT
+		scripts: [PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
 	});
 
 	let response = c.html(html);
