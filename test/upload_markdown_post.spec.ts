@@ -23,8 +23,8 @@ function createPostEnv(options: { hasExistingFilename?: boolean; redirects?: Rec
 		if (sql.includes('FROM speech_index WHERE filename = ?')) {
 			return { success: true, results: [] };
 		}
-		if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
-			return { success: true, results: [{ max_id: 1000 }] };
+		if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+			return { success: true, results: [{ next_id: 1001 + Number(args[0] || 1) }] };
 		}
 		if (sql.includes('SELECT COUNT(*) AS count FROM speech_index')) {
 			return { success: true, results: [{ count: 1 }] };
@@ -85,7 +85,7 @@ function createPostEnv(options: { hasExistingFilename?: boolean; redirects?: Rec
 			},
 			batch: async (statements: PreparedStatement[]) => {
 				for (const stmt of statements) {
-					operations.push(stmt);
+					if (typeof stmt.sql === 'string') operations.push(stmt);
 				}
 				return statements.map(() => ({ meta: { changes: 1 } }));
 			}

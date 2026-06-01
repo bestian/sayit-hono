@@ -72,8 +72,9 @@ function createUploadEnv(options?: {
 		if (sql.includes('FROM speech_index WHERE filename = ?')) {
 			return { success: true, results: speechIndexRows.filter((row) => row.filename === args[0]) };
 		}
-		if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
-			return { success: true, results: [{ max_id: oldSections[oldSections.length - 1]?.section_id ?? 0 }] };
+		if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+			const start = (oldSections[oldSections.length - 1]?.section_id ?? 0) + 1;
+			return { success: true, results: [{ next_id: start + Number(args[0] || 1) }] };
 		}
 		if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
 			return { success: true, results: args[0] === 'demo-speech' ? oldSections : [] };
@@ -137,6 +138,7 @@ function createUploadEnv(options?: {
 	}
 
 	function applyStatement(stmt: PreparedStatement) {
+		if (typeof stmt.sql !== 'string') return;
 		operations.push(stmt);
 	}
 
@@ -240,7 +242,7 @@ describe('upload_markdown PATCH', () => {
 			.map((stmt) => stmt.args[3]);
 
 		expect(updateSectionIds).toEqual([100, 101]);
-		expect(insertedSectionIds).toEqual([10001]);
+		expect(insertedSectionIds).toEqual([102]);
 		expect(env.__deletedKeys).toEqual(
 			expect.arrayContaining([
 				`${CACHE_KEY_VERSION}/example.com/speeches`,
