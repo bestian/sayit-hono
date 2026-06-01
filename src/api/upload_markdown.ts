@@ -205,52 +205,53 @@ function assignSpeakersToSections(parsed: ParsedSection[], speakerMarks: Speaker
 }
 
 /**
- * 預先抓出 PATCH 子段落分配 ID 時可能會撞到的「其他 speech 既有 section_id」。
+ * Atomically reserve a contiguous block of `count` fresh section_ids and return
+ * the FIRST id of the block (the block is [start, start + count - 1]).
  *
- * appendInsertedSections 用 `oldId * 100 + N` 規則挑下一個 section_id，原本只
- * 檢查同一篇 speech 的 oldRows——若這個候選值剛好被別篇 speech 的某段落佔走
- * (UNIQUE PK on speech_content.section_id)，INSERT 會在 D1 端炸 503。把
- * 這個區間裡屬於其他 filename 的 section_id 一次撈出來，先丟進 usedIds，
- * appendInsertedSections 內的 `while (usedIds.has(...))` 就會跳過衝突。
+ * speech_content.section_id is a GLOBAL INTEGER PRIMARY KEY. The previous scheme
+ * read MAX(section_id) and then computed MAX+1.. in JS before a separate INSERT,
+ * which (a) raced — two concurrent uploads read the same MAX and minted the same
+ * ids, colliding on the PK and surfacing as HTTP 503 — and (b) tried to place
+ * inserted sections at positional `base*100+N` ids that collided with other
+ * speeches. Both are eliminated here: the reservation is a SINGLE atomic
+ * UPDATE … RETURNING against a dedicated counter row, so SQLite serialises
+ * concurrent reservations into disjoint blocks, and the counter is always bumped
+ * to at least MAX(section_id)+1 (self-healing) so every reserved id is strictly
+ * greater than any existing row — collision-free by construction.
  *
- * 只覆蓋第一層子段落 [oldId*100+1, oldId*100+99]——足以解決實務上撞到的
- * cross-speech 重號。第二層以上 (sub-sub) 的衝突極罕見，需要時再延伸。
+ * Reserved ids are pure identity, never positional; display order is carried by
+ * the previous/next link chain (see sectionUtils), so gaps are harmless.
  */
-async function loadConflictingSubSectionIds(
-	c: Context<ApiEnv>,
-	currentFilename: string,
-	oldSections: ExistingSection[]
-): Promise<Set<number>> {
-	// 呼叫端保證 oldSections.length > 0（PATCH 內 length === 0 走另一條分支）。
-	const ids = oldSections.map((section) => section.section_id);
-	const lo = Math.min(...ids) * 100 + 1;
-	const hi = Math.max(...ids) * 100 + 99;
-
-	const result = await withRetry(() =>
-		c.env.DB.prepare(
-			'SELECT section_id FROM speech_content WHERE filename != ? AND section_id BETWEEN ? AND ?'
-		)
-			.bind(currentFilename, lo, hi)
-			.all<{ section_id: number }>()
+async function reserveSectionIds(c: Context<ApiEnv>, count: number): Promise<number> {
+	const n = Math.max(1, Math.floor(count));
+	// Idempotent: create the counter table + seed row if missing. The seed value
+	// (0) is irrelevant because the reservation below floors next_id at MAX+1.
+	await withRetry(() =>
+		c.env.DB.batch([
+			c.env.DB.prepare(
+				'CREATE TABLE IF NOT EXISTS section_id_counter (id INTEGER PRIMARY KEY, next_id INTEGER NOT NULL)'
+			),
+			c.env.DB.prepare('INSERT OR IGNORE INTO section_id_counter (id, next_id) VALUES (1, 0)')
+		])
 	);
-	const blocked = new Set<number>();
-	for (const row of result.results ?? []) {
-		blocked.add(Number(row.section_id));
+	// The atomic reservation: one statement, serialised by SQLite's write lock.
+	// next_id := max(current counter, MAX(section_id)+1) + n ; reserved block is
+	// the n ids immediately below the returned next_id.
+	const row = await withRetry(() =>
+		c.env.DB.prepare(
+			`UPDATE section_id_counter
+			 SET next_id = MAX(next_id, (SELECT COALESCE(MAX(section_id), 0) + 1 FROM speech_content)) + ?
+			 WHERE id = 1
+			 RETURNING next_id`
+		)
+			.bind(n)
+			.first<{ next_id: number | string }>()
+	);
+	const newNext = row != null ? Number(row.next_id) : NaN;
+	if (!Number.isFinite(newNext)) {
+		throw new Error('reserveSectionIds: counter update returned no row');
 	}
-	return blocked;
-}
-
-async function findMaxSectionId(c: Context<ApiEnv>): Promise<number> {
-	// SQLite optimises MAX on INTEGER PRIMARY KEY to O(1) — no WHERE clause so
-	// the B-tree tail lookup is used instead of a full table scan.
-	const result = await c.env.DB.prepare(
-		'SELECT MAX(section_id) AS max_id FROM speech_content'
-	).first<{ max_id: number | null }>();
-	const maxId = result?.max_id;
-	// D1 可能回傳 string，強制轉數值
-	const num = maxId != null ? Number(maxId) : 0;
-	const next = Number.isNaN(num) ? 0 : num + 1;
-	return next;
+	return newNext - n;
 }
 
 /** Markdown 轉 HTML 並移除 <script> */
@@ -321,11 +322,6 @@ function sectionMatchKey(section: { markdown: string; speaker: string | null }) 
 		return `${section.speaker ?? ''}\u0000__embedded_${mediaTag}__`;
 	}
 	return `${section.speaker ?? ''}\u0000${normalizeSectionComparableContent(section.markdown)}`;
-}
-
-/** 是否為「子段落 ID」（插入時用 base*100+1 等規則產生的長數字） */
-function isSubSectionId(sectionId: number) {
-	return String(Math.abs(sectionId)).length > 7;
 }
 
 /** 依 previous/next 鏈結將 DB 取出的段落排成正確順序；找不到頭則改依 section_id 排序 */
@@ -404,69 +400,21 @@ function buildLcsPairs(oldSections: SectionPayload[], newSections: SectionPayloa
 }
 
 /**
- * PATCH 時為「新插入的段落」分配 section_id。
+ * PATCH 用：以 LCS 對齊舊/新段落，能對上的沿用舊 section_id（URL 穩定），多出來
+ * 的新段落用 `allocateFresh()` 取得全域唯一的新 ID。
  *
- * 優先用 `base*100+N` 規則（讓子段落 ID 在 parent 附近，URL 比較有 locality）；
- * 但如果該 sub-section slot `[base*100+1, base*100+99]` 撞滿（被 oldRows 自己用掉、
- * 或被 loadConflictingSubSectionIds 預先標記為別篇 speech 佔走），nextCandidate 會
- * `+= 1` 一路 overflow 出 `safeRangeMax`（= max(oldId)*100+99，也就是 query 覆蓋的
- * 上界）；那邊一旦也被別篇 speech 佔走 → INSERT UNIQUE PK fail。
- *
- * Overflow 時改從 `freshIdRef.value`（globalMaxSectionId+1 起算）拿一個保證沒人用的 ID，
- * 因為 fresh 區段一定 > 任何 existing section_id，跨 speech 不會撞。
+ * allocateFresh() draws sequentially from a block pre-reserved via
+ * reserveSectionIds (globalMax+1..), so every inserted id is strictly greater
+ * than every existing section_id and than every other id minted this request —
+ * cross-speech / intra-request UNIQUE-PK collisions are impossible by
+ * construction. There is no positional `base*100+N` scheme any more: section_id
+ * is pure identity and display order comes from the previous/next link chain
+ * (withSectionLinks + sectionUtils), so non-local inserted ids are fine.
  */
-function appendInsertedSections(
-	output: PatchAssignedSection[],
-	newInserts: SectionPayload[],
-	baseIdHint: number | null,
-	usedIds: Set<number>,
-	safeRangeMax: number,
-	freshIdRef: { value: number }
-) {
-	if (newInserts.length > 99) throw new Error('Too many inserted sections in a single gap (max 99)');
-
-	const fallbackBase = output.length > 0 ? output[output.length - 1].section_id : baseIdHint ?? 0;
-
-	const allocateFresh = (): number => {
-		while (usedIds.has(freshIdRef.value)) freshIdRef.value += 1;
-		const id = freshIdRef.value;
-		freshIdRef.value += 1;
-		return id;
-	};
-
-	// When the anchor is already a "large" sub-section id, the base*100+N / base+1
-	// locality scheme has no safe room: those candidates fall *below* the global
-	// MAX(section_id) counter and walk straight into ids owned by OTHER speeches,
-	// hitting "UNIQUE constraint failed: speech_content.section_id" on INSERT (503).
-	// loadConflictingSubSectionIds only pre-blocks [min*100+1, max*100+99], which for
-	// a sub-section anchor is a far-away ~10-digit window that misses the real
-	// collision zone near base+1. For those anchors, allocate guaranteed-unique
-	// fresh ids (globalMax+1…) instead; small-id anchors keep the locality scheme.
-	if (isSubSectionId(fallbackBase)) {
-		for (const insertSection of newInserts) {
-			const chosenId = allocateFresh();
-			usedIds.add(chosenId);
-			output.push({ ...insertSection, section_id: chosenId });
-		}
-		return;
-	}
-
-	let nextCandidate = fallbackBase * 100 + 1;
-	for (const insertSection of newInserts) {
-		while (nextCandidate <= safeRangeMax && usedIds.has(nextCandidate)) nextCandidate += 1;
-		const chosenId = nextCandidate <= safeRangeMax ? nextCandidate : allocateFresh();
-		if (chosenId === nextCandidate) nextCandidate += 1;
-		usedIds.add(chosenId);
-		output.push({ ...insertSection, section_id: chosenId });
-	}
-}
-
-/** PATCH 用：以 LCS 對齊舊/新段落，能對上的沿用舊 section_id，多出來的新段落分配新 ID */
 function assignPatchedSections(
 	oldRows: ExistingSection[],
 	newSections: SectionPayload[],
-	extraBlockedIds: ReadonlySet<number>,
-	freshIdStart: number
+	allocateFresh: () => number
 ): PatchAssignedSection[] {
 	const oldSections: Array<SectionPayload & { section_id: number }> = oldRows.map((row) => ({
 		section_id: row.section_id,
@@ -475,13 +423,12 @@ function assignPatchedSections(
 		section_content: row.section_content
 	}));
 	const output: PatchAssignedSection[] = [];
-	const usedIds = new Set<number>(oldRows.map((row) => row.section_id));
-	for (const blocked of extraBlockedIds) usedIds.add(blocked);
-	const oldIds = oldRows.map((row) => row.section_id);
-	const safeRangeMax = oldIds.length > 0 ? Math.max(...oldIds) * 100 + 99 : 0;
-	const freshIdRef = { value: freshIdStart };
 	let oldCursor = 0;
 	let newCursor = 0;
+
+	const emit = (section: SectionPayload, sectionId: number) => {
+		output.push({ ...section, section_id: sectionId });
+	};
 
 	// Special case: 改第一段（新第一段是陌生內容）時，強制沿用舊第一段 section_id
 	if (
@@ -489,7 +436,7 @@ function assignPatchedSections(
 		newSections.length > 0 &&
 		sectionMatchKey(oldSections[0]) !== sectionMatchKey(newSections[0])
 	) {
-		output.push({ ...newSections[0], section_id: oldSections[0].section_id });
+		emit(newSections[0], oldSections[0].section_id);
 		oldCursor = 1;
 		newCursor = 1;
 	}
@@ -503,21 +450,11 @@ function assignPatchedSections(
 		const newGap = newSections.slice(newCursor, newMatchIdx);
 		const pairedCount = Math.min(oldGap.length, newGap.length);
 
-		for (let k = 0; k < pairedCount; k += 1) {
-			output.push({ ...newGap[k], section_id: oldGap[k].section_id });
-		}
+		// Reuse old ids for paired sections in the gap; fresh ids for the rest.
+		for (let k = 0; k < pairedCount; k += 1) emit(newGap[k], oldGap[k].section_id);
+		for (let k = pairedCount; k < newGap.length; k += 1) emit(newGap[k], allocateFresh());
 
-		if (newGap.length > oldGap.length) {
-			const baseIdHint =
-				pairedCount > 0
-					? oldGap[pairedCount - 1].section_id
-					: output.length > 0
-						? output[output.length - 1].section_id
-						: oldSections[0]?.section_id ?? null;
-			appendInsertedSections(output, newGap.slice(pairedCount), baseIdHint, usedIds, safeRangeMax, freshIdRef);
-		}
-
-		output.push({ ...newSections[newMatchIdx], section_id: oldSections[oldMatchIdx].section_id });
+		emit(newSections[newMatchIdx], oldSections[oldMatchIdx].section_id);
 		oldCursor = oldMatchIdx + 1;
 		newCursor = newMatchIdx + 1;
 	}
@@ -526,19 +463,8 @@ function assignPatchedSections(
 	const newTail = newSections.slice(newCursor);
 	const tailPairCount = Math.min(oldTail.length, newTail.length);
 
-	for (let k = 0; k < tailPairCount; k += 1) {
-		output.push({ ...newTail[k], section_id: oldTail[k].section_id });
-	}
-
-	if (newTail.length > oldTail.length) {
-		const baseIdHint =
-			tailPairCount > 0
-				? oldTail[tailPairCount - 1].section_id
-				: output.length > 0
-					? output[output.length - 1].section_id
-					: oldSections[0]?.section_id ?? null;
-		appendInsertedSections(output, newTail.slice(tailPairCount), baseIdHint, usedIds, safeRangeMax, freshIdRef);
-	}
+	for (let k = 0; k < tailPairCount; k += 1) emit(newTail[k], oldTail[k].section_id);
+	for (let k = tailPairCount; k < newTail.length; k += 1) emit(newTail[k], allocateFresh());
 
 	return output;
 }
@@ -863,7 +789,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const speakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
-			const baseSectionId = await withRetry(() => findMaxSectionId(c));
+			// Atomically reserve a contiguous, collision-free block of ids.
+			const baseSectionId = await reserveSectionIds(c, sectionPayloads.length);
 
 			// 為每個段落分配連續的 section_id 與 prev/next 鏈結
 			const normalized: NormalizedSection[] = sectionPayloads.map((section, idx) => {
@@ -1062,26 +989,18 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const newSpeakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
 
-			let assignedPatched: PatchAssignedSection[];
-			if (oldSections.length === 0) {
-				// 安全補強：若舊資料沒有任何段落，改用 POST 式連號分配，避免 ID 無基準導致失敗
-				const baseSectionId = await withRetry(() => findMaxSectionId(c));
-				assignedPatched = sectionPayloads.map((section, idx) => ({
-					...section,
-					section_id: baseSectionId + idx
-				}));
-			} else {
-				const blockedSubIds = await loadConflictingSubSectionIds(c, filename, oldSections);
-				// freshIdStart 用 globalMaxSectionId+1 起算；當 sub-section slot 撞滿、
-				// nextCandidate overflow 出 safeRangeMax 時 appendInsertedSections 會改用這裡的 ID。
-				const freshIdStart = await withRetry(() => findMaxSectionId(c));
-				try {
-					assignedPatched = assignPatchedSections(oldSections, sectionPayloads, blockedSubIds, freshIdStart);
-				} catch (err) {
-					const message = err instanceof Error ? err.message : 'Failed to assign section ids for PATCH';
-					return c.json({ success: false, message, filename }, 409, corsHeadersWithMethods);
-				}
-			}
+			// Reserve a contiguous, collision-free block of fresh ids up front.
+			// sectionPayloads.length is an upper bound on how many we can need
+			// (matched sections reuse their old ids); any unused reserved ids are
+			// harmless gaps. The reservation is atomic, so concurrent uploads never
+			// collide on the global section_id PK.
+			const reservedStart = await reserveSectionIds(c, sectionPayloads.length);
+			let nextFreshId = reservedStart;
+			const allocateFresh = () => nextFreshId++;
+			const assignedPatched: PatchAssignedSection[] =
+				oldSections.length === 0
+					? sectionPayloads.map((section) => ({ ...section, section_id: allocateFresh() }))
+					: assignPatchedSections(oldSections, sectionPayloads, allocateFresh);
 
 			const normalized = withSectionLinks(assignedPatched);
 			// 既有段落 ID（DB 原本有的）；finalSectionIds = PATCH 後要保留的 ID（供刪除用）
