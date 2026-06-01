@@ -426,7 +426,6 @@ function appendInsertedSections(
 	if (newInserts.length > 99) throw new Error('Too many inserted sections in a single gap (max 99)');
 
 	const fallbackBase = output.length > 0 ? output[output.length - 1].section_id : baseIdHint ?? 0;
-	let nextCandidate = isSubSectionId(fallbackBase) ? fallbackBase + 1 : fallbackBase * 100 + 1;
 
 	const allocateFresh = (): number => {
 		while (usedIds.has(freshIdRef.value)) freshIdRef.value += 1;
@@ -435,6 +434,24 @@ function appendInsertedSections(
 		return id;
 	};
 
+	// When the anchor is already a "large" sub-section id, the base*100+N / base+1
+	// locality scheme has no safe room: those candidates fall *below* the global
+	// MAX(section_id) counter and walk straight into ids owned by OTHER speeches,
+	// hitting "UNIQUE constraint failed: speech_content.section_id" on INSERT (503).
+	// loadConflictingSubSectionIds only pre-blocks [min*100+1, max*100+99], which for
+	// a sub-section anchor is a far-away ~10-digit window that misses the real
+	// collision zone near base+1. For those anchors, allocate guaranteed-unique
+	// fresh ids (globalMax+1…) instead; small-id anchors keep the locality scheme.
+	if (isSubSectionId(fallbackBase)) {
+		for (const insertSection of newInserts) {
+			const chosenId = allocateFresh();
+			usedIds.add(chosenId);
+			output.push({ ...insertSection, section_id: chosenId });
+		}
+		return;
+	}
+
+	let nextCandidate = fallbackBase * 100 + 1;
 	for (const insertSection of newInserts) {
 		while (nextCandidate <= safeRangeMax && usedIds.has(nextCandidate)) nextCandidate += 1;
 		const chosenId = nextCandidate <= safeRangeMax ? nextCandidate : allocateFresh();
