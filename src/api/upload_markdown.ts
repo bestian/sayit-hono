@@ -38,6 +38,31 @@ function transformFilename(input: string): string {
 	return replaced.slice(0, 50);
 }
 
+/** FNV-1a 32-bit hash → 7-char base36. Deterministic, dependency-free. */
+function shortHash(value: string): string {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < value.length; i += 1) {
+		h ^= value.charCodeAt(i);
+		h = Math.imul(h, 0x01000193);
+	}
+	return (h >>> 0).toString(36).padStart(7, '0').slice(-7);
+}
+
+/**
+ * A bounded but collision-resistant storage key for a raw filename. For names
+ * within the 50-char budget this is byte-identical to transformFilename (so
+ * existing keys/URLs are untouched). Longer names — which transformFilename
+ * truncates to a shared 50-char prefix, letting two distinct transcripts collapse
+ * onto one key and silently clobber each other — instead get a short deterministic
+ * hash of the FULL normalized name appended, keeping the key injective on source.
+ * Only minted by the POST/PATCH title-collision guard, never for the common path.
+ */
+function collisionResistantKey(input: string): string {
+	const normalized = input.toLowerCase().replace(/\.md$/, '').replace(/：/g, '-');
+	if (normalized.length <= 50) return normalized;
+	return `${normalized.slice(0, 42)}-${shortHash(normalized)}`;
+}
+
 /**
  * 若該 filename 已被合併到 canonical 版本（speech_redirects.old_filename 命中），
  * 回傳 canonical 的 new_filename；否則回 null。
@@ -753,12 +778,16 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				return c.json({ error: 'Missing or invalid markdown field' }, 400, corsHeadersWithMethods);
 			}
 
+			// 從 markdown 第一行解析標題（display_name）；guard 用它判斷 key 衝突
+			const firstLine = body.markdown.split('\n')[0]?.trim() ?? '';
+			const incomingTitle = firstLine.replace(/^#\s*/, '');
+
 			// 冪等：若 speech_index 已有此 filename 則先刪除舊資料再重新寫入
 			let existing = await withRetry(() => c.env.DB.prepare(
-				'SELECT filename FROM speech_index WHERE filename = ?'
+				'SELECT filename, display_name FROM speech_index WHERE filename = ?'
 			)
 				.bind(filename)
-				.first<{ filename: string }>());
+				.first<{ filename: string; display_name: string }>());
 
 			if (!existing) {
 				// 若 filename 已被合併到 canonical，改 POST 到 canonical，避免重新生出重複列
@@ -767,10 +796,28 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					console.log('[upload_markdown] POST redirect:', { from: filename, to: canonicalFilename });
 					filename = canonicalFilename;
 					existing = await withRetry(() => c.env.DB.prepare(
-						'SELECT filename FROM speech_index WHERE filename = ?'
+						'SELECT filename, display_name FROM speech_index WHERE filename = ?'
 					)
 						.bind(filename)
-						.first<{ filename: string }>());
+						.first<{ filename: string; display_name: string }>());
+				}
+			}
+
+			// CLOBBER GUARD: a DIFFERENT transcript already occupies this (possibly
+			// truncated) key — its title differs from ours. Don't delete-then-insert
+			// over it; give the incoming speech a collision-resistant key instead.
+			if (existing && incomingTitle && existing.display_name !== incomingTitle) {
+				const resistantKey = collisionResistantKey(raw_filename.trim());
+				if (resistantKey !== filename) {
+					console.warn(
+						`[upload_markdown] POST key collision on "${filename}" (existing "${existing.display_name}" != incoming "${incomingTitle}"); using "${resistantKey}"`
+					);
+					filename = resistantKey;
+					existing = await withRetry(() => c.env.DB.prepare(
+						'SELECT filename, display_name FROM speech_index WHERE filename = ?'
+					)
+						.bind(filename)
+						.first<{ filename: string; display_name: string }>());
 				}
 			}
 
@@ -783,9 +830,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				]));
 			}
 
-			// 從 markdown 第一行解析 display_name：去掉開頭 '# '
-			const firstLine = body.markdown.split('\n')[0]?.trim() ?? '';
-			const display_name = firstLine.replace(/^#\s*/, '') || filename;
+			const display_name = incomingTitle || filename;
 
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const speakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
@@ -911,11 +956,13 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			let filename = transformFilename(rawFilename.trim());
 			const markdown = body.markdown;
+			const patchFirstLine = markdown.split('\n')[0]?.trim() ?? '';
+			const incomingTitle = patchFirstLine.replace(/^#\s*/, '');
 			let existingSpeech = await withRetry(() => c.env.DB.prepare(
-				'SELECT filename, alternate_filename FROM speech_index WHERE filename = ?'
+				'SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?'
 			)
 				.bind(filename)
-				.first<{ filename: string; alternate_filename?: string | null }>());
+				.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>());
 			if (!existingSpeech) {
 				// 若 filename 已被合併到 canonical，改 PATCH 到 canonical，避免重新生出重複列
 				const canonicalFilename = await lookupRedirectTarget(c, filename);
@@ -923,10 +970,28 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					console.log('[upload_markdown] PATCH redirect:', { from: filename, to: canonicalFilename });
 					filename = canonicalFilename;
 					existingSpeech = await withRetry(() => c.env.DB.prepare(
-						'SELECT filename, alternate_filename FROM speech_index WHERE filename = ?'
+						'SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?'
 					)
 						.bind(filename)
-						.first<{ filename: string; alternate_filename?: string | null }>());
+						.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>());
+				}
+			}
+			// CLOBBER GUARD (mirrors POST): if this (possibly truncated) key holds a
+			// DIFFERENTLY-TITLED speech, it is a distinct transcript that collided on
+			// the key — re-point to a collision-resistant key so we edit/create the
+			// right speech instead of corrupting the incumbent.
+			if (existingSpeech && incomingTitle && existingSpeech.display_name && existingSpeech.display_name !== incomingTitle) {
+				const resistantKey = collisionResistantKey(rawFilename.trim());
+				if (resistantKey !== filename) {
+					console.warn(
+						`[upload_markdown] PATCH key collision on "${filename}" (existing "${existingSpeech.display_name}" != incoming "${incomingTitle}"); using "${resistantKey}"`
+					);
+					filename = resistantKey;
+					existingSpeech = await withRetry(() => c.env.DB.prepare(
+						'SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?'
+					)
+						.bind(filename)
+						.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>());
 				}
 			}
 			if (!existingSpeech) {
@@ -958,8 +1023,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const desiredAlternateFilename =
 				nextAlternateFilename === undefined ? currentAlternateFilename : nextAlternateFilename;
 
-			const firstLine = markdown.split('\n')[0]?.trim() ?? '';
-			const displayName = firstLine.replace(/^#\s*/, '') || filename;
+			const displayName = incomingTitle || filename;
 			const oldSectionsRaw = await withRetry(() => c.env.DB.prepare(
 				`SELECT section_id, previous_section_id, next_section_id, section_speaker, section_content
 				 FROM speech_content

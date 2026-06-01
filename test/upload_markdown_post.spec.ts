@@ -14,13 +14,10 @@ function createPostEnv(options: { hasExistingFilename?: boolean; redirects?: Rec
 	const redirects: Record<string, string> = options.redirects ?? {};
 
 	function query(sql: string, args: unknown[]) {
-		if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) {
-			if (options.hasExistingFilename && args[0] === 'new-speech') {
-				return { success: true, results: [{ filename: 'new-speech' }] };
-			}
-			return { success: true, results: [] };
-		}
 		if (sql.includes('FROM speech_index WHERE filename = ?')) {
+			if (options.hasExistingFilename && args[0] === 'new-speech') {
+				return { success: true, results: [{ filename: 'new-speech', display_name: 'new-speech' }] };
+			}
 			return { success: true, results: [] };
 		}
 		if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
