@@ -21,7 +21,14 @@ function makeContext(overrides: Partial<{
 			const run = (args: unknown[]) => ({
 				sql,
 				args,
-				first: async () => resolver(sql, args).results[0] ?? null,
+				first: async () => {
+					const row = resolver(sql, args).results[0];
+					if (row != null) return row;
+					if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+						return { next_id: 1 + Number(args[0] || 1) };
+					}
+					return null;
+				},
 				all: async () => {
 					const r = resolver(sql, args);
 					return { success: r.success ?? true, results: r.results };
@@ -36,7 +43,9 @@ function makeContext(overrides: Partial<{
 			};
 		},
 		batch: async (stmts: any[]) => {
-			for (const stmt of stmts) batchStatements.push({ sql: stmt.sql, args: stmt.args });
+			for (const stmt of stmts) {
+				if (typeof stmt.sql === 'string') batchStatements.push({ sql: stmt.sql, args: stmt.args });
+			}
 			return stmts.map((_, i) => ({ meta: { changes: changes[i] ?? 1 } }));
 		}
 	};

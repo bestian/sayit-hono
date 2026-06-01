@@ -30,7 +30,14 @@ function env(resolver: Resolver) {
 				const run = (args: unknown[]) => ({
 					sql,
 					args,
-					first: async () => resolver(sql, args).results[0] ?? null,
+					first: async () => {
+						const row = resolver(sql, args).results[0];
+						if (row != null) return row;
+						if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+							return { next_id: 1 + Number(args[0] || 1) };
+						}
+						return null;
+					},
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
@@ -48,7 +55,9 @@ function env(resolver: Resolver) {
 				};
 			},
 			batch: async (stmts: any[]) => {
-				for (const s of stmts) operations.push({ sql: s.sql, args: s.args });
+				for (const s of stmts) {
+					if (typeof s.sql === 'string') operations.push({ sql: s.sql, args: s.args });
+				}
 				return stmts.map(() => ({ meta: { changes: 1 } }));
 			}
 		}
@@ -228,7 +237,9 @@ describe('PATCH alternate_filename explicit null', () => {
 			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
 				return { success: true, results: [] };
 			}
-			if (sql.includes('SELECT MAX(section_id)')) return { success: true, results: [{ max_id: 1000 }] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return { success: true, results: [{ next_id: 1001 + Number(args[0] || 1) }] };
+			}
 			return { success: true, results: [] };
 		});
 		const { res } = await req('/api/upload_markdown', e, {
@@ -244,10 +255,11 @@ describe('PATCH alternate_filename explicit null', () => {
 	});
 });
 
-describe('PATCH >99 inserts triggers 409', () => {
-	it('returns 409 when one gap contains more than 99 new sections', async () => {
-		// Old: single section X. New: X + 100 new sections — appendInsertedSections throws.
-		// uploadMarkdown catches and returns 409.
+describe('PATCH >99 inserts uses reserved fresh ids', () => {
+	it('succeeds when one gap contains more than 99 new sections', async () => {
+		// Old: single section X. New: X + 100 new sections. The removed 99-id
+		// positional gap cap no longer applies; inserted sections come from the
+		// fresh reserved id block.
 		const oldSections = [
 			{ section_id: 500, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor-X</p>' }
 		];
@@ -264,13 +276,16 @@ describe('PATCH >99 inserts triggers 409', () => {
 			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
 				return { success: true, results: oldSections };
 			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return { success: true, results: [{ next_id: 501 + Number(args[0] || 1) }] };
+			}
 			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
 				return { success: true, results: [] };
 			}
 			return { success: true, results: [] };
 		});
-		// Anchor-X match preserved, with 100 inserts before it.
-		const newSections = Array.from({ length: 100 }, (_, i) => `## A:\ninserted-${i}`).join('\n\n') + '\n\n## A:\nanchor-X';
+		// Anchor-X match preserved, with 100 inserts after it.
+		const newSections = '## A:\nanchor-X\n\n' + Array.from({ length: 100 }, (_, i) => `## A:\ninserted-${i}`).join('\n\n');
 		const { res } = await req('/api/upload_markdown', e, {
 			method: 'PATCH',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
@@ -279,10 +294,22 @@ describe('PATCH >99 inserts triggers 409', () => {
 				markdown: `# Too Many\n${newSections}`
 			})
 		});
-		expect(res.status).toBe(409);
+		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
-		expect(body.success).toBe(false);
-		expect(body.message).toContain('Too many inserted sections');
+		expect(body).toMatchObject({
+			success: true,
+			filename: 'too-many',
+			sectionsCount: 101,
+			insertedCount: 100,
+			updatedCount: 1,
+			deletedCount: 0
+		});
+		const insertedIds = e.__operations
+			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
+			.map((stmt) => stmt.args[3]);
+		expect(insertedIds).toHaveLength(100);
+		expect(new Set(insertedIds).size).toBe(100);
+		expect(insertedIds).toEqual(Array.from({ length: 100 }, (_, i) => 501 + i));
 	});
 });
 
@@ -299,11 +326,13 @@ describe('decodeURIComponent catch for speaker name', () => {
 		// for the decode step, still contains an unpaired `%`. Since that's impossible
 		// through normalizeSpeakerName, we smoke-test the happy path here to keep
 		// things executing; the catch is defensive and guarded.
-		const e = env((sql) => {
+		const e = env((sql, args) => {
 			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) {
 				return { success: true, results: [] };
 			}
-			if (sql.includes('SELECT MAX(section_id)')) return { success: true, results: [{ max_id: 10 }] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return { success: true, results: [{ next_id: 11 + Number(args[0] || 1) }] };
+			}
 			return { success: true, results: [] };
 		});
 		const { res } = await req('/api/upload_markdown', e, {

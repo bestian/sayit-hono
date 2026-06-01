@@ -9,6 +9,10 @@ const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 type Resolver = (sql: string, args: unknown[]) => { success?: boolean; results: any[] };
 
+function reservedCounterResult(maxSectionId: number, args: unknown[]) {
+	return { success: true, results: [{ next_id: maxSectionId + 1 + Number(args[0] || 1) }] };
+}
+
 function makeUploadEnv(resolver: Resolver, options: { batchChanges?: number[]; failSearchSync?: boolean } = {}) {
 	const deletedKeys: string[] = [];
 	const putObjects = new Map<string, string>();
@@ -43,7 +47,17 @@ function makeUploadEnv(resolver: Resolver, options: { batchChanges?: number[]; f
 				const run = (args: unknown[]) => ({
 					sql,
 					args,
-					first: async () => resolver(sql, args).results[0] ?? null,
+					first: async () => {
+						const fromResolver = resolver(sql, args).results[0];
+						if (fromResolver != null) return fromResolver;
+						// Default reservation: reserveSectionIds() issues
+						// `UPDATE section_id_counter ... RETURNING next_id`; return a
+						// block starting at 1 unless the test's resolver overrides it.
+						if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+							return { next_id: 1 + (Number((args as unknown[])[0]) || 1) };
+						}
+						return null;
+					},
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
@@ -61,7 +75,9 @@ function makeUploadEnv(resolver: Resolver, options: { batchChanges?: number[]; f
 				};
 			},
 			batch: async (stmts: any[]) => {
-				for (const stmt of stmts) operations.push({ sql: stmt.sql, args: stmt.args });
+				for (const stmt of stmts) {
+					if (typeof stmt.sql === 'string') operations.push({ sql: stmt.sql, args: stmt.args });
+				}
 				return stmts.map((_, i) => ({ meta: { changes: changes[i] ?? 1 } }));
 			}
 		}
@@ -75,13 +91,121 @@ async function request(path: string, env: ReturnType<typeof makeUploadEnv>, init
 	return { res };
 }
 
-describe('parseMarkdownSections edge branches', () => {
-	it('quote-only section gets speaker=null', async () => {
-		const env = makeUploadEnv((sql) => {
+describe('reserveSectionIds atomic reservation', () => {
+	it('hands out disjoint id blocks across sequential POSTs', async () => {
+		let counter = 100;
+		let tableMax = 99;
+		const idsByFilename = new Map<string, number[]>();
+		const operations: Array<{ sql: string; args: unknown[] }> = [];
+
+		const query = (sql: string, args: unknown[]) => {
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				const n = Number(args[0] || 1);
+				counter = Math.max(counter, tableMax + 1) + n;
+				return { success: true, results: [{ next_id: counter }] };
+			}
 			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) {
 				return { success: true, results: [] };
 			}
-			if (sql.includes('SELECT MAX(section_id)')) return { success: true, results: [{ max_id: 100 }] };
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
+				return { success: true, results: (idsByFilename.get(String(args[0])) ?? []).map((section_id) => ({ section_id })) };
+			}
+			if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si ON sc.filename = si.filename')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('SELECT COUNT(*) AS count')) {
+				return { success: true, results: [{ count: 0 }] };
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) {
+				return { success: true, results: [] };
+			}
+			return { success: true, results: [] };
+		};
+
+		const env = {
+			AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
+			BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
+			ASSETS: { fetch: () => new Response('NF', { status: 404 }) },
+			SPEECH_CACHE: {
+				delete: async () => true,
+				get: async () => null,
+				put: async () => {},
+				list: async () => ({ objects: [], truncated: false, cursor: '' })
+			},
+			DB: {
+				prepare: (sql: string) => {
+					const statement = (args: unknown[] = []): any => ({
+						sql,
+						args,
+						bind: (...bound: unknown[]) => statement(bound),
+						first: async () => query(sql, args).results[0] ?? null,
+						all: async () => {
+							const result = query(sql, args);
+							return { success: result.success ?? true, results: result.results };
+						},
+						run: async () => ({ success: true, meta: { changes: 1 } })
+					});
+					return statement();
+				},
+				batch: async (stmts: any[]) => {
+					for (const stmt of stmts) {
+						operations.push({ sql: stmt.sql, args: stmt.args ?? [] });
+						if (typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content')) {
+							for (let i = 0; i < stmt.args.length; i += 8) {
+								const filename = String(stmt.args[i]);
+								const sectionId = Number(stmt.args[i + 3]);
+								const ids = idsByFilename.get(filename) ?? [];
+								ids.push(sectionId);
+								idsByFilename.set(filename, ids);
+								tableMax = Math.max(tableMax, sectionId);
+							}
+						}
+					}
+					return stmts.map(() => ({ meta: { changes: 1 } }));
+				}
+			},
+			__operations: operations
+		};
+
+		const post = async (filename: string, markdown: string) => {
+			const req = new IncomingRequest('https://example.com/api/upload_markdown', {
+				method: 'POST',
+				headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+				body: JSON.stringify({ filename, markdown })
+			});
+			const ctx = createExecutionContext();
+			return worker.fetch(req, env as any, ctx);
+		};
+
+		const first = await post('race-one', '# Race One\nA\n\nB');
+		const second = await post('race-two', '# Race Two\nA\n\nB\n\nC');
+
+		expect(first.status).toBe(200);
+		expect(second.status).toBe(200);
+		const firstIds = idsByFilename.get('race-one') ?? [];
+		const secondIds = idsByFilename.get('race-two') ?? [];
+		expect(firstIds).toEqual([100, 101]);
+		expect(secondIds).toEqual([102, 103, 104]);
+		expect(Math.min(...secondIds)).toBeGreaterThan(Math.max(...firstIds));
+		expect(new Set([...firstIds, ...secondIds]).size).toBe(firstIds.length + secondIds.length);
+	});
+});
+
+describe('parseMarkdownSections edge branches', () => {
+	it('quote-only section gets speaker=null', async () => {
+		const env = makeUploadEnv((sql, args) => {
+			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return reservedCounterResult(100, args);
+			}
 			return { success: true, results: [] };
 		});
 		const { res } = await request('/api/upload_markdown', env, {
@@ -102,11 +226,13 @@ describe('parseMarkdownSections edge branches', () => {
 	});
 
 	it('drops empty speaker names (heading `## : ` with no name)', async () => {
-		const env = makeUploadEnv((sql) => {
+		const env = makeUploadEnv((sql, args) => {
 			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) {
 				return { success: true, results: [] };
 			}
-			if (sql.includes('SELECT MAX(section_id)')) return { success: true, results: [{ max_id: 200 }] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return reservedCounterResult(200, args);
+			}
 			return { success: true, results: [] };
 		});
 		const { res } = await request('/api/upload_markdown', env, {
@@ -175,7 +301,7 @@ describe('orderSectionsByLinks and assignPatchedSections branches', () => {
 describe('invalidateSpeakerCaches empty-route skip branch', () => {
 	it('skips cache invalidation entries for empty/null speaker routes', async () => {
 		// Construct a DELETE scenario where speech_speakers contains a row with null route_pathname.
-		const env = makeUploadEnv((sql) => {
+		const env = makeUploadEnv((sql, args) => {
 			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
 				return {
 					success: true,
@@ -201,11 +327,13 @@ describe('invalidateSpeakerCaches empty-route skip branch', () => {
 
 describe('syncSearchArtifacts error logging', () => {
 	it('logs but does not fail upsert when the search sync rejects', async () => {
-		const env = makeUploadEnv((sql) => {
+		const env = makeUploadEnv((sql, args) => {
 			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) {
 				return { success: true, results: [] };
 			}
-			if (sql.includes('SELECT MAX(section_id)')) return { success: true, results: [{ max_id: 300 }] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return reservedCounterResult(300, args);
+			}
 			return { success: true, results: [] };
 		}, { failSearchSync: true });
 
@@ -268,6 +396,10 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
 				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
 			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				const maxSectionId = Math.max(0, ...oldSections.map((section) => Number(section.section_id) || 0));
+				return reservedCounterResult(maxSectionId, args);
+			}
 			return { success: true, results: [] };
 		};
 
@@ -286,7 +418,14 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						const run = (args: unknown[]) => ({
 							sql,
 							args,
-							first: async () => resolver(sql, args).results[0] ?? null,
+							first: async () => {
+								const row = resolver(sql, args).results[0];
+								if (row != null) return row;
+								if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+									return { next_id: 1 + Number(args[0] || 1) };
+								}
+								return null;
+							},
 							all: async () => {
 								const r = resolver(sql, args);
 								return { success: r.success ?? true, results: r.results };
@@ -301,7 +440,9 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						};
 					},
 					batch: async (stmts: any[]) => {
-						for (const s of stmts) ops.push(s);
+						for (const s of stmts) {
+							if (typeof s.sql === 'string') ops.push(s);
+						}
 						return stmts.map(() => ({ meta: { changes: 1 } }));
 					}
 				}
@@ -324,7 +465,7 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 
 	it('threads new sections into a short old list (tail-insertion with no LCS matches)', async () => {
 		// Old list has 1 section with content that doesn't match new sections — LCS pairs is empty.
-		// appendInsertedSections runs via the tail path (line 419) with baseIdHint derived from output.
+		// The first changed section reuses the old id and the remaining tail uses reserved fresh ids.
 		const { ctx } = makeCtx([
 			{ section_id: 500, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>totally-different-old-content</p>' }
 		]);
@@ -332,7 +473,7 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		expect(res.status).toBe(200);
 	});
 
-	it('skips over an already-used generated section id inside an insertion gap', async () => {
+	it('allocates a reserved fresh id inside an insertion gap', async () => {
 		const { ctx, ops } = makeCtx(
 			[
 				{ section_id: 1, previous_section_id: null, next_section_id: 101, section_speaker: 'A', section_content: '<p>anchor one</p>' },
@@ -349,18 +490,12 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		const insertedIds = ops
 			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
 			.map((stmt) => stmt.args[3]);
-		expect(insertedIds).toContain(102);
+		expect(insertedIds).toEqual([102]);
 	});
 
-	it('falls back to globalMax+1 fresh IDs when the sub-section slot is fully blocked (overflow guard)', async () => {
-		// Old single section id 1 → sub-section slot is [101, 199] (99 ids).
-		// Mock the cross-filename query to return ALL 99 ids as taken, simulating the
-		// production case where another speech's contiguous range exhausts the entire
-		// [base*100+1, base*100+99] window. Without the fresh-ID fallback, nextCandidate
-		// would overflow past safeRangeMax (199) into the unguarded [200, …] range
-		// — and would hit "UNIQUE constraint failed: speech_content.section_id" if
-		// another speech happens to own those ids too.
-		// findMaxSectionId is mocked to 50000 so the fresh allocator should start at 50000.
+	it('allocates sequential reserved fresh IDs for multiple inserted sections', async () => {
+		// The old positional sub-section window is gone. Inserts are allocated from
+		// the reserved global block, starting at max(section_id)+1.
 		const ops: any[] = [];
 		const requestBody = {
 			filename: 'overflow-fresh',
@@ -369,7 +504,6 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		const oldSections = [
 			{ section_id: 1, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor</p>' }
 		];
-		const fullyBlockedRange = Array.from({ length: 99 }, (_, i) => ({ section_id: 101 + i }));
 		const resolver: Resolver = (sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
 				return { success: true, results: args[0] === requestBody.filename
@@ -389,11 +523,8 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
 				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
 			}
-			if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
-				return { success: true, results: fullyBlockedRange };
-			}
-			if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
-				return { success: true, results: [{ max_id: 49999 }] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return reservedCounterResult(49999, args);
 			}
 			return { success: true, results: [] };
 		};
@@ -413,7 +544,14 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						const run = (args: unknown[]) => ({
 							sql,
 							args,
-							first: async () => resolver(sql, args).results[0] ?? null,
+							first: async () => {
+								const row = resolver(sql, args).results[0];
+								if (row != null) return row;
+								if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+									return { next_id: 1 + Number(args[0] || 1) };
+								}
+								return null;
+							},
 							all: async () => {
 								const r = resolver(sql, args);
 								return { success: r.success ?? true, results: r.results };
@@ -428,7 +566,9 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						};
 					},
 					batch: async (stmts: any[]) => {
-						for (const s of stmts) ops.push(s);
+						for (const s of stmts) {
+							if (typeof s.sql === 'string') ops.push(s);
+						}
 						return stmts.map(() => ({ meta: { changes: 1 } }));
 					}
 				}
@@ -452,26 +592,12 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		const insertedIds = ops
 			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
 			.map((stmt) => stmt.args[3]);
-		// All 3 newly-inserted sections must come from the fresh ID range (>= 50000),
-		// not the overflowed [200, …] range that would risk cross-speech UNIQUE PK collision.
-		expect(insertedIds.length).toBeGreaterThanOrEqual(3);
-		for (const id of insertedIds) {
-			expect(id).toBeGreaterThanOrEqual(50000);
-		}
-		// Specifically should be 50000, 50001, 50002 (sequential from freshIdStart).
-		expect(insertedIds.slice(0, 3)).toEqual([50000, 50001, 50002]);
+		expect(insertedIds).toEqual([50000, 50001, 50002]);
 	});
 
 	it('allocates fresh global ids (not base+1) when the anchor is already a sub-section id', async () => {
-		// Regression: the EN "Outrage to Overlap" speech was left with 8-digit
-		// sub-section ids (e.g. 63852882). On PATCH, inserting after such an anchor
-		// took the `fallbackBase + 1` branch and walked 63852883, 63852884, … —
-		// ids that sit *below* the global MAX(section_id) counter and are owned by
-		// OTHER speeches, so the INSERT hit "UNIQUE constraint failed:
-		// speech_content.section_id" (surfaced as HTTP 503). loadConflictingSubSectionIds
-		// only pre-blocks [min*100+1, max*100+99] (a far-away ~10-digit window here) and
-		// misses the +1 zone, so anchorId+1 was chosen and collided. The fix forces a
-		// sub-section anchor to allocate fresh global ids.
+		// Regression guard for old sub-section-like ids. Inserted sections must come
+		// from the reserved global block, never anchorId+1.
 		const ops: any[] = [];
 		const requestBody = {
 			filename: 'sub-anchor-insert',
@@ -498,12 +624,10 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
 			}
 			if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
-				// loadConflictingSubSectionIds queries the far-away ~10-digit window and
-				// finds nothing — so anchorId+1 (63852883) is NOT pre-blocked.
 				return { success: true, results: [] };
 			}
-			if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
-				return { success: true, results: [{ max_id: 70000000 }] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return reservedCounterResult(70000000, args);
 			}
 			return { success: true, results: [] };
 		};
@@ -523,7 +647,14 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						const run = (args: unknown[]) => ({
 							sql,
 							args,
-							first: async () => resolver(sql, args).results[0] ?? null,
+							first: async () => {
+								const row = resolver(sql, args).results[0];
+								if (row != null) return row;
+								if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+									return { next_id: 1 + Number(args[0] || 1) };
+								}
+								return null;
+							},
 							all: async () => {
 								const r = resolver(sql, args);
 								return { success: r.success ?? true, results: r.results };
@@ -538,7 +669,9 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						};
 					},
 					batch: async (stmts: any[]) => {
-						for (const s of stmts) ops.push(s);
+						for (const s of stmts) {
+							if (typeof s.sql === 'string') ops.push(s);
+						}
 						return stmts.map(() => ({ meta: { changes: 1 } }));
 					}
 				}
@@ -571,22 +704,15 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		expect(insertedIds[0]).toBe(70000001);
 	});
 
-	it('allocateFresh skips freshIdRef.value when it collides with usedIds', async () => {
-		// 防禦性測試：當 freshIdRef.value（globalMax+1）剛好落在 usedIds 內時，
-		// allocateFresh 的 `while (usedIds.has(freshIdRef.value)) freshIdRef.value += 1`
-		// 必須跳過該 ID。實務上 DB 狀態一致時不會發生，但 inconsistency / race
-		// 仍可能讓 freshIdStart 撞上 oldRows.section_id，這支 while 是最後一道防線。
+	it('reservation starts above existing section ids even when the counter was stale', async () => {
 		const ops: any[] = [];
 		const requestBody = {
 			filename: 'fresh-collision',
 			markdown: '# X\n## A:\nanchor\n\nins1\n\nins2'
 		};
-		// 老 section id = 1，所以 usedIds 起始 = {1}。
 		const oldSections = [
 			{ section_id: 1, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor</p>' }
 		];
-		// 把 sub-section slot [101, 199] 全部佔住，逼 nextCandidate 溢出 safeRangeMax(=199)。
-		const fullyBlockedRange = Array.from({ length: 99 }, (_, i) => ({ section_id: 101 + i }));
 		const resolver: Resolver = (sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
 				return { success: true, results: args[0] === requestBody.filename
@@ -606,12 +732,8 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
 				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
 			}
-			if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
-				return { success: true, results: fullyBlockedRange };
-			}
-			if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
-				// 故意讓 freshIdStart = 0+1 = 1 撞上 oldSections[0].section_id。
-				return { success: true, results: [{ max_id: 0 }] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return reservedCounterResult(1, args);
 			}
 			return { success: true, results: [] };
 		};
@@ -631,7 +753,14 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						const run = (args: unknown[]) => ({
 							sql,
 							args,
-							first: async () => resolver(sql, args).results[0] ?? null,
+							first: async () => {
+								const row = resolver(sql, args).results[0];
+								if (row != null) return row;
+								if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+									return { next_id: 1 + Number(args[0] || 1) };
+								}
+								return null;
+							},
 							all: async () => {
 								const r = resolver(sql, args);
 								return { success: r.success ?? true, results: r.results };
@@ -646,7 +775,9 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						};
 					},
 					batch: async (stmts: any[]) => {
-						for (const s of stmts) ops.push(s);
+						for (const s of stmts) {
+							if (typeof s.sql === 'string') ops.push(s);
+						}
 						return stmts.map(() => ({ meta: { changes: 1 } }));
 					}
 				}
@@ -670,20 +801,13 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		const insertedIds = ops
 			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
 			.map((stmt) => stmt.args[3]);
-		// allocateFresh 第一次 freshIdRef.value=1 撞 usedIds 跳到 2；之後依序給 3, …
-		// 不能拿到 1（會撞 oldSections）也不能落在 [101,199]（被別篇 speech 佔走）。
 		expect(insertedIds).not.toContain(1);
-		for (const id of insertedIds) {
-			expect(id < 101 || id > 199).toBe(true);
-		}
-		expect(insertedIds).toContain(2);
+		expect(insertedIds).toEqual([2, 3]);
 	});
 
-	it('skips over a sub-section id already used by ANOTHER speech (cross-filename UNIQUE PK guard)', async () => {
-		// Old section id 1 → first sub-id candidate would be 101. If another speech in
-		// speech_content already owns 101, the INSERT would otherwise hit
-		// "UNIQUE constraint failed: speech_content.section_id". loadConflictingSubSectionIds
-		// should pre-fetch that 101 and append it to usedIds, so the inserter advances to 102.
+	it('allocates a fresh id beyond another speech collision candidate', async () => {
+		// Another speech already owns what the old positional scheme would have used.
+		// The new contract allocates from the global reserved block instead.
 		const ops: any[] = [];
 		const requestBody = {
 			filename: 'cross-collision',
@@ -716,6 +840,9 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 				// Another speech already owns 101 in the candidate range.
 				return { success: true, results: [{ section_id: 101 }] };
 			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return reservedCounterResult(200, args);
+			}
 			return { success: true, results: [] };
 		};
 
@@ -734,7 +861,14 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						const run = (args: unknown[]) => ({
 							sql,
 							args,
-							first: async () => resolver(sql, args).results[0] ?? null,
+							first: async () => {
+								const row = resolver(sql, args).results[0];
+								if (row != null) return row;
+								if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+									return { next_id: 1 + Number(args[0] || 1) };
+								}
+								return null;
+							},
 							all: async () => {
 								const r = resolver(sql, args);
 								return { success: r.success ?? true, results: r.results };
@@ -749,7 +883,9 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 						};
 					},
 					batch: async (stmts: any[]) => {
-						for (const s of stmts) ops.push(s);
+						for (const s of stmts) {
+							if (typeof s.sql === 'string') ops.push(s);
+						}
 						return stmts.map(() => ({ meta: { changes: 1 } }));
 					}
 				}
@@ -773,9 +909,8 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		const insertedIds = ops
 			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
 			.map((stmt) => stmt.args[3]);
-		// 101 is blocked by another filename → inserter must skip to 102
 		expect(insertedIds).not.toContain(101);
-		expect(insertedIds).toContain(102);
+		expect(insertedIds).toEqual([201]);
 	});
 });
 
@@ -800,14 +935,18 @@ describe('PATCH treats svg / iframe blocks as match anchors (issue #68)', () => 
 			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
 				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
 			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				const maxSectionId = Math.max(0, ...oldSections.map((section) => Number(section.section_id) || 0));
+				return reservedCounterResult(maxSectionId, args);
+			}
 			return { success: true, results: [] };
 		};
 	}
 
 	it('preserves the svg section_id when prose is inserted before it and inner svg markup changes', async () => {
 		// Without #68: LCS only matches the intro; gap-pairing makes the new prose inherit the svg's
-		// old id, and the new svg is allocated a sub-id. With #68: svg is treated as an anchor in LCS,
-		// so the new prose gets the sub-id and the svg keeps its original section_id.
+		// old id. With #68: svg is treated as an anchor in LCS, so the new prose gets
+		// a fresh reserved id and the svg keeps its original section_id.
 		const oldSections = [
 			{ section_id: 100, previous_section_id: null, next_section_id: 200, section_speaker: 'A', section_content: '<p>Intro paragraph here.</p>' },
 			{ section_id: 200, previous_section_id: 100, next_section_id: null, section_speaker: 'A', section_content: '<svg viewBox="0 0 100 100"><title>Old Chart</title><circle/></svg>' }
@@ -850,6 +989,7 @@ describe('PATCH treats svg / iframe blocks as match anchors (issue #68)', () => 
 		});
 		expect(explanationInsert).toBeDefined();
 		expect((explanationInsert!.args as any[])[3]).not.toBe(200);
+		expect((explanationInsert!.args as any[])[3]).toBeGreaterThan(200);
 	});
 
 	it('preserves the iframe section_id when iframe src changes and an unrelated section is inserted', async () => {
@@ -882,6 +1022,14 @@ describe('PATCH treats svg / iframe blocks as match anchors (issue #68)', () => 
 		const iframeContent = (iframeUpdate!.args as any[])[3] as string;
 		expect(iframeContent).toContain('<iframe');
 		expect(iframeContent).toContain('new.example.com');
+		const insertOps = env.__operations.filter((s) => s.sql.startsWith('INSERT INTO speech_content'));
+		const noteInsert = insertOps.find((s) => {
+			const content = (s.args as any[])[7];
+			return typeof content === 'string' && content.includes('A note added between');
+		});
+		expect(noteInsert).toBeDefined();
+		expect((noteInsert!.args as any[])[3]).not.toBe(300);
+		expect((noteInsert!.args as any[])[3]).toBeGreaterThan(300);
 	});
 
 	it('does NOT short-circuit when a section mixes iframe with surrounding prose', async () => {
