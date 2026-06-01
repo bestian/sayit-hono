@@ -11,6 +11,7 @@ import {
 	type SearchOverlayManifest
 } from './indexFormat';
 import { docsFromSections, type ApiSection } from './docBuilder';
+import { normalizeSections } from '../utils/sectionUtils';
 
 const SEARCH_MANIFEST_CACHE_CONTROL = 'public, max-age=60, s-maxage=60';
 const SEARCH_UPDATE_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400';
@@ -119,6 +120,8 @@ export async function buildSearchDocsForSpeech(
 			sc.filename,
 			sc.nest_filename,
 			sc.section_id,
+			sc.previous_section_id,
+			sc.next_section_id,
 			sc.section_content,
 			si.display_name,
 			sp.name
@@ -127,16 +130,24 @@ export async function buildSearchDocsForSpeech(
 		LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
 		WHERE sc.filename = ?
 		ORDER BY sc.section_id ASC`
-	).bind(filename).all<ApiSection>();
+	).bind(filename).all<ApiSection & { previous_section_id: number | null; next_section_id: number | null }>();
 
-	const sections = (rows.results ?? []).map((row) => ({
-		filename: row.filename,
-		nest_filename: row.nest_filename ?? null,
-		section_id: Number(row.section_id),
-		section_content: row.section_content ?? '',
-		display_name: row.display_name ?? filename,
-		name: row.name ?? null
-	}));
+	// Order by the previous/next link chain (true display order), NOT raw section_id.
+	// Inserted sections get fresh ids far above their neighbours, so a section_id ASC
+	// sort would scramble the excerpt; normalizeSections returns rows untouched when
+	// already in chain order, otherwise re-stitches them by the link chain.
+	const sections = normalizeSections(
+		(rows.results ?? []).map((row) => ({
+			filename: row.filename,
+			nest_filename: row.nest_filename ?? null,
+			section_id: Number(row.section_id),
+			previous_section_id: row.previous_section_id != null ? Number(row.previous_section_id) : null,
+			next_section_id: row.next_section_id != null ? Number(row.next_section_id) : null,
+			section_content: row.section_content ?? '',
+			display_name: row.display_name ?? filename,
+			name: row.name ?? null
+		}))
+	);
 
 	if (sections.length === 0) return [];
 	return docsFromSections(sections, `/${encodeURIComponent(filename)}`, filename);

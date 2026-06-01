@@ -44,8 +44,8 @@ function createUpsertEnv(options: {
 		if (sql.includes('SELECT COUNT(*) AS count FROM speech_content')) {
 			return { success: true, results: [{ count: 0 }] };
 		}
-		if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
-			return { success: true, results: [{ max_id: 500 }] };
+		if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+			return { success: true, results: [{ next_id: 501 + Number(args[0] || 1) }] };
 		}
 		if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
 			return { success: true, results: [] };
@@ -114,7 +114,7 @@ function createUpsertEnv(options: {
 			},
 			batch: async (statements: PreparedStatement[]) => {
 				for (const stmt of statements) {
-					operations.push(stmt);
+					if (typeof stmt.sql === 'string') operations.push(stmt);
 				}
 				return statements.map(() => ({ meta: { changes: 1 } }));
 			}
