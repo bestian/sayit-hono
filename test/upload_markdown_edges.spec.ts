@@ -462,6 +462,115 @@ describe('assignPatchedSections branches — many inserted sections', () => {
 		expect(insertedIds.slice(0, 3)).toEqual([50000, 50001, 50002]);
 	});
 
+	it('allocates fresh global ids (not base+1) when the anchor is already a sub-section id', async () => {
+		// Regression: the EN "Outrage to Overlap" speech was left with 8-digit
+		// sub-section ids (e.g. 63852882). On PATCH, inserting after such an anchor
+		// took the `fallbackBase + 1` branch and walked 63852883, 63852884, … —
+		// ids that sit *below* the global MAX(section_id) counter and are owned by
+		// OTHER speeches, so the INSERT hit "UNIQUE constraint failed:
+		// speech_content.section_id" (surfaced as HTTP 503). loadConflictingSubSectionIds
+		// only pre-blocks [min*100+1, max*100+99] (a far-away ~10-digit window here) and
+		// misses the +1 zone, so anchorId+1 was chosen and collided. The fix forces a
+		// sub-section anchor to allocate fresh global ids.
+		const ops: any[] = [];
+		const requestBody = {
+			filename: 'sub-anchor-insert',
+			markdown: '# X\n## A:\nanchor\n\nbrand new section'
+		};
+		const anchorId = 63852882; // 8 digits → isSubSectionId === true
+		const oldSections = [
+			{ section_id: anchorId, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor</p>' }
+		];
+		const resolver: Resolver = (sql, args) => {
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				return { success: true, results: args[0] === requestBody.filename
+					? [{ filename: requestBody.filename, display_name: 'X', isNested: 0, alternate_filename: null }]
+					: []
+				};
+			}
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return { success: true, results: oldSections };
+			}
+			if (sql.includes('SELECT DISTINCT section_speaker')) {
+				return { success: true, results: [{ section_speaker: 'A' }] };
+			}
+			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
+				return { success: true, results: [{ speaker_route_pathname: 'A' }] };
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
+				// loadConflictingSubSectionIds queries the far-away ~10-digit window and
+				// finds nothing — so anchorId+1 (63852883) is NOT pre-blocked.
+				return { success: true, results: [] };
+			}
+			if (sql.includes('SELECT MAX(section_id) AS max_id FROM speech_content')) {
+				return { success: true, results: [{ max_id: 70000000 }] };
+			}
+			return { success: true, results: [] };
+		};
+
+		const ctx = {
+			env: {
+				AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
+				BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
+				SPEECH_CACHE: {
+					get: async () => null,
+					put: async () => {},
+					delete: async () => true,
+					list: async () => ({ objects: [], truncated: false, cursor: '' })
+				},
+				DB: {
+					prepare: (sql: string) => {
+						const run = (args: unknown[]) => ({
+							sql,
+							args,
+							first: async () => resolver(sql, args).results[0] ?? null,
+							all: async () => {
+								const r = resolver(sql, args);
+								return { success: r.success ?? true, results: r.results };
+							},
+							run: async () => ({ success: true, meta: { changes: 1 } })
+						});
+						return {
+							bind: (...args: unknown[]) => run(args),
+							first: async () => run([]).first(),
+							all: async () => run([]).all(),
+							run: async () => run([]).run()
+						};
+					},
+					batch: async (stmts: any[]) => {
+						for (const s of stmts) ops.push(s);
+						return stmts.map(() => ({ meta: { changes: 1 } }));
+					}
+				}
+			},
+			req: {
+				method: 'PATCH',
+				url: 'https://example.com/api/upload_markdown',
+				header: (name: string) => (name === 'Authorization' ? 'Bearer token-audrey' : null),
+				query: () => null,
+				json: async () => requestBody
+			},
+			json: (body: any, status = 200, headers: Record<string, string> = {}) =>
+				new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }),
+			text: (body: string, status = 200, headers: Record<string, string> = {}) =>
+				new Response(body, { status, headers })
+		} as unknown as Context<ApiEnv>;
+
+		const res = await uploadMarkdown(ctx);
+		expect(res.status).toBe(200);
+
+		const insertedIds = ops
+			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
+			.map((stmt) => stmt.args[3]);
+		expect(insertedIds.length).toBeGreaterThanOrEqual(1);
+		// Must be fresh global ids (> existing MAX), never the collision-prone anchorId+1.
+		for (const id of insertedIds) {
+			expect(id).toBeGreaterThan(70000000);
+			expect(id).not.toBe(anchorId + 1);
+		}
+		expect(insertedIds[0]).toBe(70000001);
+	});
+
 	it('allocateFresh skips freshIdRef.value when it collides with usedIds', async () => {
 		// 防禦性測試：當 freshIdRef.value（globalMax+1）剛好落在 usedIds 內時，
 		// allocateFresh 的 `while (usedIds.has(freshIdRef.value)) freshIdRef.value += 1`
