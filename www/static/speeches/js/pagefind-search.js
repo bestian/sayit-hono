@@ -5,6 +5,10 @@
 	var results = document.getElementById('sayit-search-results');
 	var shortcutBadge = document.getElementById('sayit-search-shortcut');
 	var speechList = document.getElementById('sayit-speech-list');
+	var askPanel = document.getElementById('sayit-ask');
+	var askSubmit = document.getElementById('sayit-ask-submit');
+	var askStatus = document.getElementById('sayit-ask-status');
+	var askAnswer = document.getElementById('sayit-ask-answer');
 	if (!input || !results) return;
 
 	var isZh = document.documentElement.classList.contains('lang-zh');
@@ -20,6 +24,12 @@
 	var requestId = 0;
 	var pendingResolves = {};
 	var workerWarmed = false;
+	var askAvailable = false;
+	var askLoading = false;
+	var askCooldownTimer = null;
+	var askCooldownRemaining = 0;
+	var askAbortController = null;
+	var ASK_BASE_URL = 'https://ask.archive.tw';
 
 	function shouldWarmupOnFocus() {
 		var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -73,6 +83,79 @@
 		return textarea.value;
 	}
 
+	function isSafeHttpUrl(value) {
+		if (/[\s"'<>]/.test(value) || /&(quot|#39|lt|gt);/i.test(value)) return false;
+		try {
+			var url = new URL(value);
+			return url.protocol === 'http:' || url.protocol === 'https:';
+		} catch (e) {
+			return false;
+		}
+	}
+
+	function sanitizeHtml(html) {
+		var doc = new DOMParser().parseFromString(html, 'text/html');
+		var blocked = doc.body.querySelectorAll('script, iframe, object, embed, base, meta, link');
+		for (var i = 0; i < blocked.length; i++) blocked[i].remove();
+
+		var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
+		var element = walker.nextNode();
+		while (element) {
+			var attrs = Array.prototype.slice.call(element.attributes);
+			for (var j = 0; j < attrs.length; j++) {
+				var attr = attrs[j];
+				var name = attr.name.toLowerCase();
+				if (name.indexOf('on') === 0 || name === 'srcdoc' || name === 'style') {
+					element.removeAttribute(attr.name);
+					continue;
+				}
+				if (/^(href|src|xlink:href|action|formaction|poster)$/i.test(name) && !isSafeHttpUrl(attr.value)) {
+					element.removeAttribute(attr.name);
+				}
+			}
+			if (element.tagName.toLowerCase() === 'a') {
+				element.setAttribute('target', '_blank');
+				element.setAttribute('rel', 'nofollow noopener noreferrer');
+			}
+			element = walker.nextNode();
+		}
+
+		return doc.body.innerHTML;
+	}
+
+	function parseAskAnswer(raw) {
+		var sources = [];
+		var seen = {};
+		var body = (raw || '').replace(/^\[\^(\d+)\]:\s*\[([^\]]*)\]\(([^)\s]+)\)\s*$/gm, function (_m, num, label, href) {
+			if (!isSafeHttpUrl(href)) return '';
+			var index = Number(num);
+			if (!seen[index]) {
+				seen[index] = true;
+				sources.push({ index: index, label: label.trim() || href, href: href });
+			}
+			return '';
+		}).trim();
+		sources.sort(function (a, b) { return a.index - b.index; });
+
+		var hrefByIndex = {};
+		for (var i = 0; i < sources.length; i++) hrefByIndex[sources[i].index] = sources[i].href;
+
+		var html = escapeHtml(body);
+		html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+		html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+		html = html.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_m, label, href) {
+			if (!isSafeHttpUrl(href)) return escapeHtml(label);
+			return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(label) + '</a>';
+		});
+		html = html.replace(/\[\^(\d+)\]/g, function (m, num) {
+			var href = hrefByIndex[Number(num)];
+			if (!href) return '';
+			return '<sup class="cite"><a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">[' + escapeHtml(num) + ']</a></sup>';
+		});
+
+		return { html: sanitizeHtml(html), sources: sources };
+	}
+
 	function showResults() {
 		results.hidden = false;
 		if (speechList) speechList.style.display = 'none';
@@ -84,6 +167,80 @@
 		if (speechList) speechList.style.display = '';
 		currentSearchResults = null;
 		displayedCount = 0;
+	}
+
+	function hideAskAnswer() {
+		if (!askAnswer) return;
+		askAnswer.hidden = true;
+		askAnswer.innerHTML = '';
+	}
+
+	function setAskStatus(message) {
+		if (askStatus) askStatus.textContent = message || '';
+	}
+
+	function updateAskControls() {
+		if (!askPanel || !askSubmit) return;
+		var hasQuestion = Boolean(input.value.trim());
+		var disabled = askLoading || askCooldownRemaining > 0;
+		askSubmit.disabled = disabled || !hasQuestion;
+		askSubmit.textContent = askLoading
+			? '💬 提問中…'
+			: (askCooldownRemaining > 0 ? '💬 ' + askCooldownRemaining + ' 秒後可再提問' : '💬 提問');
+
+		var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
+		for (var i = 0; i < samples.length; i++) {
+			samples[i].disabled = disabled;
+		}
+	}
+
+	function startAskCooldown(seconds) {
+		askCooldownRemaining = Math.max(0, Number(seconds) || 0);
+		if (askCooldownTimer) clearInterval(askCooldownTimer);
+		if (askCooldownRemaining <= 0) {
+			updateAskControls();
+			return;
+		}
+		updateAskControls();
+		askCooldownTimer = setInterval(function () {
+			askCooldownRemaining -= 1;
+			if (askCooldownRemaining <= 0) {
+				askCooldownRemaining = 0;
+				clearInterval(askCooldownTimer);
+				askCooldownTimer = null;
+			}
+			updateAskControls();
+		}, 1000);
+	}
+
+	function renderAskAnswer(raw, loading, error) {
+		if (!askAnswer) return;
+		askAnswer.hidden = false;
+		if (error) {
+			askAnswer.innerHTML = '<p class="homepage-ask-answer__error">' + sanitizeHtml(escapeHtml(error)) + '</p>';
+			return;
+		}
+
+		var parsed = parseAskAnswer(raw);
+		var html = '';
+		if (!parsed.html && loading) {
+			html += '<p class="homepage-ask-answer__status">檢索逐字稿中…</p>';
+		}
+		if (parsed.html) {
+			html += '<div class="homepage-ask-answer__body">' + parsed.html + '</div>';
+		}
+		if (loading) {
+			html += '<span class="homepage-ask-answer__cursor" aria-hidden="true">▌</span>';
+		}
+		if (parsed.sources.length > 0) {
+			html += '<div class="homepage-ask-answer__sources"><h3>出處</h3><ol>';
+			for (var i = 0; i < parsed.sources.length; i++) {
+				var source = parsed.sources[i];
+				html += '<li value="' + source.index + '"><a href="' + escapeHtml(source.href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(source.label) + '</a></li>';
+			}
+			html += '</ol></div>';
+		}
+		askAnswer.innerHTML = html;
 	}
 
 	function renderLoading() {
@@ -247,6 +404,7 @@
 			return;
 		}
 
+		hideAskAnswer();
 		currentQuery = query;
 		currentSearchResults = null;
 		displayedCount = 0;
@@ -276,11 +434,116 @@
 		});
 	}
 
+	function setAskLoading(value) {
+		askLoading = value;
+		updateAskControls();
+	}
+
+	function askEndpointForQuestion(question) {
+		return ASK_BASE_URL + '/cag/' + encodeURIComponent(question);
+	}
+
+	function parseRetryAfter(response) {
+		var retryAfter = Number(response.headers.get('Retry-After'));
+		return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : 0;
+	}
+
+	function runAsk(question) {
+		var query = (question || '').trim();
+		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0) return;
+		if (query.length > 100) {
+			renderAskAnswer('', false, '問題太長，請縮短到 100 字以內。');
+			return;
+		}
+
+		input.value = query;
+		currentQuery = '';
+		clearTimeout(debounceTimer);
+		hideResults();
+		setAskStatus('');
+		renderAskAnswer('', true, '');
+		setAskLoading(true);
+
+		if (askAbortController) askAbortController.abort();
+		askAbortController = new AbortController();
+
+		fetch(askEndpointForQuestion(query), { signal: askAbortController.signal }).then(function (response) {
+			if (!response.ok) {
+				return response.text().then(function (text) {
+					var retryAfter = parseRetryAfter(response);
+					if (response.status === 429 && retryAfter > 0) startAskCooldown(retryAfter);
+					throw new Error(text || '提問服務暫時無法使用，請稍後再試。');
+				});
+			}
+
+			if (!response.body || !response.body.getReader) {
+				return response.text().then(function (text) {
+					renderAskAnswer(text, false, '');
+				});
+			}
+
+			var reader = response.body.getReader();
+			var decoder = new TextDecoder();
+			var raw = '';
+
+			function readNext() {
+				return reader.read().then(function (chunk) {
+					if (chunk.done) {
+						raw += decoder.decode();
+						renderAskAnswer(raw, false, '');
+						return;
+					}
+					raw += decoder.decode(chunk.value, { stream: true });
+					renderAskAnswer(raw, true, '');
+					return readNext();
+				});
+			}
+
+			return readNext();
+		}).catch(function (error) {
+			if (error && error.name === 'AbortError') return;
+			renderAskAnswer('', false, error && error.message ? error.message : '連線發生錯誤，請稍後再試。');
+		}).finally(function () {
+			setAskLoading(false);
+			askAbortController = null;
+		});
+	}
+
+	function initAsk() {
+		if (!askPanel || !askSubmit || !askAnswer || !window.fetch) return;
+
+		fetch(ASK_BASE_URL + '/capacity', { headers: { Accept: 'application/json' } }).then(function (response) {
+			if (!response.ok) throw new Error('capacity unavailable');
+			return response.json();
+		}).then(function (data) {
+			if (!data || data.status !== 'available') return;
+			askAvailable = true;
+			askPanel.hidden = false;
+			updateAskControls();
+		}).catch(function () {
+			askAvailable = false;
+		});
+
+		askSubmit.addEventListener('click', function () {
+			runAsk(input.value);
+		});
+
+		var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
+		for (var i = 0; i < samples.length; i++) {
+			samples[i].addEventListener('click', function (event) {
+				var question = event.currentTarget.getAttribute('data-sayit-ask-question') || '';
+				runAsk(question);
+			});
+		}
+	}
+
 	input.addEventListener('input', function () {
 		clearTimeout(debounceTimer);
 		var query = input.value;
+		updateAskControls();
 		if (!query.trim()) {
 			hideResults();
+			hideAskAnswer();
 			currentQuery = '';
 			return;
 		}
@@ -294,8 +557,10 @@
 			input.value = '';
 			input.blur();
 			hideResults();
+			hideAskAnswer();
 			currentQuery = '';
 			clearTimeout(debounceTimer);
+			updateAskControls();
 		}
 	});
 
@@ -318,4 +583,6 @@
 	input.addEventListener('blur', function () {
 		if (shortcutBadge && !input.value) shortcutBadge.style.opacity = '1';
 	});
+
+	initAsk();
 })();
