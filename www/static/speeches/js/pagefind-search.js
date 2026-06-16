@@ -7,13 +7,41 @@
 	var speechList = document.getElementById('sayit-speech-list');
 	var askPanel = document.getElementById('sayit-ask');
 	var askSubmit = document.getElementById('sayit-ask-submit');
+	var askConsent = document.getElementById('sayit-ask-consent');
 	var askStatus = document.getElementById('sayit-ask-status');
 	var askAnswer = document.getElementById('sayit-ask-answer');
 	if (!input || !results) return;
 
 	var isZh = document.documentElement.classList.contains('lang-zh');
-	input.setAttribute('placeholder', isZh ? '搜尋對話內容…' : 'Search speeches…');
-	if (isZh) input.setAttribute('aria-label', '搜尋對話');
+	var ASK_STRINGS = {
+		zh: {
+			searchPlaceholder: '搜尋對話內容…',
+			searchAriaLabel: '搜尋對話',
+			submit: '💬 提問',
+			submitting: '💬 提問中…',
+			cooldown: function (seconds) { return '💬 ' + seconds + ' 秒後可再提問'; },
+			searching: '檢索逐字稿中…',
+			sourcesHeading: '出處',
+			questionTooLong: '問題太長，請縮短到 100 字以內。',
+			fetchError: '提問服務暫時無法使用，請稍後再試。',
+			networkError: '連線發生錯誤，請稍後再試。',
+		},
+		en: {
+			searchPlaceholder: 'Search speeches…',
+			searchAriaLabel: 'Search speeches',
+			submit: '💬 Ask',
+			submitting: '💬 Asking…',
+			cooldown: function (seconds) { return '💬 Ask again in ' + seconds + ' s'; },
+			searching: 'Searching the transcripts…',
+			sourcesHeading: 'Sources',
+			questionTooLong: 'Your question is too long. Please shorten it to 100 characters or fewer.',
+			fetchError: 'The ask service is temporarily unavailable. Please try again later.',
+			networkError: 'Connection error. Please try again later.',
+		},
+	};
+	var askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
+	input.setAttribute('placeholder', askT.searchPlaceholder);
+	input.setAttribute('aria-label', askT.searchAriaLabel);
 
 	var worker = null;
 	var debounceTimer = null;
@@ -179,18 +207,25 @@
 		if (askStatus) askStatus.textContent = message || '';
 	}
 
+	function consentAccepted() {
+		return askConsent ? askConsent.checked : false;
+	}
+
 	function updateAskControls() {
-		if (!askPanel || !askSubmit) return;
+		if (!askSubmit) return;
 		var hasQuestion = Boolean(input.value.trim());
 		var disabled = askLoading || askCooldownRemaining > 0;
-		askSubmit.disabled = disabled || !hasQuestion;
+		var canAsk = consentAccepted();
+		askSubmit.disabled = disabled || !hasQuestion || !canAsk;
 		askSubmit.textContent = askLoading
-			? '💬 提問中…'
-			: (askCooldownRemaining > 0 ? '💬 ' + askCooldownRemaining + ' 秒後可再提問' : '💬 提問');
+			? askT.submitting
+			: (askCooldownRemaining > 0 ? askT.cooldown(askCooldownRemaining) : askT.submit);
+		if (askConsent) askConsent.disabled = askLoading;
 
+		if (!askPanel) return;
 		var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
 		for (var i = 0; i < samples.length; i++) {
-			samples[i].disabled = disabled;
+			samples[i].disabled = disabled || !canAsk;
 		}
 	}
 
@@ -224,7 +259,7 @@
 		var parsed = parseAskAnswer(raw);
 		var html = '';
 		if (!parsed.html && loading) {
-			html += '<p class="homepage-ask-answer__status">檢索逐字稿中…</p>';
+			html += '<p class="homepage-ask-answer__status">' + escapeHtml(askT.searching) + '</p>';
 		}
 		if (parsed.html) {
 			html += '<div class="homepage-ask-answer__body">' + parsed.html + '</div>';
@@ -233,7 +268,7 @@
 			html += '<span class="homepage-ask-answer__cursor" aria-hidden="true">▌</span>';
 		}
 		if (parsed.sources.length > 0) {
-			html += '<div class="homepage-ask-answer__sources"><h3>出處</h3><ol>';
+			html += '<div class="homepage-ask-answer__sources"><h3>' + escapeHtml(askT.sourcesHeading) + '</h3><ol>';
 			for (var i = 0; i < parsed.sources.length; i++) {
 				var source = parsed.sources[i];
 				html += '<li value="' + source.index + '"><a href="' + escapeHtml(source.href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(source.label) + '</a></li>';
@@ -440,7 +475,8 @@
 	}
 
 	function askEndpointForQuestion(question) {
-		return ASK_BASE_URL + '/cag/' + encodeURIComponent(question);
+		var endpoint = ASK_BASE_URL + '/cag/' + encodeURIComponent(question);
+		return isZh ? endpoint : endpoint + '?lang=en';
 	}
 
 	function parseRetryAfter(response) {
@@ -450,9 +486,9 @@
 
 	function runAsk(question) {
 		var query = (question || '').trim();
-		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0) return;
+		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0 || !consentAccepted()) return;
 		if (query.length > 100) {
-			renderAskAnswer('', false, '問題太長，請縮短到 100 字以內。');
+			renderAskAnswer('', false, askT.questionTooLong);
 			return;
 		}
 
@@ -472,7 +508,7 @@
 				return response.text().then(function (text) {
 					var retryAfter = parseRetryAfter(response);
 					if (response.status === 429 && retryAfter > 0) startAskCooldown(retryAfter);
-					throw new Error(text || '提問服務暫時無法使用，請稍後再試。');
+					throw new Error(text || askT.fetchError);
 				});
 			}
 
@@ -502,7 +538,7 @@
 			return readNext();
 		}).catch(function (error) {
 			if (error && error.name === 'AbortError') return;
-			renderAskAnswer('', false, error && error.message ? error.message : '連線發生錯誤，請稍後再試。');
+			renderAskAnswer('', false, error && error.message ? error.message : askT.networkError);
 		}).finally(function () {
 			setAskLoading(false);
 			askAbortController = null;
@@ -510,7 +546,7 @@
 	}
 
 	function initAsk() {
-		if (!askPanel || !askSubmit || !askAnswer || !window.fetch) return;
+		if (!askSubmit || !askAnswer || !window.fetch) return;
 
 		fetch(ASK_BASE_URL + '/capacity', { headers: { Accept: 'application/json' } }).then(function (response) {
 			if (!response.ok) throw new Error('capacity unavailable');
@@ -518,7 +554,8 @@
 		}).then(function (data) {
 			if (!data || data.status !== 'available') return;
 			askAvailable = true;
-			askPanel.hidden = false;
+			if (askPanel) askPanel.hidden = false;
+			askSubmit.hidden = false;
 			updateAskControls();
 		}).catch(function () {
 			askAvailable = false;
@@ -528,6 +565,13 @@
 			runAsk(input.value);
 		});
 
+		if (askConsent) {
+			askConsent.addEventListener('change', function () {
+				updateAskControls();
+			});
+		}
+
+		if (!askPanel) return;
 		var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
 		for (var i = 0; i < samples.length; i++) {
 			samples[i].addEventListener('click', function (event) {
