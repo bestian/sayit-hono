@@ -7,22 +7,6 @@
 				<div class="page-content__row">
 					<div class="homepage-search">
 						<h2><span lang="zh">搜尋對話與發言</span><span lang="en">Search speeches and statements</span></h2>
-						<div class="homepage-search__row">
-							<div id="sayit-search" class="sayit-search sayit-search--homepage" role="search">
-								<div class="sayit-search__input-wrap">
-									<input
-										id="sayit-search-input"
-										type="search"
-										class="sayit-search__input"
-										autocomplete="off"
-										spellcheck="false"
-										aria-label="Search speeches"
-									>
-									<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
-								</div>
-							</div>
-							<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden></button>
-						</div>
 						<div id="sayit-ask" class="homepage-ask" hidden>
 							<p class="homepage-ask__intro">
 								<span lang="zh">或直接提問，讓 AI 從逐字稿中找出回答：</span>
@@ -42,6 +26,22 @@
 								</span>
 							</label>
 							<p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
+						</div>
+						<div class="homepage-search__row">
+							<div id="sayit-search" class="sayit-search sayit-search--homepage" role="search">
+								<div class="sayit-search__input-wrap">
+									<input
+										id="sayit-search-input"
+										type="search"
+										class="sayit-search__input"
+										autocomplete="off"
+										spellcheck="false"
+										aria-label="Search speeches"
+									>
+									<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+								</div>
+							</div>
+							<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden></button>
 						</div>
 					</div>
 				</div>
