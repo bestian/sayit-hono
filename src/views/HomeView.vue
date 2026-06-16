@@ -7,28 +7,40 @@
 				<div class="page-content__row">
 					<div class="homepage-search">
 						<h2><span lang="zh">搜尋對話與發言</span><span lang="en">Search speeches and statements</span></h2>
-						<div id="sayit-search" class="sayit-search sayit-search--homepage" role="search">
-							<div class="sayit-search__input-wrap">
-								<input
-									id="sayit-search-input"
-									type="search"
-									class="sayit-search__input"
-									autocomplete="off"
-									spellcheck="false"
-									aria-label="Search speeches"
-								>
-								<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+						<div class="homepage-search__row">
+							<div id="sayit-search" class="sayit-search sayit-search--homepage" role="search">
+								<div class="sayit-search__input-wrap">
+									<input
+										id="sayit-search-input"
+										type="search"
+										class="sayit-search__input"
+										autocomplete="off"
+										spellcheck="false"
+										aria-label="Search speeches"
+									>
+									<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+								</div>
 							</div>
+							<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden></button>
 						</div>
 						<div id="sayit-ask" class="homepage-ask" hidden>
-							<p class="homepage-ask__intro">或直接提問，讓 AI 從逐字稿中找出回答：</p>
-							<div class="homepage-ask__samples" aria-label="範例問句">
+							<p class="homepage-ask__intro">
+								<span lang="zh">或直接提問，讓 AI 從逐字稿中找出回答：</span>
+								<span lang="en">Or ask a question and let AI search the transcripts:</span>
+							</p>
+							<!-- <div class="homepage-ask__samples" aria-label="範例問句">
 								<button type="button" class="homepage-ask__sample" data-sayit-ask-question="什麼是仁工智慧？">什麼是仁工智慧？</button>
 								<button type="button" class="homepage-ask__sample" data-sayit-ask-question="什麼是數位民主？">什麼是數位民主？</button>
 								<button type="button" class="homepage-ask__sample" data-sayit-ask-question="如何看待開放政府？">如何看待開放政府？</button>
 								<button type="button" class="homepage-ask__sample" data-sayit-ask-question="唐鳳對 AI 的看法？">唐鳳對 AI 的看法？</button>
-							</div>
-							<button type="button" id="sayit-ask-submit" class="homepage-ask__submit">💬 提問</button>
+							</div> -->
+							<label class="homepage-ask__consent" id="sayit-ask-consent-label">
+								<input type="checkbox" id="sayit-ask-consent">
+								<span>
+									<span lang="zh">我已閱讀並同意 <a href="https://ask.archive.tw/privacy" target="_blank" rel="noopener noreferrer">隱私權政策</a> 和 <a href="https://ask.archive.tw/terms" target="_blank" rel="noopener noreferrer">使用條款</a></span>
+									<span lang="en">I have read and agree to the <a href="https://ask.archive.tw/en/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and the <a href="https://ask.archive.tw/en/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a></span>
+								</span>
+							</label>
 							<p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
 						</div>
 					</div>
@@ -63,9 +75,19 @@
 	align-items: center;
 }
 
-.sayit-search--homepage {
+.homepage-search__row {
+	display: flex;
+	align-items: stretch;
+	gap: 0.65rem;
 	width: 100%;
-	max-width: 520px;
+	max-width: 680px;
+}
+
+.sayit-search--homepage {
+	flex: 1 1 auto;
+	min-width: 0;
+	width: auto;
+	max-width: none;
 }
 
 .sayit-search--homepage .sayit-search__input {
@@ -96,6 +118,33 @@
 	color: #6b6357;
 }
 
+.homepage-ask__consent {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+	max-width: 680px;
+	margin: 0;
+	text-align: left;
+	font-size: 0.95rem;
+	color: #6b6357;
+	cursor: pointer;
+}
+
+.homepage-ask__consent input {
+	margin-top: 1px;
+	flex: 0 0 auto;
+	accent-color: #c9564b;
+}
+
+.homepage-ask__consent a {
+	color: #c9564b;
+	text-underline-offset: 0.18em;
+}
+
+.homepage-ask__consent a:hover {
+	color: #a8443b;
+}
+
 .homepage-ask__samples {
 	display: flex;
 	flex-wrap: wrap;
@@ -118,8 +167,15 @@
 }
 
 .homepage-ask__submit {
+	flex: 0 0 auto;
+	align-self: stretch;
 	padding: 0.55rem 1.3rem;
 	font-weight: 700;
+	white-space: nowrap;
+}
+
+.homepage-ask__submit[hidden] {
+	display: none;
 }
 
 .homepage-ask__sample:hover,
@@ -153,68 +209,64 @@
 	display: none;
 }
 
-/* 子元素由 JS 動態插入，需用後代選擇器才能套到 scoped 樣式 */
-.homepage-ask-answer :is(.homepage-ask-answer__status, .homepage-ask-answer__body, .homepage-ask-answer__error) {
+/* 子元素由 JS 動態插入，需用 :deep() 才能套到 scoped 樣式 */
+.homepage-ask-answer :deep(.homepage-ask-answer__status),
+.homepage-ask-answer :deep(.homepage-ask-answer__body),
+.homepage-ask-answer :deep(.homepage-ask-answer__error) {
 	margin: 0;
 	line-height: 1.6;
 }
 
-.homepage-ask-answer .homepage-ask-answer__body {
+.homepage-ask-answer :deep(.homepage-ask-answer__body) {
 	white-space: pre-wrap;
+	word-break: break-word;
 }
 
-.homepage-ask-answer .homepage-ask-answer__body strong {
-	display: inline-block;
-	margin-top: 0.85em;
-}
-
-.homepage-ask-answer .homepage-ask-answer__body strong:first-child {
-	margin-top: 0;
-}
-
-.homepage-ask-answer .homepage-ask-answer__body sup.cite {
+.homepage-ask-answer :deep(.homepage-ask-answer__body sup.cite) {
 	line-height: 1;
 	vertical-align: super;
 }
 
-.homepage-ask-answer .homepage-ask-answer__error {
+.homepage-ask-answer :deep(.homepage-ask-answer__error) {
 	color: #a8443b;
 }
 
-.homepage-ask-answer .homepage-ask-answer__cursor {
+.homepage-ask-answer :deep(.homepage-ask-answer__cursor) {
 	display: inline-block;
 	margin-left: 0.1em;
 	animation: ask-cursor-blink 1s steps(1) infinite;
 }
 
-.homepage-ask-answer .homepage-ask-answer__sources {
+.homepage-ask-answer :deep(.homepage-ask-answer__sources) {
 	margin-top: 1.35rem;
 	padding-top: 0.85rem;
 	border-top: 1px solid rgba(199, 194, 186, 0.55);
 }
 
-.homepage-ask-answer .homepage-ask-answer__sources h3 {
+.homepage-ask-answer :deep(.homepage-ask-answer__sources h3) {
 	margin: 0 0 0.65rem;
+	padding: 0;
 	font-size: 1rem;
 	line-height: 1.6;
 }
 
-.homepage-ask-answer .homepage-ask-answer__sources ol {
+.homepage-ask-answer :deep(.homepage-ask-answer__sources ol) {
 	margin: 0;
-	margin-left: 1.6rem;
-	padding-left: 1.6rem;
+	padding: 0;
+	list-style-position: inside;
 	line-height: 1.6;
 }
 
-.homepage-ask-answer .homepage-ask-answer__sources li {
+.homepage-ask-answer :deep(.homepage-ask-answer__sources li) {
 	margin: 0.45rem 0;
+	padding: 0;
 }
 
-.homepage-ask-answer .homepage-ask-answer__sources li:first-child {
+.homepage-ask-answer :deep(.homepage-ask-answer__sources li:first-child) {
 	margin-top: 0;
 }
 
-.homepage-ask-answer .homepage-ask-answer__sources li:last-child {
+.homepage-ask-answer :deep(.homepage-ask-answer__sources li:last-child) {
 	margin-bottom: 0;
 }
 
@@ -224,10 +276,29 @@
 	}
 }
 
+@media (max-width: 580px) {
+	.homepage-search__row {
+		flex-direction: column;
+	}
+
+	.homepage-ask__submit {
+		width: 100%;
+	}
+}
+
 @media (prefers-color-scheme: dark) {
 	.homepage-ask__intro,
-	.homepage-ask__status {
+	.homepage-ask__status,
+	.homepage-ask__consent {
 		color: var(--sayit-text-muted, #b8c4d1);
+	}
+
+	.homepage-ask__consent a {
+		color: var(--sayit-link, #9fc2ff);
+	}
+
+	.homepage-ask__consent a:hover {
+		color: var(--sayit-link-hover, #ffd0c7);
 	}
 
 	.homepage-ask__sample,

@@ -24,7 +24,11 @@ describe('SSR layout', () => {
 
 		expect(html).toContain('id="sayit-ask"');
 		expect(html).toContain('class="homepage-ask" hidden');
+		expect(html).toContain('id="sayit-ask-consent"');
 		expect(html).toContain('id="sayit-ask-submit"');
+		expect(html).toContain('class="homepage-search__row"');
+		expect(html).toContain('https://ask.archive.tw/privacy');
+		expect(html).toContain('https://ask.archive.tw/en/privacy');
 		expect(html).toContain('id="sayit-ask-answer"');
 		expect(html).toContain('class="homepage-ask-answer" aria-live="polite" hidden');
 	});
