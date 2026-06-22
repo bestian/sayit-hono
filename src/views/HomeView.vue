@@ -12,19 +12,6 @@
 								<span lang="zh">或直接提問，讓 AI 從逐字稿中找出回答：</span>
 								<span lang="en">Or ask a question and let AI search the transcripts:</span>
 							</p>
-							<!-- <div class="homepage-ask__samples" aria-label="範例問句">
-								<button type="button" class="homepage-ask__sample" data-sayit-ask-question="什麼是仁工智慧？">什麼是仁工智慧？</button>
-								<button type="button" class="homepage-ask__sample" data-sayit-ask-question="什麼是數位民主？">什麼是數位民主？</button>
-								<button type="button" class="homepage-ask__sample" data-sayit-ask-question="如何看待開放政府？">如何看待開放政府？</button>
-								<button type="button" class="homepage-ask__sample" data-sayit-ask-question="唐鳳對 AI 的看法？">唐鳳對 AI 的看法？</button>
-							</div> -->
-							<label class="homepage-ask__consent" id="sayit-ask-consent-label">
-								<input type="checkbox" id="sayit-ask-consent">
-								<span>
-									<span lang="zh">我已閱讀並同意 <a href="https://ask.archive.tw/privacy" target="_blank" rel="noopener noreferrer">隱私權政策</a> 和 <a href="https://ask.archive.tw/terms" target="_blank" rel="noopener noreferrer">使用條款</a></span>
-									<span lang="en">I have read and agree to the <a href="https://ask.archive.tw/en/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and the <a href="https://ask.archive.tw/en/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a></span>
-								</span>
-							</label>
 							<p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
 						</div>
 						<div class="homepage-search__row">

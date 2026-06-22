@@ -4,6 +4,7 @@ import HomeView, { styles as HomeViewStyles } from '../src/.generated/views/Home
 import Navbar, { styles as NavbarStyles } from '../src/.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from '../src/.generated/components/Footer';
 import SearchResultView, { styles as SearchResultViewStyles } from '../src/.generated/views/SearchResultView';
+import LegalPrivacyView, { styles as LegalPrivacyViewStyles } from '../src/.generated/views/LegalPrivacyView';
 
 describe('SSR layout', () => {
 	it('renders the global share control and share script', async () => {
@@ -25,13 +26,23 @@ describe('SSR layout', () => {
 
 		expect(html).toContain('id="sayit-ask"');
 		expect(html).toContain('class="homepage-ask" hidden');
-		expect(html).toContain('id="sayit-ask-consent"');
+		expect(html).not.toContain('id="sayit-ask-consent"');
 		expect(html).toContain('id="sayit-ask-submit"');
 		expect(html).toContain('class="homepage-search__row"');
-		expect(html).toContain('https://ask.archive.tw/privacy');
-		expect(html).toContain('https://ask.archive.tw/en/privacy');
 		expect(html).toContain('class="homepage-ask-answer" aria-live="polite" hidden');
 		expect(html.indexOf('id="sayit-ask-answer"')).toBeLessThan(html.indexOf('id="sayit-search-results"'));
+	});
+
+	it('renders footer ask notice with local privacy and terms links', async () => {
+		const html = await renderHtml(HomeView, {
+			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer }
+		});
+
+		expect(html).toContain('sayit-footer-ask-notice');
+		expect(html).toContain('href="/privacy"');
+		expect(html).toContain('href="/terms"');
+		expect(html).not.toContain('ask.archive.tw/privacy');
 	});
 
 	it('renders the search results page Ask UI above regular results', async () => {
@@ -51,10 +62,22 @@ describe('SSR layout', () => {
 		});
 
 		expect(html).toContain('id="sayit-ask"');
-		expect(html).toContain('id="sayit-ask-consent"');
+		expect(html).not.toContain('id="sayit-ask-consent"');
 		expect(html).toContain('id="sayit-ask-status"');
 		expect(html).toContain('id="sayit-ask-answer"');
 		expect(html).toContain('class="homepage-ask-answer" aria-live="polite" hidden');
 		expect(html.indexOf('id="sayit-ask-answer"')).toBeLessThan(html.indexOf('unstyled-list search-results-speakers'));
+	});
+
+	it('renders bilingual privacy policy content', async () => {
+		const html = await renderHtml(LegalPrivacyView, {
+			styles: [LegalPrivacyViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer }
+		});
+
+		expect(html).toContain('id="privacy-zh"');
+		expect(html).toContain('id="privacy-en"');
+		expect(html).toContain('不會販售或交換您的個人資料');
+		expect(html).toContain('We do not sell or exchange your personal data');
 	});
 });

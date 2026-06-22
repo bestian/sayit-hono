@@ -7,10 +7,9 @@
 	var speechList = document.getElementById('sayit-speech-list');
 	var askPanel = document.getElementById('sayit-ask');
 	var askSubmit = document.getElementById('sayit-ask-submit');
-	var askConsent = document.getElementById('sayit-ask-consent');
-	var askStatus = document.getElementById('sayit-ask-status');
+		var askStatus = document.getElementById('sayit-ask-status');
 	var askAnswer = document.getElementById('sayit-ask-answer');
-	if (!input || !results) return;
+	if (!input) return;
 
 	var isZh = document.documentElement.classList.contains('lang-zh');
 	var ASK_STRINGS = {
@@ -187,11 +186,13 @@
 	}
 
 	function showResults() {
+		if (!results) return;
 		results.hidden = false;
 		if (speechList) speechList.style.display = 'none';
 	}
 
 	function hideResults() {
+		if (!results) return;
 		results.hidden = true;
 		results.innerHTML = '';
 		if (speechList) speechList.style.display = '';
@@ -210,7 +211,7 @@
 	}
 
 	function consentAccepted() {
-		return askConsent ? askConsent.checked : false;
+		return true;
 	}
 
 	function updateAskControls() {
@@ -222,7 +223,6 @@
 		askSubmit.textContent = askLoading
 			? askT.submitting
 			: (askCooldownRemaining > 0 ? askT.cooldown(askCooldownRemaining) : askT.submit);
-		if (askConsent) askConsent.disabled = askLoading;
 
 		if (!askPanel) return;
 		var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
@@ -436,6 +436,7 @@
 	}
 
 	function doSearch(query) {
+		if (!results) return;
 		if (!query.trim()) {
 			hideResults();
 			return;
@@ -487,7 +488,7 @@
 
 	function runAsk(question) {
 		var query = (question || '').trim();
-		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0 || !consentAccepted()) return Promise.resolve();
+		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0) return Promise.resolve();
 		if (query.length > 100) {
 			renderAskAnswer('', false, askT.questionTooLong);
 			return Promise.resolve();
@@ -547,7 +548,7 @@
 	}
 
 	function initAsk() {
-		if (!askSubmit || !askAnswer || !window.fetch) return Promise.resolve();
+		if (!askAnswer || !window.fetch) return Promise.resolve();
 
 		var capacityPromise = fetch(ASK_BASE_URL + '/capacity', { headers: { Accept: 'application/json' } }).then(function (response) {
 			if (!response.ok) throw new Error('capacity unavailable');
@@ -556,21 +557,10 @@
 			if (!data || data.status !== 'available') return;
 			askAvailable = true;
 			if (askPanel) askPanel.hidden = false;
-			askSubmit.hidden = false;
 			updateAskControls();
 		}).catch(function () {
 			askAvailable = false;
 		});
-
-		askSubmit.addEventListener('click', function () {
-			submitSearch(input.value);
-		});
-
-		if (askConsent) {
-			askConsent.addEventListener('change', function () {
-				updateAskControls();
-			});
-		}
 
 		if (askPanel) {
 			var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
@@ -591,20 +581,21 @@
 
 		var onSearchResults = window.location.pathname === '/search/';
 
-		if (askAnswer && askAvailable && consentAccepted() && q.length <= 100 && !askLoading && askCooldownRemaining <= 0) {
+		if (askAnswer && askAvailable && q.length <= 100 && !askLoading && askCooldownRemaining <= 0) {
 			runAiFirstSearch(q, onSearchResults);
 			return;
 		}
 
 		if (askAnswer) {
-			if (askAvailable && !consentAccepted() && q.length <= 100) setAskStatus(askT.consentRequired);
 			if (onSearchResults) return;
 			hideAskAnswer();
 			doSearch(q);
 			return;
 		}
 
-		window.location.assign('/search/?q=' + encodeURIComponent(query));
+		if (!results) return;
+		hideAskAnswer();
+		doSearch(q);
 	}
 
 	function runAiFirstSearch(query, skipRegularResults) {
