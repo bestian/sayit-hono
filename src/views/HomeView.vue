@@ -45,9 +45,9 @@
 						</div>
 					</div>
 				</div>
-				<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden>
-				</div>
 				<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden>
+				</div>
+				<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden>
 				</div>
 			</div>
 			</div>

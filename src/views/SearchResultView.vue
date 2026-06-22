@@ -19,6 +19,22 @@
 							<input type="submit" class="icon-search" value="Search" />
 						</div>
 					</form>
+					<div id="sayit-ask" class="homepage-ask" hidden>
+						<p class="homepage-ask__intro">
+							<span lang="zh">或直接提問，讓 AI 從逐字稿中找出回答：</span>
+							<span lang="en">Or ask a question and let AI search the transcripts:</span>
+						</p>
+						<label class="homepage-ask__consent" id="sayit-ask-consent-label">
+							<input type="checkbox" id="sayit-ask-consent">
+							<span>
+								<span lang="zh">我已閱讀並同意 <a href="https://ask.archive.tw/privacy" target="_blank" rel="noopener noreferrer">隱私權政策</a> 和 <a href="https://ask.archive.tw/terms" target="_blank" rel="noopener noreferrer">使用條款</a></span>
+								<span lang="en">I have read and agree to the <a href="https://ask.archive.tw/en/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and the <a href="https://ask.archive.tw/en/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a></span>
+							</span>
+						</label>
+						<p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
+						<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
+						<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden></button>
+					</div>
 					<div class="page-content__row ">
 						<div class="full-page__unit">
 							<!-- 當有講者篩選時，顯示 checkbox -->

@@ -25,6 +25,7 @@
 			questionTooLong: '問題太長，請縮短到 100 字以內。',
 			fetchError: '提問服務暫時無法使用，請稍後再試。',
 			networkError: '連線發生錯誤，請稍後再試。',
+			consentRequired: '請先同意隱私權政策和使用條款，再按 Enter 提問；一般搜尋結果仍會顯示。',
 		},
 		en: {
 			searchPlaceholder: 'Search speeches…',
@@ -37,6 +38,7 @@
 			questionTooLong: 'Your question is too long. Please shorten it to 100 characters or fewer.',
 			fetchError: 'The ask service is temporarily unavailable. Please try again later.',
 			networkError: 'Connection error. Please try again later.',
+			consentRequired: 'Please agree to the Privacy Policy and Terms of Use first to ask AI; regular search results will still show.',
 		},
 	};
 	var askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
@@ -439,7 +441,6 @@
 			return;
 		}
 
-		hideAskAnswer();
 		currentQuery = query;
 		currentSearchResults = null;
 		displayedCount = 0;
@@ -486,10 +487,10 @@
 
 	function runAsk(question) {
 		var query = (question || '').trim();
-		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0 || !consentAccepted()) return;
+		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0 || !consentAccepted()) return Promise.resolve();
 		if (query.length > 100) {
 			renderAskAnswer('', false, askT.questionTooLong);
-			return;
+			return Promise.resolve();
 		}
 
 		input.value = query;
@@ -503,7 +504,7 @@
 		if (askAbortController) askAbortController.abort();
 		askAbortController = new AbortController();
 
-		fetch(askEndpointForQuestion(query), { signal: askAbortController.signal }).then(function (response) {
+		return fetch(askEndpointForQuestion(query), { signal: askAbortController.signal }).then(function (response) {
 			if (!response.ok) {
 				return response.text().then(function (text) {
 					var retryAfter = parseRetryAfter(response);
@@ -546,9 +547,9 @@
 	}
 
 	function initAsk() {
-		if (!askSubmit || !askAnswer || !window.fetch) return;
+		if (!askSubmit || !askAnswer || !window.fetch) return Promise.resolve();
 
-		fetch(ASK_BASE_URL + '/capacity', { headers: { Accept: 'application/json' } }).then(function (response) {
+		var capacityPromise = fetch(ASK_BASE_URL + '/capacity', { headers: { Accept: 'application/json' } }).then(function (response) {
 			if (!response.ok) throw new Error('capacity unavailable');
 			return response.json();
 		}).then(function (data) {
@@ -562,7 +563,7 @@
 		});
 
 		askSubmit.addEventListener('click', function () {
-			runAsk(input.value);
+			submitSearch(input.value);
 		});
 
 		if (askConsent) {
@@ -571,14 +572,46 @@
 			});
 		}
 
-		if (!askPanel) return;
-		var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
-		for (var i = 0; i < samples.length; i++) {
-			samples[i].addEventListener('click', function (event) {
-				var question = event.currentTarget.getAttribute('data-sayit-ask-question') || '';
-				runAsk(question);
-			});
+		if (askPanel) {
+			var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
+			for (var i = 0; i < samples.length; i++) {
+				samples[i].addEventListener('click', function (event) {
+					var question = event.currentTarget.getAttribute('data-sayit-ask-question') || '';
+					submitSearch(question);
+				});
+			}
 		}
+
+		return capacityPromise;
+	}
+
+	function submitSearch(query) {
+		var q = (query || '').trim();
+		if (!q) return;
+
+		var onSearchResults = window.location.pathname === '/search/';
+
+		if (askAnswer && askAvailable && consentAccepted() && q.length <= 100 && !askLoading && askCooldownRemaining <= 0) {
+			runAiFirstSearch(q, onSearchResults);
+			return;
+		}
+
+		if (askAnswer) {
+			if (askAvailable && !consentAccepted() && q.length <= 100) setAskStatus(askT.consentRequired);
+			if (onSearchResults) return;
+			hideAskAnswer();
+			doSearch(q);
+			return;
+		}
+
+		window.location.assign('/search/?q=' + encodeURIComponent(query));
+	}
+
+	function runAiFirstSearch(query, skipRegularResults) {
+		hideResults();
+		return runAsk(query).then(function () {
+			if (!skipRegularResults) doSearch(query);
+		});
 	}
 
 	input.addEventListener('input', function () {
@@ -591,12 +624,16 @@
 			currentQuery = '';
 			return;
 		}
-		debounceTimer = setTimeout(function () {
-			doSearch(query);
-		}, 250);
 	});
 
 	input.addEventListener('keydown', function (e) {
+		if (e.key === 'Enter') {
+			if (e.isComposing || e.keyCode === 229) return;
+			if (e.metaKey || e.ctrlKey || e.altKey) return;
+			e.preventDefault();
+			submitSearch(input.value);
+			return;
+		}
 		if (e.key === 'Escape') {
 			input.value = '';
 			input.blur();
@@ -628,5 +665,12 @@
 		if (shortcutBadge && !input.value) shortcutBadge.style.opacity = '1';
 	});
 
-	initAsk();
+	initAsk().finally(function () {
+		if (!results || window.location.pathname !== '/search/') return;
+		var initialQuery = new URLSearchParams(window.location.search).get('q') || '';
+		if (!initialQuery.trim()) return;
+		input.value = initialQuery;
+		updateAskControls();
+		submitSearch(initialQuery);
+	});
 })();
