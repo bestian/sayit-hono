@@ -5,11 +5,69 @@
 	var results = document.getElementById('sayit-search-results');
 	var shortcutBadge = document.getElementById('sayit-search-shortcut');
 	var speechList = document.getElementById('sayit-speech-list');
-	if (!input || !results) return;
+	var askPanel = document.getElementById('sayit-ask');
+	var askSubmit = document.getElementById('sayit-ask-submit');
+		var askStatus = document.getElementById('sayit-ask-status');
+	var askAnswer = document.getElementById('sayit-ask-answer');
+	var lastAskMarkdown = '';
+	var askCopyResetTimer = null;
+	if (!input) return;
 
 	var isZh = document.documentElement.classList.contains('lang-zh');
-	input.setAttribute('placeholder', isZh ? '搜尋對話內容…' : 'Search speeches…');
-	if (isZh) input.setAttribute('aria-label', '搜尋對話');
+	var ASK_STRINGS = {
+		zh: {
+			searchPlaceholder: '搜尋對話內容…',
+			searchAriaLabel: '搜尋對話',
+			submit: '💬 提問',
+			submitting: '💬 提問中…',
+			cooldown: function (seconds) { return '💬 ' + seconds + ' 秒後可再提問'; },
+			searching: '檢索逐字稿中…',
+			sourcesHeading: '出處',
+			copyMarkdown: '複製 Markdown',
+			copiedMarkdown: '已複製',
+			copyFailed: '無法複製，請手動選取文字',
+			questionTooLong: '問題太長，請縮短到 100 字以內。',
+			fetchError: '提問服務暫時無法使用，請稍後再試。',
+			networkError: '連線發生錯誤，請稍後再試。',
+			consentRequired: '請先同意隱私權政策和使用條款，再按 Enter 提問；一般搜尋結果仍會顯示。',
+		},
+		en: {
+			searchPlaceholder: 'Search speeches…',
+			searchAriaLabel: 'Search speeches',
+			submit: '💬 Ask',
+			submitting: '💬 Asking…',
+			cooldown: function (seconds) { return '💬 Ask again in ' + seconds + ' s'; },
+			searching: 'Searching the transcripts…',
+			sourcesHeading: 'Sources',
+			copyMarkdown: 'Copy Markdown',
+			copiedMarkdown: 'Copied',
+			copyFailed: 'Could not copy. Select the answer and copy manually.',
+			questionTooLong: 'Your question is too long. Please shorten it to 100 characters or fewer.',
+			fetchError: 'The ask service is temporarily unavailable. Please try again later.',
+			networkError: 'Connection error. Please try again later.',
+			consentRequired: 'Please agree to the Privacy Policy and Terms of Use first to ask AI; regular search results will still show.',
+		},
+	};
+	var askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
+	input.setAttribute('placeholder', askT.searchPlaceholder);
+	input.setAttribute('aria-label', askT.searchAriaLabel);
+	function refreshSearchI18n() {
+		isZh = document.documentElement.classList.contains('lang-zh');
+		askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
+		input.setAttribute('placeholder', askT.searchPlaceholder);
+		input.setAttribute('aria-label', askT.searchAriaLabel);
+		updateAskControls();
+	}
+
+	var searchSubmitButtons = document.querySelectorAll('.sayit-search__submit');
+	for (var si = 0; si < searchSubmitButtons.length; si++) {
+		searchSubmitButtons[si].addEventListener('click', function () {
+			submitSearch(input.value);
+		});
+	}
+	for (var sb = 0; sb < searchSubmitButtons.length; sb++) searchSubmitButtons[sb].hidden = false;
+
+	window.addEventListener('sayit-lang-change', refreshSearchI18n);
 
 	var worker = null;
 	var debounceTimer = null;
@@ -20,6 +78,12 @@
 	var requestId = 0;
 	var pendingResolves = {};
 	var workerWarmed = false;
+	var askAvailable = false;
+	var askLoading = false;
+	var askCooldownTimer = null;
+	var askCooldownRemaining = 0;
+	var askAbortController = null;
+	var ASK_BASE_URL = 'https://ask.archive.tw';
 
 	function shouldWarmupOnFocus() {
 		var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -73,17 +137,228 @@
 		return textarea.value;
 	}
 
+	function isSafeHttpUrl(value) {
+		if (/[\s"'<>]/.test(value) || /&(quot|#39|lt|gt);/i.test(value)) return false;
+		try {
+			var url = new URL(value);
+			return url.protocol === 'http:' || url.protocol === 'https:';
+		} catch (e) {
+			return false;
+		}
+	}
+
+	function sanitizeHtml(html) {
+		var doc = new DOMParser().parseFromString(html, 'text/html');
+		var blocked = doc.body.querySelectorAll('script, iframe, object, embed, base, meta, link');
+		for (var i = 0; i < blocked.length; i++) blocked[i].remove();
+
+		var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
+		var element = walker.nextNode();
+		while (element) {
+			var attrs = Array.prototype.slice.call(element.attributes);
+			for (var j = 0; j < attrs.length; j++) {
+				var attr = attrs[j];
+				var name = attr.name.toLowerCase();
+				if (name.indexOf('on') === 0 || name === 'srcdoc' || name === 'style') {
+					element.removeAttribute(attr.name);
+					continue;
+				}
+				if (/^(href|src|xlink:href|action|formaction|poster)$/i.test(name) && !isSafeHttpUrl(attr.value)) {
+					element.removeAttribute(attr.name);
+				}
+			}
+			if (element.tagName.toLowerCase() === 'a') {
+				element.setAttribute('target', '_blank');
+				element.setAttribute('rel', 'nofollow noopener noreferrer');
+			}
+			element = walker.nextNode();
+		}
+
+		return doc.body.innerHTML;
+	}
+
+
+	function askHasVisibleAnswer() {
+		return !!(askAnswer && !askAnswer.hidden && (lastAskMarkdown || '').trim());
+	}
+
+	function copyMarkdownText(text) {
+		if (!text) return Promise.resolve(false);
+		try {
+			if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+				return navigator.clipboard.writeText(text).then(function () { return true; }).catch(function () { return false; });
+			}
+		} catch (e) {}
+		try {
+			var textarea = document.createElement('textarea');
+			textarea.value = text;
+			textarea.setAttribute('readonly', '');
+			textarea.style.position = 'fixed';
+			textarea.style.inset = '0 auto auto 0';
+			textarea.style.opacity = '0';
+			document.body.appendChild(textarea);
+			textarea.focus();
+			textarea.select();
+			var ok = document.execCommand('copy');
+			textarea.remove();
+			return Promise.resolve(!!ok);
+		} catch (err) {
+			return Promise.resolve(false);
+		}
+	}
+
+	function bindAskCopyButton() {
+		if (!askAnswer || askAnswer.dataset.sayitCopyBound) return;
+		askAnswer.dataset.sayitCopyBound = '1';
+		askAnswer.addEventListener('click', function (e) {
+			var btn = e.target && e.target.closest ? e.target.closest('[data-sayit-ask-copy]') : null;
+			if (!btn || btn.disabled) return;
+			var text = lastAskMarkdown || '';
+			if (!text.trim()) return;
+			copyMarkdownText(text).then(function (ok) {
+				btn.textContent = ok ? askT.copiedMarkdown : askT.copyFailed;
+				if (askCopyResetTimer) clearTimeout(askCopyResetTimer);
+				askCopyResetTimer = setTimeout(function () {
+					btn.textContent = askT.copyMarkdown;
+					askCopyResetTimer = null;
+				}, 2000);
+			});
+		});
+	}
+
+	function parseAskAnswer(raw) {
+		var sources = [];
+		var seen = {};
+		var body = (raw || '').replace(/^\[\^(\d+)\]:\s*\[([^\]]*)\]\(([^)\s]+)\)\s*$/gm, function (_m, num, label, href) {
+			if (!isSafeHttpUrl(href)) return '';
+			var index = Number(num);
+			if (!seen[index]) {
+				seen[index] = true;
+				sources.push({ index: index, label: label.trim() || href, href: href });
+			}
+			return '';
+		}).trim();
+		sources.sort(function (a, b) { return a.index - b.index; });
+
+		var hrefByIndex = {};
+		for (var i = 0; i < sources.length; i++) hrefByIndex[sources[i].index] = sources[i].href;
+
+		var html = escapeHtml(body);
+		html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+		html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+		html = html.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_m, label, href) {
+			if (!isSafeHttpUrl(href)) return escapeHtml(label);
+			return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(label) + '</a>';
+		});
+		html = html.replace(/\[\^(\d+)\]/g, function (m, num) {
+			var href = hrefByIndex[Number(num)];
+			if (!href) return '';
+			return '<sup class="cite"><a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">[' + escapeHtml(num) + ']</a></sup>';
+		});
+
+		return { html: sanitizeHtml(html), sources: sources };
+	}
+
 	function showResults() {
+		if (!results) return;
 		results.hidden = false;
 		if (speechList) speechList.style.display = 'none';
 	}
 
 	function hideResults() {
+		if (!results) return;
 		results.hidden = true;
 		results.innerHTML = '';
 		if (speechList) speechList.style.display = '';
 		currentSearchResults = null;
 		displayedCount = 0;
+	}
+
+	function hideAskAnswer() {
+		if (!askAnswer) return;
+		askAnswer.hidden = true;
+		askAnswer.innerHTML = '';
+		lastAskMarkdown = '';
+	}
+
+	function setAskStatus(message) {
+		if (askStatus) askStatus.textContent = message || '';
+	}
+
+	function consentAccepted() {
+		return true;
+	}
+
+	function updateAskControls() {
+		if (!askSubmit) return;
+		var hasQuestion = Boolean(input.value.trim());
+		var disabled = askLoading || askCooldownRemaining > 0;
+		var canAsk = consentAccepted();
+		askSubmit.disabled = disabled || !hasQuestion || !canAsk;
+		askSubmit.textContent = askLoading
+			? askT.submitting
+			: (askCooldownRemaining > 0 ? askT.cooldown(askCooldownRemaining) : askT.submit);
+
+		if (!askPanel) return;
+		var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
+		for (var i = 0; i < samples.length; i++) {
+			samples[i].disabled = disabled || !canAsk;
+		}
+	}
+
+	function startAskCooldown(seconds) {
+		askCooldownRemaining = Math.max(0, Number(seconds) || 0);
+		if (askCooldownTimer) clearInterval(askCooldownTimer);
+		if (askCooldownRemaining <= 0) {
+			updateAskControls();
+			return;
+		}
+		updateAskControls();
+		askCooldownTimer = setInterval(function () {
+			askCooldownRemaining -= 1;
+			if (askCooldownRemaining <= 0) {
+				askCooldownRemaining = 0;
+				clearInterval(askCooldownTimer);
+				askCooldownTimer = null;
+			}
+			updateAskControls();
+		}, 1000);
+	}
+
+	function renderAskAnswer(raw, loading, error) {
+		if (!askAnswer) return;
+		bindAskCopyButton();
+		askAnswer.hidden = false;
+		if (error) {
+			lastAskMarkdown = '';
+			askAnswer.innerHTML = '<p class="homepage-ask-answer__error">' + sanitizeHtml(escapeHtml(error)) + '</p>';
+			return;
+		}
+
+		lastAskMarkdown = raw || '';
+		var parsed = parseAskAnswer(raw);
+		var html = '';
+		if ((raw || '').trim()) {
+			html += '<div class="homepage-ask-answer__toolbar"><button type="button" class="homepage-ask-answer__copy" data-sayit-ask-copy aria-label="' + escapeHtml(askT.copyMarkdown) + '">' + escapeHtml(askT.copyMarkdown) + '</button></div>';
+		}
+		if (!parsed.html && loading) {
+			html += '<p class="homepage-ask-answer__status">' + escapeHtml(askT.searching) + '</p>';
+		}
+		if (parsed.html) {
+			html += '<div class="homepage-ask-answer__body">' + parsed.html + '</div>';
+		}
+		if (loading) {
+			html += '<span class="homepage-ask-answer__cursor" aria-hidden="true">▌</span>';
+		}
+		if (parsed.sources.length > 0) {
+			html += '<div class="homepage-ask-answer__sources"><h3>' + escapeHtml(askT.sourcesHeading) + '</h3><ol>';
+			for (var i = 0; i < parsed.sources.length; i++) {
+				var source = parsed.sources[i];
+				html += '<li value="' + source.index + '"><a href="' + escapeHtml(source.href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(source.label) + '</a></li>';
+			}
+			html += '</ol></div>';
+		}
+		askAnswer.innerHTML = html;
 	}
 
 	function renderLoading() {
@@ -242,6 +517,7 @@
 	}
 
 	function doSearch(query) {
+		if (!results) return;
 		if (!query.trim()) {
 			hideResults();
 			return;
@@ -264,7 +540,8 @@
 			}
 
 			if (!msg.results || msg.results.length === 0) {
-				renderNoResults(query);
+				if (!askHasVisibleAnswer()) renderNoResults(query);
+				else hideResults();
 				return;
 			}
 
@@ -276,26 +553,169 @@
 		});
 	}
 
+	function setAskLoading(value) {
+		askLoading = value;
+		updateAskControls();
+	}
+
+	function askEndpointForQuestion(question) {
+		var endpoint = ASK_BASE_URL + '/au/' + encodeURIComponent(question);
+		return isZh ? endpoint : endpoint + '?lang=en';
+	}
+
+	function parseRetryAfter(response) {
+		var retryAfter = Number(response.headers.get('Retry-After'));
+		return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : 0;
+	}
+
+	function runAsk(question) {
+		var query = (question || '').trim();
+		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0) return Promise.resolve();
+		if (query.length > 100) {
+			renderAskAnswer('', false, askT.questionTooLong);
+			return Promise.resolve();
+		}
+
+		input.value = query;
+		currentQuery = '';
+		clearTimeout(debounceTimer);
+		hideResults();
+		setAskStatus('');
+		renderAskAnswer('', true, '');
+		setAskLoading(true);
+
+		if (askAbortController) askAbortController.abort();
+		askAbortController = new AbortController();
+
+		return fetch(askEndpointForQuestion(query), { signal: askAbortController.signal }).then(function (response) {
+			if (!response.ok) {
+				return response.text().then(function (text) {
+					var retryAfter = parseRetryAfter(response);
+					if (response.status === 429 && retryAfter > 0) startAskCooldown(retryAfter);
+					throw new Error(text || askT.fetchError);
+				});
+			}
+
+			if (!response.body || !response.body.getReader) {
+				return response.text().then(function (text) {
+					renderAskAnswer(text, false, '');
+				});
+			}
+
+			var reader = response.body.getReader();
+			var decoder = new TextDecoder();
+			var raw = '';
+
+			function readNext() {
+				return reader.read().then(function (chunk) {
+					if (chunk.done) {
+						raw += decoder.decode();
+						renderAskAnswer(raw, false, '');
+						return;
+					}
+					raw += decoder.decode(chunk.value, { stream: true });
+					renderAskAnswer(raw, true, '');
+					return readNext();
+				});
+			}
+
+			return readNext();
+		}).catch(function (error) {
+			if (error && error.name === 'AbortError') return;
+			renderAskAnswer('', false, error && error.message ? error.message : askT.networkError);
+		}).finally(function () {
+			setAskLoading(false);
+			askAbortController = null;
+		});
+	}
+
+	function initAsk() {
+		if (!askAnswer || !window.fetch) return Promise.resolve();
+
+		var capacityPromise = fetch(ASK_BASE_URL + '/capacity', { headers: { Accept: 'application/json' } }).then(function (response) {
+			if (!response.ok) throw new Error('capacity unavailable');
+			return response.json();
+		}).then(function (data) {
+			if (!data || data.status !== 'available') return;
+			askAvailable = true;
+			if (askPanel) askPanel.hidden = false;
+			for (var sb = 0; sb < searchSubmitButtons.length; sb++) searchSubmitButtons[sb].hidden = false;
+			updateAskControls();
+		}).catch(function () {
+			askAvailable = false;
+		});
+
+		if (askPanel) {
+			var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
+			for (var i = 0; i < samples.length; i++) {
+				samples[i].addEventListener('click', function (event) {
+					var question = event.currentTarget.getAttribute('data-sayit-ask-question') || '';
+					submitSearch(question);
+				});
+			}
+		}
+
+		return capacityPromise;
+	}
+
+	function submitSearch(query) {
+		var q = (query || '').trim();
+		if (!q) return;
+
+		var onSearchResults = window.location.pathname === '/search/';
+
+		if (askAnswer && askAvailable && q.length <= 100 && !askLoading && askCooldownRemaining <= 0) {
+			runAiFirstSearch(q, onSearchResults);
+			return;
+		}
+
+		if (askAnswer) {
+			if (onSearchResults) return;
+			hideAskAnswer();
+			doSearch(q);
+			return;
+		}
+
+		if (!results) return;
+		hideAskAnswer();
+		doSearch(q);
+	}
+
+	function runAiFirstSearch(query, skipRegularResults) {
+		hideResults();
+		return runAsk(query).then(function () {
+			if (!skipRegularResults) doSearch(query);
+		});
+	}
+
 	input.addEventListener('input', function () {
 		clearTimeout(debounceTimer);
 		var query = input.value;
+		updateAskControls();
 		if (!query.trim()) {
 			hideResults();
+			hideAskAnswer();
 			currentQuery = '';
 			return;
 		}
-		debounceTimer = setTimeout(function () {
-			doSearch(query);
-		}, 250);
 	});
 
 	input.addEventListener('keydown', function (e) {
+		if (e.key === 'Enter') {
+			if (e.isComposing || e.keyCode === 229) return;
+			if (e.metaKey || e.ctrlKey || e.altKey) return;
+			e.preventDefault();
+			submitSearch(input.value);
+			return;
+		}
 		if (e.key === 'Escape') {
 			input.value = '';
 			input.blur();
 			hideResults();
+			hideAskAnswer();
 			currentQuery = '';
 			clearTimeout(debounceTimer);
+			updateAskControls();
 		}
 	});
 
@@ -317,5 +737,14 @@
 
 	input.addEventListener('blur', function () {
 		if (shortcutBadge && !input.value) shortcutBadge.style.opacity = '1';
+	});
+
+	initAsk().finally(function () {
+		if (!results || window.location.pathname !== '/search/') return;
+		var initialQuery = new URLSearchParams(window.location.search).get('q') || '';
+		if (!initialQuery.trim()) return;
+		input.value = initialQuery;
+		updateAskControls();
+		submitSearch(initialQuery);
 	});
 })();
