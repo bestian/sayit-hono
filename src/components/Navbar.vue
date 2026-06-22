@@ -44,14 +44,65 @@
 	align-items: center;
 	justify-content: flex-end;
 	flex-wrap: wrap;
-	gap: 0.6rem;
+	gap: 0.5rem;
 }
 
 /* Search widget styles (shared across all pages with search) */
 .sayit-search {
-	width: 220px;
+	flex: 1 1 12rem;
+	min-width: 10rem;
+	max-width: 20rem;
 	margin: 0;
 }
+
+.navbar__right .sayit-search__row {
+	align-items: center;
+}
+
+.navbar__right .sayit-search {
+	display: flex;
+	align-items: center;
+}
+
+.navbar__right > .sayit-search,
+.navbar__right > .sayit-lang-switch,
+.navbar__right > #sayit-site-lang-toggle,
+.navbar__right > .sayit-share-button {
+	align-self: center;
+}
+
+.navbar__right .sayit-search__input,
+.navbar__right .sayit-search__submit,
+.navbar__right .sayit-lang-switch,
+.navbar__right .sayit-share-button {
+	box-sizing: border-box;
+	margin: 0;
+	min-height: 2.375rem;
+	height: 2.375rem;
+}
+
+.navbar__right .sayit-lang-switch,
+.navbar__right #sayit-site-lang-toggle,
+.navbar__right .sayit-share-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 0.95em;
+	line-height: 1.2;
+}
+
+.navbar__right .sayit-search__submit {
+	width: 2.375rem;
+	padding: 0;
+	flex-shrink: 0;
+}
+
+.navbar__right .sayit-search__input {
+	padding-top: 0;
+	padding-bottom: 0;
+	line-height: 1.35;
+}
+
 
 @media (max-width: 580px) {
 	.sayit-search {
@@ -104,10 +155,11 @@
 	-webkit-appearance: none;
 }
 
+
 .sayit-search__shortcut {
 	position: absolute;
 	right: 0.8em;
-	top: 50%;
+	top: 38%;
 	transform: translateY(-50%);
 	display: inline-flex;
 	align-items: center;
@@ -123,6 +175,10 @@
 	border-radius: 4px;
 	pointer-events: none;
 	transition: opacity 0.25s ease;
+}
+
+.full-page__row.navbar .sayit-search__shortcut {
+	top: 50% !important;
 }
 
 @media (hover: none) {
@@ -331,7 +387,7 @@ button.sayit-search__more:active {
 	align-items: center;
 	justify-content: center;
 	box-sizing: border-box;
-	margin-top: 5px;
+	margin: 0;
 	padding: 0.45em 0.95em;
 	font-family: 'Noto Sans TC', sans-serif;
 	font-size: 0.9em;
@@ -403,4 +459,10 @@ button.sayit-search__more:active {
 		font-size: 16px;
 	}
 }
+
+.navbar .navbar__right button,
+.navbar .navbar__right input.sayit-search__input {
+	margin: 0 !important;
+}
+
 </style>

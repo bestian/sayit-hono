@@ -88,7 +88,8 @@ const THEME_STYLES = `<style>
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    margin-top: -13px;
+    margin: 0;
+    min-height: 2.375rem;
     padding: 0.45em 0.95em;
     font-family: 'Noto Sans TC', sans-serif;
     font-size: 0.9em;
@@ -704,6 +705,194 @@ const THEME_STYLES = `<style>
      永遠不命中、連結變成永遠顯示。
      純觸控裝置 (hover: hover) 為 false，這段不適用，連結維持永遠顯示
      —— 對沒有 hover 的裝置才合理。 */
+  .sayit-ask-overlay {
+    max-width: 71.25em;
+    margin: 0.75rem auto 0;
+    padding: 0 0.75em;
+    box-sizing: border-box;
+  }
+  .homepage-ask {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 680px;
+    margin-top: 1rem;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+  }
+  .sayit-ask-overlay .homepage-ask {
+    max-width: none;
+    margin-top: 0;
+    align-items: stretch;
+    text-align: left;
+    padding: 1rem 1.15rem;
+    border: 1px solid rgba(199, 194, 186, 0.95);
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7f2ec 100%);
+    box-shadow: 0 10px 26px rgba(73, 54, 40, 0.07);
+    box-sizing: border-box;
+  }
+  .homepage-ask[hidden] { display: none; }
+  .homepage-ask__intro, .homepage-ask__status { margin: 0; color: #6b6357; }
+  .homepage-ask__submit {
+    border: 1px solid rgba(201, 86, 75, 0.28);
+    border-radius: 999px;
+    background: #fffaf4;
+    color: #a8443b;
+    font: inherit;
+    cursor: pointer;
+    flex: 0 0 auto;
+    padding: 0.55rem 1.3rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .homepage-ask__submit[hidden] { display: none; }
+  .homepage-ask__submit:hover, .homepage-ask__submit:focus { background: #fdece8; outline: none; }
+  .homepage-ask__submit:disabled { cursor: not-allowed; opacity: 0.62; }
+  .homepage-ask-answer {
+    width: 100%;
+    max-width: 760px;
+    margin: 1.5rem auto 0;
+    padding: 1.25rem 1.35rem;
+    border: 1px solid rgba(199, 194, 186, 0.95);
+    border-radius: 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7f2ec 100%);
+    box-shadow: 0 12px 30px rgba(73, 54, 40, 0.08);
+    box-sizing: border-box;
+    line-height: 1.6;
+  }
+  .sayit-ask-overlay .homepage-ask-answer { max-width: none; margin-top: 0.85rem; }
+  .homepage-ask-answer .homepage-ask-answer__toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 0.65rem;
+  }
+  .homepage-ask-answer .homepage-ask-answer__copy {
+    border: 1px solid rgba(199, 194, 186, 0.75);
+    border-radius: 999px;
+    background: #fffaf4;
+    color: #4a433c;
+    font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    padding: 0.35rem 0.85rem;
+    cursor: pointer;
+  }
+  .homepage-ask-answer .homepage-ask-answer__copy:hover,
+  .homepage-ask-answer .homepage-ask-answer__copy:focus { background: #fdece8; outline: none; }
+  .homepage-ask-answer[hidden] { display: none; }
+  .homepage-ask-answer .homepage-ask-answer__status,
+  .homepage-ask-answer .homepage-ask-answer__body,
+  .homepage-ask-answer .homepage-ask-answer__error { margin: 0; line-height: 1.6; }
+  .homepage-ask-answer .homepage-ask-answer__body { white-space: pre-wrap; word-break: break-word; }
+  .homepage-ask-answer .homepage-ask-answer__body sup.cite { line-height: 1; vertical-align: super; }
+  .homepage-ask-answer .homepage-ask-answer__error { color: #a8443b; }
+  .homepage-ask-answer .homepage-ask-answer__cursor {
+    display: inline-block;
+    margin-left: 0.1em;
+    animation: ask-cursor-blink 1s steps(1) infinite;
+  }
+  .homepage-ask-answer .homepage-ask-answer__sources {
+    margin-top: 1.35rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid rgba(199, 194, 186, 0.55);
+  }
+  .homepage-ask-answer .homepage-ask-answer__sources h3 { margin: 0 0 0.65rem; font-size: 1rem; line-height: 1.6; }
+  .homepage-ask-answer .homepage-ask-answer__sources ol { margin: 0; padding: 0; list-style-position: inside; line-height: 1.6; }
+  .homepage-ask-answer .homepage-ask-answer__sources li { margin: 0.45rem 0; }
+  @keyframes ask-cursor-blink { 50% { opacity: 0; } }
+  .sayit-search__row { display: flex; align-items: center; gap: 0.4rem; width: 100%; }
+  .sayit-search__row .sayit-search__input-wrap { flex: 1 1 auto; min-width: 0; }
+  .sayit-search__submit {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 2.375rem;
+    height: 2.375rem;
+    min-height: 2.375rem;
+    padding: 0;
+    color: #a8443b;
+    background: #fffaf4;
+    border: 1.5px solid rgba(201, 86, 75, 0.35);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .sayit-search__submit[hidden] { display: none; }
+  .sayit-search__submit:hover:not(:disabled), .sayit-search__submit:focus-visible:not(:disabled) {
+    background: #fdece8; border-color: #c9564b; outline: none;
+  }
+  .sayit-search__submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  .sayit-search__submit svg { display: block; width: 1.15rem; height: 1.15rem; }
+  .sayit-search--homepage { flex: 1 1 auto; min-width: 0; width: auto; max-width: none; }
+  .sayit-search--homepage .sayit-search__input {
+    font-size: 1.1em; padding: 0.55em 1.1em; padding-right: 2.8em; border-radius: 8px;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+  }
+  .sayit-search--homepage .sayit-search__submit {
+    width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    border-radius: 8px;
+  }
+  .navbar .sayit-search__input {
+    height: 2.375rem;
+    min-height: 2.375rem;
+    box-sizing: border-box;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.35;
+  }
+  .navbar .sayit-search__submit {
+    height: 2.375rem;
+    width: 2.375rem;
+    min-height: 2.375rem;
+  }
+  .navbar__right .sayit-lang-switch,
+  .navbar__right #sayit-site-lang-toggle,
+  .navbar__right .sayit-share-button {
+    margin: 0 !important;
+    align-self: center;
+    height: 2.375rem;
+    min-height: 2.375rem;
+    padding: 0 0.95em !important;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .navbar__right .sayit-search__input,
+  .navbar__right .sayit-search__submit {
+    margin: 0 !important;
+    align-self: center;
+  }
+  .navbar .navbar__right button,
+  .navbar .navbar__right input[type="search"] {
+    margin: 0 !important;
+  }
+  .navbar .navbar__right .sayit-search__input-wrap {
+    margin: 0 !important;
+  }
+  .sayit-site-lang-toggle { cursor: pointer; font: inherit; }
+  @media (prefers-color-scheme: dark) {
+    .sayit-ask-overlay .homepage-ask, .homepage-ask-answer {
+      border-color: var(--sayit-border, rgba(164, 184, 204, 0.14));
+      background: linear-gradient(180deg, rgba(20, 29, 42, 0.96), rgba(13, 20, 31, 0.9));
+      color: var(--sayit-text, #ecf2f8);
+    }
+    .homepage-ask__intro, .homepage-ask__status { color: var(--sayit-text-muted, #b8c4d1); }
+    .homepage-ask__submit, .sayit-search__submit {
+      border-color: rgba(127, 214, 176, 0.36);
+      background: rgba(18, 26, 37, 0.92);
+      color: var(--sayit-link-hover, #ffd0c7);
+    }
+  }
+
   @media (hover: hover) {
     .speech__links { display: none !important; }
 
@@ -873,14 +1062,31 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
       var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
       root.classList.remove('no-touch');
       root.classList.add(hasTouch ? 'touch' : 'no-touch');
-      var zh = /^zh\\b/i.test(navigator.language);
+      var stored = null;
+      try { stored = localStorage.getItem('sayit-ui-lang'); } catch (e) {}
+      var zh = stored === 'zh' || stored === 'en' ? stored === 'zh' : /^zh\b/i.test(navigator.language || '');
+      root.classList.remove('lang-zh', 'lang-en');
       root.classList.add(zh ? 'lang-zh' : 'lang-en');
-      if (zh) document.addEventListener('DOMContentLoaded', function() {
-        var map = {'Search': '搜尋', "Search this person's speeches": '搜尋此人的發言'};
+      function applyZhPlaceholders() {
+        var map = {'Search': '搜尋', "Search this person's speeches": '搜尋此人的發言', 'Search speeches…': '搜尋對話內容…', 'Search speeches': '搜尋對話'};
         document.querySelectorAll('[placeholder]').forEach(function(el) {
           var zh_text = map[el.getAttribute('placeholder')];
           if (zh_text) el.setAttribute('placeholder', zh_text);
         });
+      }
+      if (zh) {
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyZhPlaceholders);
+        else applyZhPlaceholders();
+      }
+      document.addEventListener('click', function(e) {
+        var btn = e.target && e.target.closest ? e.target.closest('#sayit-site-lang-toggle') : null;
+        if (!btn) return;
+        var nextZh = !root.classList.contains('lang-zh');
+        root.classList.remove('lang-zh', 'lang-en');
+        root.classList.add(nextZh ? 'lang-zh' : 'lang-en');
+        try { localStorage.setItem('sayit-ui-lang', nextZh ? 'zh' : 'en'); } catch (err) {}
+        window.dispatchEvent(new CustomEvent('sayit-lang-change', { detail: { zh: nextZh } }));
+        if (nextZh) applyZhPlaceholders();
       });
     })();
   </script>
