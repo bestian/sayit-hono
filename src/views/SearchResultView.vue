@@ -2,12 +2,18 @@
 	<div class="page">
 		<Navbar>
 			<div id="sayit-search" class="sayit-search" role="search">
-				<div class="sayit-search__input-wrap">
-					<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
-					<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+								<div class="sayit-search__row">
+					<div class="sayit-search__input-wrap">
+						<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
+						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+					</div>
+					<button type="button" class="sayit-search__submit" aria-label="Search">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+					</button>
 				</div>
 			</div>
 		</Navbar>
+		<div class="sayit-ask-overlay">
 		<div id="sayit-ask" class="homepage-ask" hidden>
 			<p class="homepage-ask__intro">
 				<span lang="zh">或直接提問，讓 AI 從逐字稿中找出回答：</span>
@@ -16,7 +22,8 @@
 			<p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
 		</div>
 		<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
-		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden></button>
+		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden aria-hidden="true"></button>
+		</div>
 		<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
 		<div class="full-page">
 			<div class="full-page__row">
