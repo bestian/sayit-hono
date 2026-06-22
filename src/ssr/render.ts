@@ -765,6 +765,24 @@ const THEME_STYLES = `<style>
     line-height: 1.6;
   }
   .sayit-ask-overlay .homepage-ask-answer { max-width: none; margin-top: 0.85rem; }
+  .homepage-ask-answer .homepage-ask-answer__toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 0.65rem;
+  }
+  .homepage-ask-answer .homepage-ask-answer__copy {
+    border: 1px solid rgba(199, 194, 186, 0.75);
+    border-radius: 999px;
+    background: #fffaf4;
+    color: #4a433c;
+    font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    padding: 0.35rem 0.85rem;
+    cursor: pointer;
+  }
+  .homepage-ask-answer .homepage-ask-answer__copy:hover,
+  .homepage-ask-answer .homepage-ask-answer__copy:focus { background: #fdece8; outline: none; }
   .homepage-ask-answer[hidden] { display: none; }
   .homepage-ask-answer .homepage-ask-answer__status,
   .homepage-ask-answer .homepage-ask-answer__body,
