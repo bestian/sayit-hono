@@ -158,7 +158,7 @@
 .sayit-search__shortcut {
 	position: absolute;
 	right: 0.8em;
-	top: 50%;
+	top: 38%;
 	transform: translateY(-50%);
 	display: inline-flex;
 	align-items: center;
