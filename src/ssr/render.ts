@@ -1044,14 +1044,31 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
       var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
       root.classList.remove('no-touch');
       root.classList.add(hasTouch ? 'touch' : 'no-touch');
-      var zh = /^zh\\b/i.test(navigator.language);
+      var stored = null;
+      try { stored = localStorage.getItem('sayit-ui-lang'); } catch (e) {}
+      var zh = stored === 'zh' || stored === 'en' ? stored === 'zh' : /^zh\b/i.test(navigator.language || '');
+      root.classList.remove('lang-zh', 'lang-en');
       root.classList.add(zh ? 'lang-zh' : 'lang-en');
-      if (zh) document.addEventListener('DOMContentLoaded', function() {
-        var map = {'Search': '搜尋', "Search this person's speeches": '搜尋此人的發言'};
+      function applyZhPlaceholders() {
+        var map = {'Search': '搜尋', "Search this person's speeches": '搜尋此人的發言', 'Search speeches…': '搜尋對話內容…', 'Search speeches': '搜尋對話'};
         document.querySelectorAll('[placeholder]').forEach(function(el) {
           var zh_text = map[el.getAttribute('placeholder')];
           if (zh_text) el.setAttribute('placeholder', zh_text);
         });
+      }
+      if (zh) {
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyZhPlaceholders);
+        else applyZhPlaceholders();
+      }
+      document.addEventListener('click', function(e) {
+        var btn = e.target && e.target.closest ? e.target.closest('#sayit-site-lang-toggle') : null;
+        if (!btn) return;
+        var nextZh = !root.classList.contains('lang-zh');
+        root.classList.remove('lang-zh', 'lang-en');
+        root.classList.add(nextZh ? 'lang-zh' : 'lang-en');
+        try { localStorage.setItem('sayit-ui-lang', nextZh ? 'zh' : 'en'); } catch (err) {}
+        window.dispatchEvent(new CustomEvent('sayit-lang-change', { detail: { zh: nextZh } }));
+        if (nextZh) applyZhPlaceholders();
       });
     })();
   </script>
