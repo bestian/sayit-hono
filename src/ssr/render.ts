@@ -836,13 +836,29 @@ const THEME_STYLES = `<style>
     min-height: 2.375rem;
   }
   .navbar__right .sayit-lang-switch,
-  .navbar__right #sayit-site-lang-toggle {
+  .navbar__right #sayit-site-lang-toggle,
+  .navbar__right .sayit-share-button {
+    margin: 0 !important;
+    align-self: center;
     height: 2.375rem;
     min-height: 2.375rem;
-    margin: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    line-height: 1.35;
+    padding: 0 0.95em !important;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .navbar__right .sayit-search__input,
+  .navbar__right .sayit-search__submit {
+    margin: 0 !important;
+    align-self: center;
+  }
+  .navbar .navbar__right button,
+  .navbar .navbar__right input[type="search"] {
+    margin: 0 !important;
+  }
+  .navbar .navbar__right .sayit-search__input-wrap {
+    margin: 0 !important;
   }
   .sayit-site-lang-toggle { cursor: pointer; font: inherit; }
   @media (prefers-color-scheme: dark) {
