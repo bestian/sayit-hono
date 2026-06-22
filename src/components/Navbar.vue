@@ -53,13 +53,19 @@
 	align-items: center;
 	justify-content: flex-end;
 	flex-wrap: wrap;
-	gap: 0.6rem;
+	gap: 0.5rem;
 }
 
 /* Search widget styles (shared across all pages with search) */
 .sayit-search {
-	width: 220px;
+	flex: 1 1 12rem;
+	min-width: 10rem;
+	max-width: 20rem;
 	margin: 0;
+}
+
+.navbar__right .sayit-search__row {
+	align-items: center;
 }
 
 @media (max-width: 580px) {

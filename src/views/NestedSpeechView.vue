@@ -26,7 +26,7 @@ const getNestUrl = (nestFilename: string) =>
 	<div class="page">
 		<Navbar>
 			<div id="sayit-search" class="sayit-search" role="search">
-								<div class="sayit-search__row">
+				<div class="sayit-search__row">
 					<div class="sayit-search__input-wrap">
 						<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
 						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
@@ -41,12 +41,7 @@ const getNestUrl = (nestFilename: string) =>
 			</a>
 		</Navbar>
 		<div class="sayit-ask-overlay">
-		<div id="sayit-ask" class="homepage-ask" hidden>
-			<p class="homepage-ask__intro">
-				<span lang="zh">或直接提問，讓 AI 從逐字稿中找出回答：</span>
-				<span lang="en">Or ask a question and let AI search the transcripts:</span>
-			</p>
-			<p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
+		<div id="sayit-ask" class="homepage-ask" hidden><p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
 		</div>
 		<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
 		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden aria-hidden="true"></button>
