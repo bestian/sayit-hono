@@ -83,7 +83,20 @@
 	var askCooldownTimer = null;
 	var askCooldownRemaining = 0;
 	var askAbortController = null;
-	var ASK_BASE_URL = 'https://ask.archive.tw';
+	function resolveAskBaseUrl() {
+		var host = window.location.hostname;
+		var isDevHost = host === 'localhost' || host === '127.0.0.1';
+		if (isDevHost) {
+			try {
+				var params = new URLSearchParams(window.location.search);
+				var override = params.get('ask_base');
+				if (override) return override.replace(/\/$/, '');
+			} catch (_e) { /* ignore */ }
+			return 'http://127.0.0.1:8787';
+		}
+		return 'https://ask.archive.tw';
+	}
+	var ASK_BASE_URL = resolveAskBaseUrl();
 
 	function shouldWarmupOnFocus() {
 		var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
