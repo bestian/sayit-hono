@@ -111,9 +111,6 @@ const loading = false
 					</button>
 				</div>
 			</div>
-			<a v-if="alternateUrl" :href="alternateUrl" class="sayit-lang-switch" :title="alternateLabel">
-				{{ alternateLabel }}
-			</a>
 		</Navbar>
 		<div class="sayit-ask-overlay">
 		<div id="sayit-ask" class="homepage-ask" hidden><p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>

@@ -34,6 +34,7 @@ describe('SSR layout', () => {
 			components: { Navbar, Footer }
 		});
 
+		expect(html).toContain('id="sayit-site-lang-toggle"');
 		expect(html).toContain('id="sayit-ask"');
 		expect(html).toContain('class="homepage-ask" hidden');
 		expect(html).not.toContain('id="sayit-ask-consent"');
@@ -77,6 +78,7 @@ describe('SSR layout', () => {
 		expect(html).toContain('id="sayit-ask-answer"');
 		expect(html).toContain('class="homepage-ask-answer" aria-live="polite" hidden');
 		expect(html.indexOf('id="sayit-ask-answer"')).toBeLessThan(html.indexOf('unstyled-list search-results-speakers'));
+		expect(html).not.toContain('id="sayit-site-lang-toggle"');
 	});
 
 	it('renders bilingual privacy policy content', async () => {
