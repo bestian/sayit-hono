@@ -71,6 +71,15 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 				</div>
 			</div>
 		</Navbar>
+		<div id="sayit-ask" class="homepage-ask" hidden>
+			<p class="homepage-ask__intro">
+				<span lang="zh">或直接提問，讓 AI 從逐字稿中找出回答：</span>
+				<span lang="en">Or ask a question and let AI search the transcripts:</span>
+			</p>
+			<p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
+		</div>
+		<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
+		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden></button>
 		<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
 		<div class="full-page" v-if="section">
 			<div class="full-page__row">
