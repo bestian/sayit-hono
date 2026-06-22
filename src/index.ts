@@ -24,6 +24,8 @@ import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generat
 import SearchResultView, { styles as SearchResultViewStyles } from './.generated/views/SearchResultView';
 import SpeechesView, { styles as SpeechesViewStyles } from './.generated/views/SpeechesView';
 import SpeakersView, { styles as SpeakersViewStyles } from './.generated/views/SpeakersView';
+import LegalPrivacyView, { styles as LegalPrivacyViewStyles } from './.generated/views/LegalPrivacyView';
+import LegalTermsView, { styles as LegalTermsViewStyles } from './.generated/views/LegalTermsView';
 import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
 import Footer, { styles as FooterStyles } from './.generated/components/Footer';
 import { renderHtml } from './ssr/render';
@@ -36,7 +38,9 @@ import {
 	headForSpeeches,
 	headForSearch,
 	headForSpeakers,
-	headForHome
+	headForHome,
+	headForPrivacy,
+	headForTerms
 } from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
 import { normalizeSections } from './utils/sectionUtils';
@@ -90,6 +94,8 @@ const excludedPaths = [
 	'rss.xml',
 	'feed.xml',
 	'search',
+	'privacy',
+	'terms',
 	'favicon.ico',
 	'robots.txt',
 	'static',
@@ -969,6 +975,31 @@ app.post('/api/cleanup_old_cache', async (c) => {
 	return c.json({ deleted, more: false });
 });
 
+
+async function renderPrivacyPage(c: any) {
+	const styles = [LegalPrivacyViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForPrivacy();
+	const html = await renderHtml(LegalPrivacyView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: {}
+	});
+	return withCacheHeaders(c.html(html));
+}
+
+async function renderTermsPage(c: any) {
+	const styles = [LegalTermsViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
+	const head = headForTerms();
+	const html = await renderHtml(LegalTermsView, {
+		head,
+		styles,
+		components: { Navbar, Footer },
+		props: {}
+	});
+	return withCacheHeaders(c.html(html));
+}
+
 async function renderHomePage(c: any) {
 	const styles = [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForHome();
@@ -1048,6 +1079,8 @@ async function renderSpeakersPage(c: any) {
 
 // /speeches → /speeches/, /speakers → /speakers/, /index.html → / are all redirected
 // by the canonical-URL middleware before these handlers run.
+app.get('/privacy', (c) => renderPrivacyPage(c));
+app.get('/terms', (c) => renderTermsPage(c));
 app.get('/speeches/', (c) => renderSpeechesPage(c));
 app.get('/speakers/', (c) => renderSpeakersPage(c));
 app.get('/', (c) => renderHomePage(c));

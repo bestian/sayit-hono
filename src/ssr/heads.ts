@@ -49,6 +49,20 @@ export function headForHome(): HeadSpec {
 	return { title: ' Home :: SayIt ', meta: [og(baseOgTitle), ogDescription(baseOgDescription), ...defaultImageMeta()] };
 }
 
+export function headForPrivacy(): HeadSpec {
+	return {
+		title: ' Privacy Policy :: SayIt ',
+		meta: [og('Privacy Policy'), ogDescription('Privacy policy for AI questions on SayIt.'), ...defaultImageMeta()]
+	};
+}
+
+export function headForTerms(): HeadSpec {
+	return {
+		title: ' Terms of Use :: SayIt ',
+		meta: [og('Terms of Use'), ogDescription('Terms of use for AI questions on SayIt.'), ...defaultImageMeta()]
+	};
+}
+
 export function headForSpeakers(): HeadSpec {
 	return { title: ' All Speakers :: SayIt ', meta: [og(baseOgTitle), ogDescription(baseOgDescription), ...defaultImageMeta()] };
 }
