@@ -237,6 +237,32 @@ describe('Worker routes', () => {
 		expect(await res.text()).toContain('SayIt');
 	});
 
+	it('renders the privacy page through the worker route', async () => {
+		const { res } = await request('/privacy');
+
+		expect(res.status).toBe(200);
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=60');
+		const html = await res.text();
+		expect(html).toContain('<title> Privacy Policy :: SayIt </title>');
+		expect(html).toContain('content="Privacy policy for AI questions on SayIt."');
+		expect(html).toContain('id="privacy-zh"');
+		expect(html).toContain('We do not sell or exchange your personal data');
+		expect(html).toContain('href="/terms"');
+	});
+
+	it('renders the terms page through the worker route', async () => {
+		const { res } = await request('/terms');
+
+		expect(res.status).toBe(200);
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=60');
+		const html = await res.text();
+		expect(html).toContain('<title> Terms of Use :: SayIt </title>');
+		expect(html).toContain('content="Terms of use for AI questions on SayIt."');
+		expect(html).toContain('id="terms-zh"');
+		expect(html).toContain('Content provided in AI replies is licensed under Creative Commons Attribution-ShareAlike');
+		expect(html).toContain('href="/privacy"');
+	});
+
 	it('redirects speeches to the canonical trailing-slash URL', async () => {
 		const { res } = await request('/speeches');
 		expect(res.status).toBe(302);
