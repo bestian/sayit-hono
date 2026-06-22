@@ -155,6 +155,7 @@
 	-webkit-appearance: none;
 }
 
+
 .sayit-search__shortcut {
 	position: absolute;
 	right: 0.8em;
@@ -174,6 +175,10 @@
 	border-radius: 4px;
 	pointer-events: none;
 	transition: opacity 0.25s ease;
+}
+
+.full-page__row.navbar .sayit-search__shortcut {
+	top: 50% !important;
 }
 
 @media (hover: none) {
