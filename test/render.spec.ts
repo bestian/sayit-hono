@@ -74,9 +74,8 @@ describe('SSR layout', () => {
 			}
 		});
 
-		expect(html).toContain('id="sayit-ask"');
-		expect(html).not.toContain('id="sayit-ask-consent"');
-		expect(html).toContain('id="sayit-ask-status"');
+		expect(html).not.toContain('id="sayit-ask"');
+		expect(html).not.toContain('id="sayit-ask-status"');
 		expect(html).toContain('id="sayit-ask-answer"');
 		expect(html).toContain('class="homepage-ask-answer" aria-live="polite" hidden');
 		expect(html.indexOf('id="sayit-ask-answer"')).toBeLessThan(html.indexOf('unstyled-list search-results-speakers'));

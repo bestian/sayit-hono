@@ -55,8 +55,6 @@ const sortedSpeeches = computed(() => {
 			</div>
 		</Navbar>
 		<div class="sayit-ask-overlay">
-		<div id="sayit-ask" class="homepage-ask" hidden><p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
-		</div>
 		<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
 		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden></button>
 		<div class="full-page">
