@@ -8,10 +8,6 @@
 					<div class="homepage-search">
 						<h2><span lang="zh">搜尋對話與發言</span><span lang="en">Search speeches and statements</span></h2>
 						<div id="sayit-ask" class="homepage-ask" hidden>
-							<p class="homepage-ask__intro">
-								<span lang="zh">或直接提問，讓 AI 從逐字稿中找出回答：</span>
-								<span lang="en">Or ask a question and let AI search the transcripts:</span>
-							</p>
 							<p id="sayit-ask-status" class="homepage-ask__status" aria-live="polite"></p>
 						</div>
 						<div class="homepage-search__row">
@@ -34,12 +30,11 @@
 								</div>
 							</div>
 							<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden aria-hidden="true"></button>
+						</div>
 					</div>
 				</div>
-				<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden>
-				</div>
-				<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden>
-				</div>
+				<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
+				<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
 			</div>
 			<div class="homepage-stats" id="sayit-stats">
 			<div class="full-page__row">
@@ -66,7 +61,7 @@
 
 .homepage-search__row {
 	display: flex;
-	align-items: stretch;
+	align-items: center;
 	gap: 0.65rem;
 	width: 100%;
 	max-width: 680px;

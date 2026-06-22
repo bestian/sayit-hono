@@ -88,7 +88,8 @@ const THEME_STYLES = `<style>
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    margin-top: -13px;
+    margin: 0;
+    min-height: 2.375rem;
     padding: 0.45em 0.95em;
     font-family: 'Noto Sans TC', sans-serif;
     font-size: 0.9em;
@@ -785,20 +786,22 @@ const THEME_STYLES = `<style>
   .homepage-ask-answer .homepage-ask-answer__sources ol { margin: 0; padding: 0; list-style-position: inside; line-height: 1.6; }
   .homepage-ask-answer .homepage-ask-answer__sources li { margin: 0.45rem 0; }
   @keyframes ask-cursor-blink { 50% { opacity: 0; } }
-  .sayit-search__row { display: flex; align-items: stretch; gap: 0.45rem; width: 100%; }
+  .sayit-search__row { display: flex; align-items: center; gap: 0.4rem; width: 100%; }
   .sayit-search__row .sayit-search__input-wrap { flex: 1 1 auto; min-width: 0; }
   .sayit-search__submit {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.5rem;
-    min-height: 2.5rem;
+    box-sizing: border-box;
+    width: 2.375rem;
+    height: 2.375rem;
+    min-height: 2.375rem;
     padding: 0;
     color: #a8443b;
     background: #fffaf4;
     border: 1.5px solid rgba(201, 86, 75, 0.35);
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
   }
   .sayit-search__submit[hidden] { display: none; }
@@ -809,9 +812,23 @@ const THEME_STYLES = `<style>
   .sayit-search__submit svg { display: block; width: 1.15rem; height: 1.15rem; }
   .sayit-search--homepage { flex: 1 1 auto; min-width: 0; width: auto; max-width: none; }
   .sayit-search--homepage .sayit-search__input {
-    font-size: 1.1em; padding: 0.6em 1.1em; padding-right: 2.8em; border-radius: 8px;
+    font-size: 1.1em; padding: 0.55em 1.1em; padding-right: 2.8em; border-radius: 8px;
+    min-height: 2.75rem;
+    box-sizing: border-box;
   }
-  .sayit-site-lang-toggle { cursor: pointer; font: inherit; }
+  .sayit-search--homepage .sayit-search__submit {
+    width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    border-radius: 8px;
+  }
+  .navbar .sayit-search__input {
+    min-height: 2.375rem;
+    box-sizing: border-box;
+    padding-top: 0.4em;
+    padding-bottom: 0.4em;
+  }
+  .sayit-site-lang-toggle { cursor: pointer; font: inherit; margin: 0; }
   @media (prefers-color-scheme: dark) {
     .sayit-ask-overlay .homepage-ask, .homepage-ask-answer {
       border-color: var(--sayit-border, rgba(164, 184, 204, 0.14));
