@@ -18,6 +18,16 @@ describe('SSR layout', () => {
 		expect(html).toContain('navigator.share');
 	});
 
+	it('navbar share control has no legacy margin-top in SSR CSS', async () => {
+		const html = await renderHtml(HomeView, {
+			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer }
+		});
+
+		expect(html).not.toContain('margin-top: 5px');
+		expect(html).toContain('margin: 0 !important');
+	});
+
 	it('renders the homepage Ask UI hidden by default', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
