@@ -823,12 +823,28 @@ const THEME_STYLES = `<style>
     border-radius: 8px;
   }
   .navbar .sayit-search__input {
+    height: 2.375rem;
     min-height: 2.375rem;
     box-sizing: border-box;
-    padding-top: 0.4em;
-    padding-bottom: 0.4em;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.35;
   }
-  .sayit-site-lang-toggle { cursor: pointer; font: inherit; margin: 0; }
+  .navbar .sayit-search__submit {
+    height: 2.375rem;
+    width: 2.375rem;
+    min-height: 2.375rem;
+  }
+  .navbar__right .sayit-lang-switch,
+  .navbar__right #sayit-site-lang-toggle {
+    height: 2.375rem;
+    min-height: 2.375rem;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.35;
+  }
+  .sayit-site-lang-toggle { cursor: pointer; font: inherit; }
   @media (prefers-color-scheme: dark) {
     .sayit-ask-overlay .homepage-ask, .homepage-ask-answer {
       border-color: var(--sayit-border, rgba(164, 184, 204, 0.14));
