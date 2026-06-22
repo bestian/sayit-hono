@@ -1,6 +1,16 @@
 <template>
 	<div class="page">
-		<Navbar />
+		<Navbar>
+			<button
+				type="button"
+				id="sayit-site-lang-toggle"
+				class="sayit-lang-switch sayit-site-lang-toggle"
+				aria-label="Switch interface language"
+			>
+				<span lang="zh">English</span>
+				<span lang="en">華文</span>
+			</button>
+		</Navbar>
 		<div class="full-page">
 			<div class="full-page__row">
 			<div class="full-page__unit">
