@@ -42,6 +42,8 @@ describe('SSR layout', () => {
 		expect(html).toContain('class="homepage-search__row"');
 		expect(html).toContain('class="homepage-ask-answer" aria-live="polite" hidden');
 		expect(html.indexOf('id="sayit-ask-answer"')).toBeLessThan(html.indexOf('id="sayit-search-results"'));
+		expect(html).toContain('homepage-ask-answer__table');
+		expect(html).not.toContain('white-space: pre-wrap');
 	});
 
 	it('renders footer ask notice with local privacy and terms links', async () => {

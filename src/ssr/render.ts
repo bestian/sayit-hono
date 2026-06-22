@@ -787,8 +787,47 @@ const THEME_STYLES = `<style>
   .homepage-ask-answer .homepage-ask-answer__status,
   .homepage-ask-answer .homepage-ask-answer__body,
   .homepage-ask-answer .homepage-ask-answer__error { margin: 0; line-height: 1.6; }
-  .homepage-ask-answer .homepage-ask-answer__body { white-space: pre-wrap; word-break: break-word; }
-  .homepage-ask-answer .homepage-ask-answer__body sup.cite { line-height: 1; vertical-align: super; }
+  .homepage-ask-answer .homepage-ask-answer__body { word-break: break-word; }
+  .homepage-ask-answer .homepage-ask-answer__body > :first-child { margin-top: 0; }
+  .homepage-ask-answer .homepage-ask-answer__body > :last-child { margin-bottom: 0; }
+  .homepage-ask-answer .homepage-ask-answer__body p { margin: 0.75rem 0; }
+  .homepage-ask-answer .homepage-ask-answer__body ul.homepage-ask-answer__list,
+  .homepage-ask-answer .homepage-ask-answer__body ol.homepage-ask-answer__list {
+    margin: 0.75rem 0;
+    padding-left: 1.35rem;
+  }
+  .homepage-ask-answer .homepage-ask-answer__body .homepage-ask-answer__list li { margin: 0.35rem 0; }
+  .homepage-ask-answer .homepage-ask-answer__body h2,
+  .homepage-ask-answer .homepage-ask-answer__body h3,
+  .homepage-ask-answer .homepage-ask-answer__body h4 {
+    margin: 1.15rem 0 0.55rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+  .homepage-ask-answer .homepage-ask-answer__body h2 { font-size: 1.12rem; }
+  .homepage-ask-answer .homepage-ask-answer__table-wrap {
+    margin: 0.85rem 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .homepage-ask-answer .homepage-ask-answer__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+  .homepage-ask-answer .homepage-ask-answer__table th,
+  .homepage-ask-answer .homepage-ask-answer__table td {
+    border: 1px solid rgba(199, 194, 186, 0.65);
+    padding: 0.45rem 0.55rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  .homepage-ask-answer .homepage-ask-answer__table th {
+    font-weight: 600;
+    background: rgba(245, 244, 240, 0.85);
+  }
   .homepage-ask-answer .homepage-ask-answer__error { color: #a8443b; }
   .homepage-ask-answer .homepage-ask-answer__cursor {
     display: inline-block;
@@ -890,6 +929,13 @@ const THEME_STYLES = `<style>
       border-color: rgba(127, 214, 176, 0.36);
       background: rgba(18, 26, 37, 0.92);
       color: var(--sayit-link-hover, #ffd0c7);
+    }
+    .homepage-ask-answer .homepage-ask-answer__table th {
+      background: rgba(30, 42, 58, 0.85);
+    }
+    .homepage-ask-answer .homepage-ask-answer__table th,
+    .homepage-ask-answer .homepage-ask-answer__table td {
+      border-color: var(--sayit-border, rgba(164, 184, 204, 0.22));
     }
   }
 
