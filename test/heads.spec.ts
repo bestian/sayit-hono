@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	headForHome,
+	headForPrivacy,
+	headForTerms,
 	headForSpeakers,
 	headForSpeeches,
 	headForSearch,
@@ -17,6 +19,28 @@ describe('heads', () => {
 		expect(head.title).toContain('Home');
 		const properties = head.meta?.map((m) => m.property);
 		expect(properties).toEqual(expect.arrayContaining(['og:title', 'og:description', 'og:image']));
+	});
+
+	it('headForPrivacy/headForTerms expose legal page titles and descriptions', () => {
+		const privacy = headForPrivacy();
+		expect(privacy.title).toBe(' Privacy Policy :: SayIt ');
+		expect(privacy.meta).toEqual(
+			expect.arrayContaining([
+				{ property: 'og:title', content: 'Privacy Policy' },
+				{ property: 'og:description', content: 'Privacy policy for AI questions on SayIt.' }
+			])
+		);
+		expect(privacy.meta?.some((m) => m.property === 'og:image')).toBe(true);
+
+		const terms = headForTerms();
+		expect(terms.title).toBe(' Terms of Use :: SayIt ');
+		expect(terms.meta).toEqual(
+			expect.arrayContaining([
+				{ property: 'og:title', content: 'Terms of Use' },
+				{ property: 'og:description', content: 'Terms of use for AI questions on SayIt.' }
+			])
+		);
+		expect(terms.meta?.some((m) => m.property === 'og:image')).toBe(true);
 	});
 
 	it('headForSpeakers/headForSpeeches return stable titles', () => {
