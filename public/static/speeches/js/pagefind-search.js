@@ -475,7 +475,7 @@
 	}
 
 	function askEndpointForQuestion(question) {
-		var endpoint = ASK_BASE_URL + '/cag/' + encodeURIComponent(question);
+		var endpoint = ASK_BASE_URL + '/au/' + encodeURIComponent(question);
 		return isZh ? endpoint : endpoint + '?lang=en';
 	}
 
