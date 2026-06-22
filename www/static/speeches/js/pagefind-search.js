@@ -9,6 +9,8 @@
 	var askSubmit = document.getElementById('sayit-ask-submit');
 		var askStatus = document.getElementById('sayit-ask-status');
 	var askAnswer = document.getElementById('sayit-ask-answer');
+	var lastAskMarkdown = '';
+	var askCopyResetTimer = null;
 	if (!input) return;
 
 	var isZh = document.documentElement.classList.contains('lang-zh');
@@ -21,6 +23,9 @@
 			cooldown: function (seconds) { return '💬 ' + seconds + ' 秒後可再提問'; },
 			searching: '檢索逐字稿中…',
 			sourcesHeading: '出處',
+			copyMarkdown: '複製 Markdown',
+			copiedMarkdown: '已複製',
+			copyFailed: '無法複製，請手動選取文字',
 			questionTooLong: '問題太長，請縮短到 100 字以內。',
 			fetchError: '提問服務暫時無法使用，請稍後再試。',
 			networkError: '連線發生錯誤，請稍後再試。',
@@ -34,6 +39,9 @@
 			cooldown: function (seconds) { return '💬 Ask again in ' + seconds + ' s'; },
 			searching: 'Searching the transcripts…',
 			sourcesHeading: 'Sources',
+			copyMarkdown: 'Copy Markdown',
+			copiedMarkdown: 'Copied',
+			copyFailed: 'Could not copy. Select the answer and copy manually.',
 			questionTooLong: 'Your question is too long. Please shorten it to 100 characters or fewer.',
 			fetchError: 'The ask service is temporarily unavailable. Please try again later.',
 			networkError: 'Connection error. Please try again later.',
@@ -169,6 +177,55 @@
 		return doc.body.innerHTML;
 	}
 
+
+	function askHasVisibleAnswer() {
+		return !!(askAnswer && !askAnswer.hidden && (lastAskMarkdown || '').trim());
+	}
+
+	function copyMarkdownText(text) {
+		if (!text) return Promise.resolve(false);
+		try {
+			if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+				return navigator.clipboard.writeText(text).then(function () { return true; }).catch(function () { return false; });
+			}
+		} catch (e) {}
+		try {
+			var textarea = document.createElement('textarea');
+			textarea.value = text;
+			textarea.setAttribute('readonly', '');
+			textarea.style.position = 'fixed';
+			textarea.style.inset = '0 auto auto 0';
+			textarea.style.opacity = '0';
+			document.body.appendChild(textarea);
+			textarea.focus();
+			textarea.select();
+			var ok = document.execCommand('copy');
+			textarea.remove();
+			return Promise.resolve(!!ok);
+		} catch (err) {
+			return Promise.resolve(false);
+		}
+	}
+
+	function bindAskCopyButton() {
+		if (!askAnswer || askAnswer.dataset.sayitCopyBound) return;
+		askAnswer.dataset.sayitCopyBound = '1';
+		askAnswer.addEventListener('click', function (e) {
+			var btn = e.target && e.target.closest ? e.target.closest('[data-sayit-ask-copy]') : null;
+			if (!btn || btn.disabled) return;
+			var text = lastAskMarkdown || '';
+			if (!text.trim()) return;
+			copyMarkdownText(text).then(function (ok) {
+				btn.textContent = ok ? askT.copiedMarkdown : askT.copyFailed;
+				if (askCopyResetTimer) clearTimeout(askCopyResetTimer);
+				askCopyResetTimer = setTimeout(function () {
+					btn.textContent = askT.copyMarkdown;
+					askCopyResetTimer = null;
+				}, 2000);
+			});
+		});
+	}
+
 	function parseAskAnswer(raw) {
 		var sources = [];
 		var seen = {};
@@ -221,6 +278,7 @@
 		if (!askAnswer) return;
 		askAnswer.hidden = true;
 		askAnswer.innerHTML = '';
+		lastAskMarkdown = '';
 	}
 
 	function setAskStatus(message) {
@@ -269,14 +327,20 @@
 
 	function renderAskAnswer(raw, loading, error) {
 		if (!askAnswer) return;
+		bindAskCopyButton();
 		askAnswer.hidden = false;
 		if (error) {
+			lastAskMarkdown = '';
 			askAnswer.innerHTML = '<p class="homepage-ask-answer__error">' + sanitizeHtml(escapeHtml(error)) + '</p>';
 			return;
 		}
 
+		lastAskMarkdown = raw || '';
 		var parsed = parseAskAnswer(raw);
 		var html = '';
+		if ((raw || '').trim()) {
+			html += '<div class="homepage-ask-answer__toolbar"><button type="button" class="homepage-ask-answer__copy" data-sayit-ask-copy aria-label="' + escapeHtml(askT.copyMarkdown) + '">' + escapeHtml(askT.copyMarkdown) + '</button></div>';
+		}
 		if (!parsed.html && loading) {
 			html += '<p class="homepage-ask-answer__status">' + escapeHtml(askT.searching) + '</p>';
 		}
@@ -476,7 +540,8 @@
 			}
 
 			if (!msg.results || msg.results.length === 0) {
-				renderNoResults(query);
+				if (!askHasVisibleAnswer()) renderNoResults(query);
+				else hideResults();
 				return;
 			}
 
