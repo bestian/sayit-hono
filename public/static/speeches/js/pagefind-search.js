@@ -43,6 +43,23 @@
 	var askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
 	input.setAttribute('placeholder', askT.searchPlaceholder);
 	input.setAttribute('aria-label', askT.searchAriaLabel);
+	function refreshSearchI18n() {
+		isZh = document.documentElement.classList.contains('lang-zh');
+		askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
+		input.setAttribute('placeholder', askT.searchPlaceholder);
+		input.setAttribute('aria-label', askT.searchAriaLabel);
+		updateAskControls();
+	}
+
+	var searchSubmitButtons = document.querySelectorAll('.sayit-search__submit');
+	for (var si = 0; si < searchSubmitButtons.length; si++) {
+		searchSubmitButtons[si].addEventListener('click', function () {
+			submitSearch(input.value);
+		});
+	}
+	for (var sb = 0; sb < searchSubmitButtons.length; sb++) searchSubmitButtons[sb].hidden = false;
+
+	window.addEventListener('sayit-lang-change', refreshSearchI18n);
 
 	var worker = null;
 	var debounceTimer = null;
@@ -557,6 +574,7 @@
 			if (!data || data.status !== 'available') return;
 			askAvailable = true;
 			if (askPanel) askPanel.hidden = false;
+			for (var sb = 0; sb < searchSubmitButtons.length; sb++) searchSubmitButtons[sb].hidden = false;
 			updateAskControls();
 		}).catch(function () {
 			askAvailable = false;

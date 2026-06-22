@@ -16,6 +16,15 @@
 					<slot />
 					<button
 						type="button"
+						id="sayit-site-lang-toggle"
+						class="sayit-lang-switch sayit-site-lang-toggle"
+						aria-label="Switch interface language"
+					>
+						<span lang="zh">English</span>
+						<span lang="en">華文</span>
+					</button>
+					<button
+						type="button"
 						class="sayit-share-button"
 						data-sayit-share
 						aria-controls="sayit-share-feedback"
