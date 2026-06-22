@@ -728,7 +728,7 @@ const THEME_STYLES = `<style>
     margin-top: 0;
     align-items: stretch;
     text-align: left;
-    padding: 1rem 1.15rem;
+    /* padding: 1rem 1.15rem; */
     border: 1px solid rgba(199, 194, 186, 0.95);
     border-radius: 14px;
     background: linear-gradient(180deg, #ffffff 0%, #f7f2ec 100%);
