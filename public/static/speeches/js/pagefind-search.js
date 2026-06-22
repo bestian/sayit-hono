@@ -226,6 +226,141 @@
 		});
 	}
 
+	function isTableSeparatorLine(line) {
+		return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+	}
+
+	function parseTableRow(line) {
+		var trimmed = line.trim();
+		if (!trimmed) return null;
+		var inner = trimmed;
+		if (inner.charAt(0) === '|') inner = inner.slice(1);
+		if (inner.charAt(inner.length - 1) === '|') inner = inner.slice(0, -1);
+		return inner.split('|').map(function (cell) { return cell.trim(); });
+	}
+
+	function renderAskInlineMarkdown(text, hrefByIndex) {
+		var html = escapeHtml(text || '');
+		html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+		html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+		html = html.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_m, label, href) {
+			if (!isSafeHttpUrl(href)) return escapeHtml(label);
+			return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(label) + '</a>';
+		});
+		if (hrefByIndex) {
+			html = html.replace(/\[\^(\d+)\]/g, function (_m, num) {
+				var href = hrefByIndex[Number(num)];
+				if (!href) return escapeHtml('[' + num + ']');
+				return '<sup class="cite"><a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">[' + escapeHtml(num) + ']</a></sup>';
+			});
+		}
+		return html;
+	}
+
+	function renderAskTable(lines, start, hrefByIndex) {
+		var header = parseTableRow(lines[start]);
+		if (!header || header.length === 0) return null;
+		if (start + 1 >= lines.length || !isTableSeparatorLine(lines[start + 1])) return null;
+		var rows = [];
+		var idx = start + 2;
+		while (idx < lines.length) {
+			var rowLine = lines[idx];
+			if (!rowLine.trim() || rowLine.indexOf('|') === -1) break;
+			if (isTableSeparatorLine(rowLine)) break;
+			var row = parseTableRow(rowLine);
+			if (!row || row.length === 0) break;
+			rows.push(row);
+			idx += 1;
+		}
+		var colCount = header.length;
+		var html = '<div class="homepage-ask-answer__table-wrap"><table class="homepage-ask-answer__table"><thead><tr>';
+		for (var h = 0; h < header.length; h++) {
+			html += '<th scope="col">' + renderAskInlineMarkdown(header[h], hrefByIndex) + '</th>';
+		}
+		html += '</tr></thead><tbody>';
+		for (var r = 0; r < rows.length; r++) {
+			html += '<tr>';
+			for (var c = 0; c < colCount; c++) {
+				html += '<td>' + renderAskInlineMarkdown(rows[r][c] || '', hrefByIndex) + '</td>';
+			}
+			html += '</tr>';
+		}
+		html += '</tbody></table></div>';
+		return { html: html, next: idx };
+	}
+
+	function parseListItemLine(line) {
+		var ul = line.match(/^(\s*)[-*+]\s+(.+)$/);
+		if (ul) return { type: 'ul', indent: ul[1].length, text: ul[2] };
+		var ol = line.match(/^(\s*)\d+\.\s+(.+)$/);
+		if (ol) return { type: 'ol', indent: ol[1].length, text: ol[2] };
+		return null;
+	}
+
+	function renderAskList(lines, start, hrefByIndex) {
+		var first = parseListItemLine(lines[start]);
+		if (!first) return null;
+		var listType = first.type;
+		var items = [];
+		var idx = start;
+		while (idx < lines.length) {
+			var item = parseListItemLine(lines[idx]);
+			if (!item || item.type !== listType) break;
+			items.push(item.text);
+			idx += 1;
+		}
+		if (!items.length) return null;
+		var tag = listType === 'ol' ? 'ol' : 'ul';
+		var html = '<' + tag + ' class="homepage-ask-answer__list">';
+		for (var k = 0; k < items.length; k++) {
+			html += '<li>' + renderAskInlineMarkdown(items[k], hrefByIndex) + '</li>';
+		}
+		html += '</' + tag + '>';
+		return { html: html, next: idx };
+	}
+	function renderAskBodyBlocks(body, hrefByIndex) {
+		var lines = body.split('\n');
+		var blocks = [];
+		var i = 0;
+		while (i < lines.length) {
+			var line = lines[i];
+			if (!line.trim()) {
+				i += 1;
+				continue;
+			}
+			var heading = line.match(/^(#{1,6})\s+(.+)$/);
+			if (heading) {
+				var level = Math.min(6, heading[1].length);
+				blocks.push('<h' + level + '>' + renderAskInlineMarkdown(heading[2].trim(), hrefByIndex) + '</h' + level + '>');
+				i += 1;
+				continue;
+			}
+			var table = renderAskTable(lines, i, hrefByIndex);
+			if (table) {
+				blocks.push(table.html);
+				i = table.next;
+				continue;
+			}
+			var list = renderAskList(lines, i, hrefByIndex);
+			if (list) {
+				blocks.push(list.html);
+				i = list.next;
+				continue;
+			}
+			var paraLines = [];
+			while (i < lines.length && lines[i].trim()) {
+				if (/^(#{1,6})\s+/.test(lines[i])) break;
+				if (renderAskTable(lines, i, hrefByIndex)) break;
+				if (parseListItemLine(lines[i])) break;
+				paraLines.push(lines[i]);
+				i += 1;
+			}
+			if (paraLines.length) {
+				blocks.push('<p>' + renderAskInlineMarkdown(paraLines.join(' '), hrefByIndex) + '</p>');
+			}
+		}
+		return blocks.join('');
+	}
 	function parseAskAnswer(raw) {
 		var sources = [];
 		var seen = {};
@@ -243,19 +378,7 @@
 		var hrefByIndex = {};
 		for (var i = 0; i < sources.length; i++) hrefByIndex[sources[i].index] = sources[i].href;
 
-		var html = escapeHtml(body);
-		html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-		html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-		html = html.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_m, label, href) {
-			if (!isSafeHttpUrl(href)) return escapeHtml(label);
-			return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(label) + '</a>';
-		});
-		html = html.replace(/\[\^(\d+)\]/g, function (m, num) {
-			var href = hrefByIndex[Number(num)];
-			if (!href) return '';
-			return '<sup class="cite"><a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">[' + escapeHtml(num) + ']</a></sup>';
-		});
-
+		var html = renderAskBodyBlocks(body, hrefByIndex);
 		return { html: sanitizeHtml(html), sources: sources };
 	}
 
