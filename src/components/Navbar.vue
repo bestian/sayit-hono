@@ -68,6 +68,34 @@
 	align-items: center;
 }
 
+.navbar__right .sayit-search {
+	display: flex;
+	align-items: center;
+}
+
+.navbar__right .sayit-search__input,
+.navbar__right .sayit-search__submit,
+.navbar__right .sayit-lang-switch,
+.navbar__right .sayit-share-button {
+	box-sizing: border-box;
+	margin: 0;
+	min-height: 2.375rem;
+	height: 2.375rem;
+}
+
+.navbar__right .sayit-search__submit {
+	width: 2.375rem;
+	padding: 0;
+	flex-shrink: 0;
+}
+
+.navbar__right .sayit-search__input {
+	padding-top: 0;
+	padding-bottom: 0;
+	line-height: 1.35;
+}
+
+
 @media (max-width: 580px) {
 	.sayit-search {
 		width: 100%;
