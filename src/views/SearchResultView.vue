@@ -8,7 +8,7 @@
 						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
 					</div>
 					<button type="button" class="sayit-search__submit" aria-label="Search">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+						✨
 					</button>
 				</div>
 			</div>
@@ -25,7 +25,7 @@
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">
 							<input type="search" class="site-search__input" placeholder="Search" name="q" :value="query" />
-							<input type="submit" class="icon-search" value="Search" />
+							<button type="submit" class="icon-search" aria-label="Search">✨</button>
 						</div>
 					</form>
 					<div class="page-content__row ">

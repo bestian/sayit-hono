@@ -31,7 +31,7 @@ const colorStyle = (route: string, name?: string) => {
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">
 							<input type="search" class="site-search__input" placeholder="Search" name="q" />
-							<input type="submit" class="icon-search" value="Search" />
+							<button type="submit" class="icon-search" aria-label="Search">✨</button>
 						</div>
 					</form>
 					<ul class="speaker-list">
