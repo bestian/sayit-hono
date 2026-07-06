@@ -7,8 +7,8 @@
 				class="sayit-lang-switch sayit-site-lang-toggle"
 				aria-label="Switch interface language"
 			>
-				<span lang="zh">English</span>
-				<span lang="en">華文</span>
+				<span lang="zh">🇬🇧</span>
+				<span lang="en">🇹🇼</span>
 			</button>
 		</Navbar>
 		<div class="full-page">

@@ -46,6 +46,20 @@ describe('SSR layout', () => {
 		expect(html).not.toContain('white-space: pre-wrap');
 	});
 
+	it('renders homepage site language toggle with emoji flag labels', async () => {
+		const html = await renderHtml(HomeView, {
+			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer }
+		});
+
+		const toggleMatch = html.match(/<button[^>]*id="sayit-site-lang-toggle"[^>]*>[\s\S]*?<\/button>/);
+		expect(toggleMatch).not.toBeNull();
+		const toggleHtml = toggleMatch![0];
+		expect(toggleHtml).toContain('🇬🇧');
+		expect(toggleHtml).toContain('🇹🇼');
+	});
+
+
 	it('renders footer ask notice with local privacy and terms links', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),

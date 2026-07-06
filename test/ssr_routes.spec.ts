@@ -465,7 +465,7 @@ describe('SSR /:filename', () => {
 		const html = await res.text();
 		expect(html).toContain('hreflang');
 		expect(html).toContain('class="sayit-lang-switch"');
-		expect(html).toContain('English');
+		expect(html).toMatch(/<a[^>]*class="sayit-lang-switch"[^>]*>\s*English\s*<\/a>/);
 	});
 });
 
