@@ -464,8 +464,6 @@ describe('SSR /:filename', () => {
 		expect(res.status).toBe(200);
 		const html = await res.text();
 		expect(html).toContain('hreflang');
-		expect(html).toContain('class="sayit-lang-switch"');
-		expect(html).toContain('English');
 	});
 });
 

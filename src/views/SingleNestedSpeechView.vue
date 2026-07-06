@@ -145,14 +145,6 @@
 	<template>
 		<div class="page">
 			<Navbar>
-			<a
-				v-if="alternateUrl && alternateLabel"
-				:href="alternateUrl"
-				class="sayit-lang-switch"
-				:aria-label="alternateLabel === 'English' ? 'Switch to English' : '切換至華文'"
-			>
-				{{ alternateLabel }}
-			</a>
 								<div id="sayit-search" class="sayit-search" role="search">
 					<div class="sayit-search__row">
 						<div class="sayit-search__input-wrap">
