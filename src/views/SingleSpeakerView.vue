@@ -246,7 +246,7 @@ const formatLongestSectionSummary = (summary: string) => {
 						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
 					</div>
 					<button type="button" class="sayit-search__submit" aria-label="Search">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+						✨
 					</button>
 				</div>
 			</div>
@@ -322,7 +322,7 @@ const formatLongestSectionSummary = (summary: string) => {
 									<input type="hidden" name="p" :value="speaker.id">
 									<div class="search-wrapper">
 										<input type="search" class="site-search__input" placeholder="Search this person's speeches" name="q">
-										<input type="submit" class="icon-search icon-search" value="Search">
+										<button type="submit" class="icon-search" aria-label="Search">✨</button>
 									</div>
 								</form>
 							</div>
