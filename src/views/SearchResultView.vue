@@ -8,7 +8,7 @@
 						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
 					</div>
 					<button type="button" class="sayit-search__submit" aria-label="Search">
-						✨
+						<span aria-hidden="true">✨</span>
 					</button>
 				</div>
 			</div>
@@ -25,7 +25,7 @@
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">
 							<input type="search" class="site-search__input" placeholder="Search" name="q" :value="query" />
-							<button type="submit" class="icon-search" aria-label="Search">✨</button>
+							<button type="submit" class="site-search__submit" aria-label="Search"><span aria-hidden="true">✨</span></button>
 						</div>
 					</form>
 					<div class="page-content__row ">
