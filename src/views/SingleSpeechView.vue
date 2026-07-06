@@ -115,7 +115,7 @@ const loading = false
 						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
 					</div>
 					<button type="button" class="sayit-search__submit" aria-label="Search">
-						✨
+						<span aria-hidden="true">✨</span>
 					</button>
 				</div>
 			</div>
