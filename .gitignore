@@ -192,3 +192,4 @@ dist
 .wrangler/
 .claude/
 og-preview*.png
+.og-bake-tmp/
