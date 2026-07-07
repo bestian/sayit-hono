@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
 import { CACHE_KEY_VERSION, deleteEdgeCache, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
@@ -58,8 +58,8 @@ type WorkerEnv = ApiEnv['Bindings'];
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
-const EDGE_TTL_SECONDS = 60;
-const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}`;
+const EDGE_TTL_SECONDS = 300;
+const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}, stale-while-revalidate=86400`;
 const VOLATILE_HTML_CACHE_CONTROL = 'no-store, no-cache, must-revalidate';
 const SEARCH_API_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
 const SEARCH_HTML_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
@@ -196,9 +196,16 @@ function buildCacheKey(url: string, { includeSearch = true }: { includeSearch?: 
 	return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${includeSearch ? u.search : ''}`;
 }
 
-function withCacheHeaders(response: Response, cacheControl = DEFAULT_HTML_CACHE_CONTROL): Response {
+function withCacheHeaders(
+	response: Response,
+	cacheControl = DEFAULT_HTML_CACHE_CONTROL,
+	tags?: string[]
+): Response {
 	const res = new Response(response.body, response);
 	res.headers.set('Cache-Control', cacheControl);
+	if (tags && tags.length > 0) {
+		res.headers.set('Cache-Tag', tags.join(','));
+	}
 	return res;
 }
 
@@ -976,7 +983,7 @@ app.post('/api/cleanup_old_cache', async (c) => {
 });
 
 
-async function renderPrivacyPage(c: any) {
+async function renderPrivacyPage(c: Context<{ Bindings: WorkerEnv }>) {
 	const styles = [LegalPrivacyViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForPrivacy();
 	const html = await renderHtml(LegalPrivacyView, {
@@ -985,10 +992,10 @@ async function renderPrivacyPage(c: any) {
 		components: { Navbar, Footer },
 		props: {}
 	});
-	return withCacheHeaders(c.html(html));
+	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, ['list:privacy']);
 }
 
-async function renderTermsPage(c: any) {
+async function renderTermsPage(c: Context<{ Bindings: WorkerEnv }>) {
 	const styles = [LegalTermsViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForTerms();
 	const html = await renderHtml(LegalTermsView, {
@@ -997,10 +1004,10 @@ async function renderTermsPage(c: any) {
 		components: { Navbar, Footer },
 		props: {}
 	});
-	return withCacheHeaders(c.html(html));
+	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, ['list:terms']);
 }
 
-async function renderHomePage(c: any) {
+async function renderHomePage(c: Context<{ Bindings: WorkerEnv }>) {
 	const styles = [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForHome();
 	const html = await renderHtml(HomeView, {
@@ -1011,10 +1018,10 @@ async function renderHomePage(c: any) {
 		scripts: [PAGEFIND_SCRIPT, STATS_SCRIPT].join('\n')
 	});
 
-	return withCacheHeaders(c.html(html));
+	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, ['list:home']);
 }
 
-async function renderSpeechesPage(c: any) {
+async function renderSpeechesPage(c: Context<{ Bindings: WorkerEnv }>) {
 	let speeches: SpeechListItem[];
 	try {
 		speeches = await loadSpeeches(c);
@@ -1040,14 +1047,14 @@ async function renderSpeechesPage(c: any) {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response, VOLATILE_HTML_CACHE_CONTROL);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, ['list:speeches']);
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	}
 	return response;
 }
 
-async function renderSpeakersPage(c: any) {
+async function renderSpeakersPage(c: Context<{ Bindings: WorkerEnv }>) {
 	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) return r2Cached;
@@ -1070,7 +1077,7 @@ async function renderSpeakersPage(c: any) {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, ['list:speakers']);
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	}
@@ -1135,7 +1142,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
 	});
 
-	const response = withCacheHeaders(c.html(html));
+	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [`speech:${encodeURIComponent(section.filename)}`]);
 	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	return response;
 });
@@ -1252,7 +1259,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [`speaker:${encodeURIComponent(routePathname)}`]);
 
 	if (response.ok && response.status < 400) {
 		console.log('writing to R2 cache', cacheKey);
@@ -1401,7 +1408,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [`speech:${encodeURIComponent(filename)}`]);
 
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
@@ -1540,7 +1547,7 @@ app.get('/:filename', async (c) => {
 		});
 
 		let response = c.html(html);
-		response = withCacheHeaders(response);
+		response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [`speech:${encodeURIComponent(filename)}`]);
 
 		if (response.ok && response.status < 400) {
 			await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
@@ -1615,7 +1622,7 @@ app.get('/:filename', async (c) => {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [`speech:${encodeURIComponent(filename)}`]);
 
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());

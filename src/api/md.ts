@@ -247,6 +247,7 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 			const edgeCached = await readEdgeCache(cacheKey);
 			if (edgeCached) {
 				const headers = new Headers(edgeCached.headers);
+				headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 				Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
 				return new Response(await edgeCached.text(), { status: 200, headers });
 			}
@@ -254,6 +255,7 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 			const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/markdown; charset=utf-8');
 			if (cached) {
 				const headers = new Headers(cached.headers);
+				headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 				Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
 				const body = await cached.text();
 				const response = new Response(body, { status: 200, headers });
@@ -272,7 +274,12 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	const headers = new Headers(corsHeaders);
 	headers.set('Content-Type', 'text/markdown; charset=utf-8');
-	headers.set('Cache-Control', 'public, max-age=3600');
+	if (!isNumericAnKey(anKey)) {
+		headers.set('Cache-Control', 'public, max-age=3600');
+		headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
+	} else {
+		headers.set('Cache-Control', 'private, no-store');
+	}
 
 	if (!isNumericAnKey(anKey)) {
 		const cacheKey = `md/${baseKey}`;
