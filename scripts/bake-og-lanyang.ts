@@ -14,14 +14,12 @@ import { execFileSync, execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { CACHE_KEY_VERSION as BUILT_CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
+import { resolveCacheKeyVersion } from './lib/archive-cache-version';
 import {
 	lanyangFontsInstalled,
 	renderLanyangSpeechPng,
 	slugFromMarkdownPath,
 } from './og-lanyang-lib';
-
-/** Match live worker (see https://archive.tw/version) when local src/cacheKeyVersion.ts is behind deploy. */
-const CACHE_KEY_VERSION = process.env.CACHE_KEY_VERSION ?? BUILT_CACHE_KEY_VERSION;
 
 const PROD_BUCKET = process.env.OG_R2_BUCKET ?? 'sayit-speech-cache';
 const API_BASE = process.env.ARCHIVE_API_BASE ?? 'https://archive.tw';
@@ -143,6 +141,7 @@ function uploadR2(cacheKey: string, filePath: string, dryRun: boolean): void {
 async function bakeOne(
 	filename: string,
 	index: SpeechRow[],
+	cacheKeyVersion: string,
 	opts: { dryRun: boolean; outDir: string | null }
 ): Promise<boolean> {
 	const meta = index.find((r) => r.filename === filename);
@@ -153,7 +152,7 @@ async function bakeOne(
 
 	const speakers = await fetchSpeakers(filename);
 	const png = await renderLanyangSpeechPng(filename, meta.display_name, speakers);
-	const cacheKey = `${CACHE_KEY_VERSION}/og/${filename}.png`;
+	const cacheKey = `${cacheKeyVersion}/og/${filename}.png`;
 
 	const tmp = join(import.meta.dirname, '..', '.og-bake-tmp');
 	mkdirSync(tmp, { recursive: true });
@@ -185,13 +184,13 @@ async function main(): Promise<void> {
 	if (args.mode === 'help' || (args.mode === 'git' && (!args.before || !args.after))) {
 		console.log(`Usage:
   bun run scripts/bake-og-lanyang.ts --filename <speech-filename> [...]
+  bun run scripts/bake-og-lanyang.ts --git <before> <after> [--transcript-root DIR]
   bun run scripts/bake-og-lanyang.ts --all [--start-after <filename>]
   --dry-run  --out-dir DIR
 
 Speech OG only: R2 key \${CACHE_KEY_VERSION}/og/<filename>.png (not /og/speech/*.png).
-Set CACHE_KEY_VERSION to match production /version when local tree is not deployed.
-
-Cache version (this run): ${CACHE_KEY_VERSION}`);
+Default CACHE_KEY_VERSION: live GET https://archive.tw/version (override with env CACHE_KEY_VERSION).
+Committed src/cacheKeyVersion.ts is fallback only when /version is unreachable.`);
 		process.exit(args.mode === 'help' ? 0 : 1);
 	}
 
@@ -199,6 +198,9 @@ Cache version (this run): ${CACHE_KEY_VERSION}`);
 		console.error('jf Lanyang fonts not found under ~/Library/Fonts — run on licensed Mac/dgx only.');
 		process.exit(1);
 	}
+
+	const cacheKeyVersion = await resolveCacheKeyVersion(BUILT_CACHE_KEY_VERSION);
+	console.log(`CACHE_KEY_VERSION=${cacheKeyVersion}`);
 
 	const index = await fetchSpeechIndex();
 	let filenames: string[] = [];
@@ -235,7 +237,7 @@ Cache version (this run): ${CACHE_KEY_VERSION}`);
 	let ok = 0;
 	for (const fn of filenames) {
 		try {
-			if (await bakeOne(fn, index, { dryRun: args.dryRun, outDir: args.outDir })) ok++;
+			if (await bakeOne(fn, index, cacheKeyVersion, { dryRun: args.dryRun, outDir: args.outDir })) ok++;
 		} catch (err) {
 			console.error(`failed ${fn}:`, err);
 		}

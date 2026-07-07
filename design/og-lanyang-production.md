@@ -29,10 +29,21 @@ Job `bake-og-lanyang` in `upload-markdown-on-change.yml`:
 
 - `needs: rebuild-search-index` (D1 + deploy finished)
 - `runs-on: self-hosted` (Mac with jf fonts + `wrangler` auth)
+- Sets `CACHE_KEY_VERSION` from live `https://archive.tw/version` before bake (not committed `cacheKeyVersion.ts`)
 - Re-runs `git diff` on transcript checkout for `before`/`after` SHAs
 - Bakes only changed speeches
 
+`scripts/bake-og-lanyang.ts` defaults to live `/version` when `CACHE_KEY_VERSION` is unset.
+
 Register runner once on the Mac: [GitHub self-hosted runners](https://docs.github.com/en/actions/hosting-your-own-runners).
+
+## Local `git push` (transcript repo)
+
+One-time: `cd transcript && bun run setup-hooks` (chains `.githooks/pre-push-lanyang` + `post-push-lanyang`).
+
+On push of root `*.md`: pre-push records `@{u}`..`HEAD`; GitHub Actions sync/deploy/bake; post-push runs `bake_lanyang_after_push.ts` against `../sayit-hono` with retries until `speech_index` has the new slug.
+
+Skip local bake: `TRANSCRIPT_SKIP_LANYANG_OG=1 git push`. Push **sayit-hono** `main` (cache-version helper + bake script) before relying on CI bake.
 
 ## Manual
 
