@@ -2,6 +2,7 @@
 	"name": "sayit-hono",
 	"version": "0.0.0",
 	"private": true,
+	"packageManager": "bun@1.3.14",
 	"scripts": {
 		"deploy": "bun run deploy:search",
 		"deploy:assets": "bun run preflight:deploy && bun run build:cache-version && bun run build:views && bun run build:assets && npx wrangler deploy && bun run verify:deploy",
