@@ -10,8 +10,10 @@
  * Actual speech keys: same prefix, .png, NOT …/og/speech/…
  *
  * Env: CLOUDFLARE_ACCOUNT_ID (or R2_ACCOUNT_ID), CLOUDFLARE_API_TOKEN
- * Usage: CACHE_KEY_VERSION=v-11988f1 bun run scripts/audit-og-r2.ts
+ * Usage: bun run scripts/audit-og-r2.ts (uses live /version unless CACHE_KEY_VERSION set)
  */
+import { resolveCacheKeyVersion } from './lib/archive-cache-version';
+
 const BUCKET = process.env.OG_R2_BUCKET ?? 'sayit-speech-cache';
 const API_BASE = process.env.ARCHIVE_API_BASE ?? 'https://archive.tw';
 
@@ -25,11 +27,7 @@ type ListObjectsResponse = {
 };
 
 async function resolveCacheVersion(): Promise<string> {
-	if (process.env.CACHE_KEY_VERSION) return process.env.CACHE_KEY_VERSION;
-	const res = await fetch('https://archive.tw/version');
-	if (!res.ok) throw new Error(`/version ${res.status}`);
-	const body = (await res.json()) as { version: string };
-	return body.version;
+	return resolveCacheKeyVersion('v-unknown');
 }
 
 async function fetchSpeechIndex(): Promise<SpeechRow[]> {
