@@ -178,7 +178,7 @@ describe('Read route cache behavior', () => {
 		expect(res.status).toBe(200);
 		const html = await res.text();
 		expect(html).not.toContain('SPEECHES-SEEDED');
-		expect(res.headers.get('Cache-Control')).toBe('no-store, no-cache, must-revalidate');
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
 			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
 		);

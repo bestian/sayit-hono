@@ -29,7 +29,16 @@ function parseContent(raw?: string | null): string {
 	}
 }
 
-async function loadSection(c: Context<ApiEnv>, sectionId: number) {
+interface OgSectionResult {
+	filename: string;
+	section_speaker: string | null;
+	section_content: string | null;
+	display_name: string | null;
+	photoURL: string | null;
+	name: string | null;
+}
+
+async function loadSection(c: Context<ApiEnv>, sectionId: number): Promise<OgSectionResult | null> {
 	return c.env.DB.prepare(
 		`SELECT
 			a.filename,
@@ -42,7 +51,7 @@ async function loadSection(c: Context<ApiEnv>, sectionId: number) {
 		LEFT JOIN speech_index si ON a.filename = si.filename
 		LEFT JOIN speakers sp ON a.section_speaker = sp.route_pathname
 		WHERE a.section_id = ?`
-	).bind(sectionId).first() as Promise<any>;
+	).bind(sectionId).first() as Promise<OgSectionResult | null>;
 }
 
 async function loadSpeechMeta(c: Context<ApiEnv>, filename: string) {
@@ -76,12 +85,26 @@ export async function handleOgSpeechImage(c: Context<ApiEnv>, loader: OgLoader) 
 	const cacheKey = `${CACHE_KEY_VERSION}/og/speech/${sectionId}.png`;
 	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
 	if (cached) {
-		return new Response(cached.body, {
-			headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
-		});
+		let filename: string | null = null;
+		try {
+			const row = await c.env.DB.prepare('SELECT filename FROM sections WHERE section_id = ?')
+				.bind(sectionId)
+				.first<{ filename: string }>();
+			if (row) filename = row.filename;
+		} catch (err) {
+			console.error('[og/speech cache hit] DB query error', err);
+		}
+		const headers: Record<string, string> = {
+			'Content-Type': 'image/png',
+			'Cache-Control': 'public, max-age=86400, s-maxage=86400'
+		};
+		if (filename) {
+			headers['Cache-Tag'] = `speech:${encodeURIComponent(filename)}`;
+		}
+		return new Response(cached.body, { headers });
 	}
 
-	let section: any;
+	let section: OgSectionResult | null;
 	try {
 		section = await loadSection(c, sectionId);
 	} catch (err) {
@@ -102,7 +125,11 @@ export async function handleOgSpeechImage(c: Context<ApiEnv>, loader: OgLoader) 
 			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
 		});
 		return new Response(png, {
-			headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
+			headers: {
+				'Content-Type': 'image/png',
+				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+				'Cache-Tag': `speech:${encodeURIComponent(section.filename)}`
+			},
 		});
 	} catch (err) {
 		console.error('[og/speech] generation error', err);
@@ -121,7 +148,11 @@ export async function handleOgImage(c: Context<ApiEnv>, loader: OgLoader) {
 	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
 	if (cached) {
 		return new Response(cached.body, {
-			headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
+			headers: {
+				'Content-Type': 'image/png',
+				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+				'Cache-Tag': `speech:${encodeURIComponent(filename)}`
+			},
 		});
 	}
 
@@ -139,7 +170,7 @@ export async function handleOgImage(c: Context<ApiEnv>, loader: OgLoader) {
 			 ORDER BY first_appearance
 			 LIMIT 5`
 		).bind(filename).all();
-		speakers = result.results.map((r: any) => r.name).filter(Boolean);
+		speakers = (result.results as Array<{ name: string | null }>).map((r) => r.name).filter(Boolean) as string[];
 	} catch (err) {
 		console.error('[og] speakers query error', err);
 	}
@@ -154,6 +185,7 @@ export async function handleOgImage(c: Context<ApiEnv>, loader: OgLoader) {
 			headers: {
 				'Content-Type': 'image/png',
 				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+				'Cache-Tag': `speech:${encodeURIComponent(filename)}`
 			},
 		});
 	} catch (err) {

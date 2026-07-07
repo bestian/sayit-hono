@@ -3,7 +3,7 @@ import { getCorsHeaders } from './cors';
 import { isAuthorizedFromHeader } from './auth';
 import type { ApiEnv } from './types';
 import { marked } from 'marked';
-import { CACHE_KEY_VERSION, deleteEdgeCache, deleteR2Cache } from './cache';
+import { CACHE_KEY_VERSION, deleteEdgeCache, deleteR2Cache, purgeWorkersCache } from './cache';
 import {
 	markSpeechDeletedInSearch,
 	syncSearchStats,
@@ -536,7 +536,8 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 		`an/${filename}`,
 		`md/${filename}`,
 		`${CACHE_KEY_VERSION}/${host}/${filename}`,
-		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`
+		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`,
+		`${CACHE_KEY_VERSION}/og/${filename}.png`,
 	];
 	const realPaths = new Set<string>([`/${filename}`, `/${encodedFilename}`]);
 
@@ -545,7 +546,7 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 		const result = await c.env.DB.prepare(
 			'SELECT section_id FROM speech_content WHERE filename = ?'
 		).bind(filename).all();
-		for (const row of result.results as any[]) {
+		for (const row of result.results as Array<{ section_id: number }>) {
 			keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${row.section_id}`);
 			realPaths.add(`/speech/${row.section_id}`);
 		}
@@ -555,7 +556,15 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 
 	await Promise.allSettled([
 		...keys.flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
-		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url))
+		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url)),
+		purgeWorkersCache(c.executionCtx, {
+			tags: [
+				`speech:${encodeURIComponent(filename)}`,
+				'list:home',
+				'list:speeches',
+				'list:rss'
+			]
+		})
 	]);
 }
 
@@ -572,9 +581,13 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 		realPaths.add(`/speaker/${encodeURIComponent(routePathname)}`);
 	}
 
+	const tags = speakerRoutePathnames.map((p) => `speaker:${encodeURIComponent(p)}`);
+	tags.push('list:speakers');
+
 	await Promise.allSettled([
 		...Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
-		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url))
+		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url)),
+		purgeWorkersCache(c.executionCtx, { tags })
 	]);
 }
 
@@ -610,9 +623,15 @@ async function invalidateListPageCaches(
 		realPaths.add('/speakers/');
 	}
 
+	const tags: string[] = [];
+	if (home) tags.push('list:home');
+	if (speeches) tags.push('list:speeches', 'list:rss');
+	if (speakers) tags.push('list:speakers');
+
 	await Promise.allSettled([
 		...Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
-		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url))
+		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url)),
+		...(tags.length > 0 ? [purgeWorkersCache(c.executionCtx, { tags })] : [])
 	]);
 }
 

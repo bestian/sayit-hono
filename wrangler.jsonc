@@ -6,7 +6,7 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "sayit-hono",
 	"main": "src/index.ts",
-	"compatibility_date": "2025-12-02",
+	"compatibility_date": "2026-07-07",
 	"observability": {
 		"enabled": true
 	},
@@ -21,6 +21,9 @@
 	 * databases, object storage, AI inference, real-time communication and more.
 	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
 	 */
+	"cache": {
+		"enabled": true
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",

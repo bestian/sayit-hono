@@ -183,7 +183,7 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		// 單一 section：從 DB 查 section 資料，即時生成 .an（不依賴 R2）
 		const sectionId = parseInt(baseKey, 10);
 		const sectionRow = await c.env.DB.prepare(
-			'SELECT section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?'
+			'SELECT filename, section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?'
 		)
 			.bind(sectionId)
 			.first();
@@ -193,6 +193,7 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		}
 
 		const section = sectionRow as {
+			filename: string;
 			section_speaker: string | null;
 			section_content: string | null;
 			display_name: string | null;
@@ -203,6 +204,7 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		const headers = new Headers(corsHeaders);
 		headers.set('Content-Type', 'text/plain; charset=utf-8');
 		headers.set('Cache-Control', 'public, max-age=3600');
+		headers.set('Cache-Tag', `speech:${encodeURIComponent(section.filename)}`);
 
 		if (c.req.method === 'HEAD') {
 			headers.set('Content-Length', new TextEncoder().encode(singleAn).length.toString());
@@ -223,6 +225,7 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		if (edgeCached) {
 			console.log('[an cache] hit edge', cacheKey);
 			const headers = new Headers(edgeCached.headers);
+			headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
 			if (c.req.method === 'HEAD') {
 				return new Response(null, { status: 200, headers });
@@ -233,6 +236,7 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		if (cached) {
 			console.log('[an cache] hit r2', cacheKey);
 			const headers = new Headers(cached.headers);
+			headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
 			if (c.req.method === 'HEAD') {
 				return new Response(null, { status: 200, headers });
@@ -289,6 +293,7 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 	const headers = new Headers(corsHeaders);
 	headers.set('Content-Type', 'text/plain; charset=utf-8');
 	headers.set('Cache-Control', 'public, max-age=3600');
+	headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 
 	if (c.req.method === 'HEAD') {
 		headers.set('Content-Length', new TextEncoder().encode(generatedAn).length.toString());
@@ -309,12 +314,13 @@ export async function getAnContentAsString(c: Context<ApiEnv>, objectKey: string
 	if (isNumericAnKey(objectKey)) {
 		const sectionId = parseInt(baseKey, 10);
 		const sectionRow = await c.env.DB.prepare(
-			'SELECT section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?'
+			'SELECT filename, section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?'
 		)
 			.bind(sectionId)
 			.first();
 		if (!sectionRow) return null;
 		const section = sectionRow as {
+			filename: string;
 			section_speaker: string | null;
 			section_content: string | null;
 			display_name: string | null;

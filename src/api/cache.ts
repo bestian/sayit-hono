@@ -125,3 +125,32 @@ export async function deleteR2Cache(bucket: R2Bucket, cacheKey: string) {
 		console.error('[r2 cache] delete error', cacheKey, err);
 	}
 }
+
+interface WorkersCache {
+	purge(options: { tags?: string[]; paths?: string[]; purgeEverything?: boolean }): Promise<void>;
+}
+
+/** 透過 Workers Cache Purge API 刪除 Edge Cache (若支援) */
+export async function purgeWorkersCache(
+	ctx: unknown,
+	options: { tags?: string[]; paths?: string[]; purgeEverything?: boolean }
+): Promise<void> {
+	try {
+		if (
+			ctx &&
+			typeof ctx === 'object' &&
+			'cache' in ctx &&
+			ctx.cache &&
+			typeof ctx.cache === 'object' &&
+			'purge' in ctx.cache &&
+			typeof ctx.cache.purge === 'function'
+		) {
+			console.log('[workers cache] purging', options);
+			await (ctx.cache as WorkersCache).purge(options);
+		} else {
+			console.log('[workers cache] purge skipped: API not available in current environment');
+		}
+	} catch (err) {
+		console.error('[workers cache] purge error', err);
+	}
+}

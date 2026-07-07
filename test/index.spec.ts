@@ -241,7 +241,7 @@ describe('Worker routes', () => {
 		const { res } = await request('/privacy');
 
 		expect(res.status).toBe(200);
-		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=60');
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		const html = await res.text();
 		expect(html).toContain('<title> Privacy Policy :: SayIt </title>');
 		expect(html).toContain('content="Privacy policy for AI questions on SayIt."');
@@ -254,7 +254,7 @@ describe('Worker routes', () => {
 		const { res } = await request('/terms');
 
 		expect(res.status).toBe(200);
-		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=60');
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		const html = await res.text();
 		expect(html).toContain('<title> Terms of Use :: SayIt </title>');
 		expect(html).toContain('content="Terms of use for AI questions on SayIt."');
@@ -279,7 +279,7 @@ describe('Worker routes', () => {
 		const env = createEnv();
 		const { res } = await request('/speeches/', env);
 		expect(res.status).toBe(200);
-		expect(res.headers.get('Cache-Control')).toBe('no-store, no-cache, must-revalidate');
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		expect(await res.text()).toContain('Demo Speech');
 		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
 			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)

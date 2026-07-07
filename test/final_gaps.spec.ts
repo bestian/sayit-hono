@@ -85,7 +85,7 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 		const { res } = await request('/speeches/', env);
 		expect(res.status).toBe(200);
 		expect(await res.text()).toContain('A Demo');
-		expect(res.headers.get('Cache-Control')).toBe('no-store, no-cache, must-revalidate');
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
 			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
 		);
@@ -112,7 +112,7 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 		// 把同一把 key 改成 sentinel，第二次呼叫應該命中 R2 直接回傳
 		env.__r2Store.set(cacheKey!, {
 			body: '<!doctype html><title>cached</title><body>SPEECHES-FROM-R2</body>',
-			cacheControl: 'no-store, no-cache, must-revalidate',
+			cacheControl: 'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400',
 			contentType: 'text/html; charset=utf-8',
 			etag: null
 		});
@@ -139,7 +139,7 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 		expect(oldKey).toBeDefined();
 		env.__r2Store.set(oldKey!, {
 			body: '<!doctype html><title>OLD</title><body>OLD-CACHED</body>',
-			cacheControl: 'no-store, no-cache, must-revalidate',
+			cacheControl: 'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400',
 			contentType: 'text/html; charset=utf-8',
 			etag: null
 		});

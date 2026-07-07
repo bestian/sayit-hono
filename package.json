@@ -13,6 +13,7 @@
 		"start": "bun run dev",
 		"build:views": "tsx --tsconfig scripts/tsconfig.json scripts/build-views.ts",
 		"build:assets": "tsx --tsconfig scripts/tsconfig.json scripts/build-assets.ts",
+		"audit-og-r2": "bun run scripts/audit-og-r2.ts",
 		"build:search": "tsx --tsconfig scripts/tsconfig.json scripts/build-search-index.ts",
 		"preview:assets": "bun run build:assets && python3 -m http.server 4173 -d www",
 		"test": "vitest run",
@@ -31,7 +32,7 @@
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
 		"vitest": "^4",
-		"wrangler": "4.86.0"
+		"wrangler": "^4.107.0"
 	},
 	"dependencies": {
 		"@resvg/resvg-wasm": "^2.6.2",

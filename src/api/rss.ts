@@ -184,14 +184,20 @@ function buildCacheKey(url: string): string {
 export async function rssFeed(c: Context<ApiEnv>) {
 	const cacheKey = buildCacheKey(c.req.url);
 	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) return edgeCached;
+	if (edgeCached) {
+		const headers = new Headers(edgeCached.headers);
+		headers.set('Cache-Tag', 'list:rss');
+		return new Response(edgeCached.body, { status: 200, headers });
+	}
 
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, FEED_CONTENT_TYPE);
 	if (r2Cached) {
-		await writeEdgeCache(cacheKey, r2Cached.clone(), FEED_CACHE_CONTROL);
-		return r2Cached;
+		const headers = new Headers(r2Cached.headers);
+		headers.set('Cache-Tag', 'list:rss');
+		const res = new Response(r2Cached.body, { status: 200, headers });
+		await writeEdgeCache(cacheKey, res.clone(), FEED_CACHE_CONTROL);
+		return res;
 	}
-
 	try {
 		const result = await c.env.DB.prepare(
 			`SELECT
@@ -255,7 +261,8 @@ export async function rssFeed(c: Context<ApiEnv>) {
 			status: 200,
 			headers: {
 				'Content-Type': FEED_CONTENT_TYPE,
-				'Cache-Control': FEED_CACHE_CONTROL
+				'Cache-Control': FEED_CACHE_CONTROL,
+				'Cache-Tag': 'list:rss'
 			}
 		});
 
