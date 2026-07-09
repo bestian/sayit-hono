@@ -128,7 +128,7 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 
 		expect(res.status).toBe(200);
 		const json = (await res.json()) as { success: boolean; filename: string; sectionsCount: number };
-		expect(json).toEqual({ success: true, filename: 'new-speech', sectionsCount: 2 });
+		expect(json).toEqual({ success: true, cachePurge: true, filename: 'new-speech', sectionsCount: 2 });
 
 		const indexInsert = env.__operations.find((s) => s.sql.startsWith('INSERT INTO speech_index'));
 		expect(indexInsert).toBeDefined();
