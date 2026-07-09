@@ -151,15 +151,25 @@ describe('uploadMarkdown PATCH — orphan speech_speakers cleanup', () => {
 		const res = await uploadMarkdown(ctx);
 		expect(res.status).toBe(200);
 
-		const cleanupSqls = batchStatements.map((s) => s.sql).filter((sql) =>
-			sql.includes('DELETE FROM speech_speakers WHERE speech_filename = ? AND speaker_route_pathname = ?')
+		// Single-batch rebuild: wipe all speech_speakers for the speech, re-insert only used speakers.
+		const wipeRelations = batchStatements.filter((s) =>
+			s.sql === 'DELETE FROM speech_speakers WHERE speech_filename = ?'
+			&& s.args[0] === 'orphan-demo'
 		);
-		expect(cleanupSqls.length).toBeGreaterThan(0);
-		// Check that ZOMBIE is the one deleted
-		const zombieCleanups = batchStatements.filter((s) =>
-			s.sql.includes('DELETE FROM speech_speakers WHERE speech_filename = ? AND speaker_route_pathname = ?')
-			&& s.args[1] === 'ZOMBIE'
+		expect(wipeRelations.length).toBeGreaterThan(0);
+
+		const relationInserts = batchStatements.filter((s) =>
+			s.sql.includes('INSERT OR IGNORE INTO speech_speakers')
 		);
-		expect(zombieCleanups.length).toBe(1);
+		const insertedSpeakers = relationInserts.map((s) => s.args[1]);
+		expect(insertedSpeakers).toContain('A');
+		expect(insertedSpeakers).not.toContain('ZOMBIE');
+
+		// Orphan speaker row cleanup for removed route.
+		const zombieSpeakerDeletes = batchStatements.filter((s) =>
+			s.sql.includes('DELETE FROM speakers WHERE route_pathname = ?')
+			&& s.args[0] === 'ZOMBIE'
+		);
+		expect(zombieSpeakerDeletes.length).toBeGreaterThan(0);
 	});
 });

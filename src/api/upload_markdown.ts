@@ -540,7 +540,7 @@ async function invalidateSpeechCaches(
 	c: Context<ApiEnv>,
 	filename: string,
 	extraSectionIds: Iterable<number> = []
-) {
+): Promise<boolean> {
 	const host = new URL(c.req.url).host;
 	const encodedFilename = encodeURIComponent(filename);
 	const r2Keys = [
@@ -577,15 +577,17 @@ async function invalidateSpeechCaches(
 
 	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
 	// Split tags vs pathPrefixes so a bad prefix cannot block tag purge.
-	await Promise.allSettled([
-		...r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)),
+	// R2 deletes are best-effort; Workers Cache purge success is returned (SWR can keep stale for ~1d).
+	await Promise.allSettled(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const [tagsOk, pathsOk] = await Promise.all([
 		purgeWorkersCache({ tags: purgeTags }),
 		purgeWorkersCache({ pathPrefixes }),
 	]);
+	return tagsOk && pathsOk;
 }
 
 /** 講者或演講-講者關聯更新後，刪除 R2 origin 並 purge Workers Cache */
-async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]) {
+async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]): Promise<boolean> {
 	const host = new URL(c.req.url).host;
 	const r2Keys = new Set<string>([`${CACHE_KEY_VERSION}/${host}/speakers`]);
 	const pathPrefixes: string[] = [];
@@ -600,18 +602,17 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 	const purgeTags = speakerRoutePathnames.map((p) => tags.speaker(p));
 	purgeTags.push(tags.listSpeakers);
 
-	await Promise.allSettled([
-		...Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)),
-		purgeWorkersCache({ tags: purgeTags }),
-		...(pathPrefixes.length > 0 ? [purgeWorkersCache({ pathPrefixes })] : []),
-	]);
+	await Promise.allSettled(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const tagsOk = await purgeWorkersCache({ tags: purgeTags });
+	const pathsOk = pathPrefixes.length > 0 ? await purgeWorkersCache({ pathPrefixes }) : true;
+	return tagsOk && pathsOk;
 }
 
 /** 失效列表頁快取：tags only for exact list roots; R2 origin keys still deleted */
 async function invalidateListPageCaches(
 	c: Context<ApiEnv>,
 	{ home, speeches, speakers }: { home: boolean; speeches: boolean; speakers: boolean }
-) {
+): Promise<boolean> {
 	const host = new URL(c.req.url).host;
 	const r2Keys = new Set<string>();
 
@@ -635,10 +636,9 @@ async function invalidateListPageCaches(
 	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss);
 	if (speakers) purgeTags.push(tags.listSpeakers);
 
-	await Promise.allSettled([
-		...Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)),
-		...(purgeTags.length > 0 ? [purgeWorkersCache({ tags: purgeTags })] : []),
-	]);
+	await Promise.allSettled(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	// Callers always request at least one list surface; empty tags is a no-op success.
+	return purgeTags.length === 0 ? true : purgeWorkersCache({ tags: purgeTags });
 }
 
 async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: string) {
@@ -769,14 +769,22 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					);
 				}
 
-				await invalidateSpeechCaches(c, filename, preexistingSectionIds);
-				await invalidateSpeakerCaches(c, speakerRoutePathnames);
-				await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
+				const cachePurge = (
+					await Promise.all([
+						invalidateSpeechCaches(c, filename, preexistingSectionIds),
+						invalidateSpeakerCaches(c, speakerRoutePathnames),
+						invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+					])
+				).every(Boolean);
+				if (!cachePurge) {
+					console.error('[upload_markdown] DELETE cache purge incomplete after D1 commit', { filename });
+				}
 				await syncSearchArtifactsAfterDelete(c, filename);
 
 				return c.json(
 					{
 						success: true,
+						cachePurge,
 						message: `Successfully deleted ${filename}`,
 						deleted: {
 							sections: sectionsDeleted,
@@ -785,7 +793,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							speech: speechDeleted
 						}
 					},
-					200,
+					cachePurge ? 200 : 503,
 					corsHeadersWithMethods
 				);
 		} else if (method === 'POST') {
@@ -852,8 +860,17 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				}
 			}
 
+			let priorSpeakerRoutePathnames: string[] = [];
 			if (existing) {
 				console.log('[upload_markdown] POST speech_index 已存在，先刪除舊資料:', filename);
+				const priorSpeakerRows = await withRetry(() => c.env.DB.prepare(
+					'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
+				)
+					.bind(filename)
+					.all<{ speaker_route_pathname: string }>());
+				priorSpeakerRoutePathnames = Array.from(
+					new Set((priorSpeakerRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
+				);
 				await withRetry(() => c.env.DB.batch([
 					c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ?').bind(filename),
 					c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
@@ -892,7 +909,16 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				).bind(filename, display_name, '', '')
 			);
 
-			for (const routePathname of speakerRoutePathnames) {
+			// Relations and speaker rows come only from speakers assigned to final sections.
+			// Marker-only names without a section must not appear on /speakers.
+			const usedSpeakerRoutePathnames = Array.from(
+				new Set(
+					normalized
+						.map((section) => section.section_speaker)
+						.filter((value): value is string => Boolean(value && value.trim()))
+				)
+			);
+			for (const routePathname of usedSpeakerRoutePathnames) {
 				const speakerName = decodeURIComponent(routePathname);
 				metaBatch.push(
 					c.env.DB.prepare(
@@ -903,6 +929,17 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					c.env.DB.prepare(
 						'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
 					).bind(filename, routePathname)
+				);
+			}
+			// Drop orphan speaker rows after replace/reassign (prior + marker-only, not used on sections).
+			const orphanCandidates = Array.from(
+				new Set([...priorSpeakerRoutePathnames, ...speakerRoutePathnames])
+			).filter((routePathname) => !usedSpeakerRoutePathnames.includes(routePathname));
+			for (const routePathname of orphanCandidates) {
+				metaBatch.push(
+					c.env.DB.prepare(
+						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
+					).bind(routePathname, routePathname)
 				);
 			}
 
@@ -954,17 +991,28 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				await withRetry(() => c.env.DB.batch(sectionBatch));
 			}
 
-			await invalidateSpeechCaches(c, filename);
-			if (altFilename && altFilename !== filename) {
-				await invalidateSpeechCaches(c, altFilename);
+			const cachePurge = (
+				await Promise.all([
+					invalidateSpeechCaches(c, filename),
+					...(altFilename && altFilename !== filename ? [invalidateSpeechCaches(c, altFilename)] : []),
+					invalidateSpeakerCaches(c, Array.from(new Set([...speakerRoutePathnames, ...usedSpeakerRoutePathnames]))),
+					invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+				])
+			).every(Boolean);
+			if (!cachePurge) {
+				console.error('[upload_markdown] POST cache purge incomplete after D1 commit', { filename });
 			}
-			await invalidateSpeakerCaches(c, speakerRoutePathnames);
-			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 			await syncSearchArtifactsAfterUpsert(c, filename);
 
 			return c.json(
-				{ success: true, filename, sectionsCount: normalized.length, ...(altFilename ? { alternate_filename: altFilename } : {}) },
-				200,
+				{
+					success: true,
+					cachePurge,
+					filename,
+					sectionsCount: normalized.length,
+					...(altFilename ? { alternate_filename: altFilename } : {})
+				},
+				cachePurge ? 200 : 503,
 				corsHeadersWithMethods
 			);
 		} else if (method === 'PATCH') {
@@ -1101,7 +1149,6 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			// 既有段落 ID（DB 原本有的）；finalSectionIds = PATCH 後要保留的 ID（供刪除用）
 			const oldSectionIds = new Set(oldSections.map((section) => section.section_id));
 			const finalSectionIds = new Set(normalized.map((section) => section.section_id));
-			const impactedSpeakers = Array.from(new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames]));
 
 			// 收集所有 D1 寫入為 batch 一次執行（含 display_name、講者、段落、關聯、孤兒清理）
 			const batchStatements: Parameters<typeof c.env.DB.batch>[0] = [];
@@ -1125,15 +1172,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				);
 			}
 
-			// 2. 確保講者存在（冪等 upsert）
-			for (const routePathname of newSpeakerRoutePathnames) {
-				const speakerName = decodeURIComponent(routePathname);
-				batchStatements.push(
-					c.env.DB.prepare(
-						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
-					).bind(routePathname, speakerName)
-				);
-			}
+			// 2. Speakers upsert happens in step 5 from final section speakers only
+			//    (marker-only names without a section must not appear on /speakers).
 
 			// 3. UPDATE 既有 / INSERT 新增段落
 			for (const section of normalized) {
@@ -1185,11 +1225,27 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				}
 			}
 
-			// 5. 重建演講-講者關聯
+			// 5. 重建演講-講者關聯：只用「段落上實際出現的講者」，單一 batch 完成（無第二階段對帳）
+			const usedSpeakerRoutePathnames = Array.from(
+				new Set(
+					normalized
+						.map((section) => section.section_speaker)
+						.filter((value): value is string => Boolean(value && value.trim()))
+				)
+			);
+			// Upsert speakers that appear on final sections only
+			for (const routePathname of usedSpeakerRoutePathnames) {
+				const speakerName = decodeURIComponent(routePathname);
+				batchStatements.push(
+					c.env.DB.prepare(
+						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
+					).bind(routePathname, speakerName)
+				);
+			}
 			batchStatements.push(
 				c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename)
 			);
-			for (const routePathname of newSpeakerRoutePathnames) {
+			for (const routePathname of usedSpeakerRoutePathnames) {
 				batchStatements.push(
 					c.env.DB.prepare(
 						'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
@@ -1197,8 +1253,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				);
 			}
 
-			// 6. 清理孤兒講者
-			for (const routePathname of impactedSpeakers) {
+			// 6. 清理孤兒講者（同一 batch：INSERT 後 NOT EXISTS 在 SQLite batch 內按序可見）
+			const finalImpactedSpeakers = Array.from(
+				new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames, ...usedSpeakerRoutePathnames])
+			);
+			for (const routePathname of finalImpactedSpeakers) {
 				batchStatements.push(
 					c.env.DB.prepare(
 						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
@@ -1208,64 +1267,24 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			await withRetry(() => c.env.DB.batch(batchStatements));
 
-			// PATCH 完成後再對帳一次：僅保留「有實際段落」的演講-講者關聯
-			const relationRows = await withRetry(() => c.env.DB.prepare(
-				'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
-			)
-				.bind(filename)
-				.all<{ speaker_route_pathname: string }>());
-			const relationRoutePathnames = Array.from(
-				new Set((relationRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
-			);
-
-			const usedSpeakerRows = await withRetry(() => c.env.DB.prepare(
-				`SELECT DISTINCT section_speaker
-				 FROM speech_content
-				 WHERE filename = ?
-				   AND section_speaker IS NOT NULL
-				   AND section_speaker != ''`
-			)
-				.bind(filename)
-				.all<{ section_speaker: string }>());
-			const usedSpeakerRoutePathnames = new Set(
-				(usedSpeakerRows.results ?? []).map((row) => row.section_speaker).filter(Boolean)
-			);
-			const relationsToDelete = relationRoutePathnames.filter(
-				(routePathname) => !usedSpeakerRoutePathnames.has(routePathname)
-			);
-
-			// 一次 batch 刪除多餘關聯 + 孤兒講者
-			const finalImpactedSpeakers = Array.from(new Set([...impactedSpeakers, ...relationsToDelete]));
-			if (relationsToDelete.length > 0 || finalImpactedSpeakers.length > 0) {
-				const cleanupBatch: Parameters<typeof c.env.DB.batch>[0] = [];
-				for (const routePathname of relationsToDelete) {
-					cleanupBatch.push(
-						c.env.DB.prepare(
-							'DELETE FROM speech_speakers WHERE speech_filename = ? AND speaker_route_pathname = ?'
-						).bind(filename, routePathname)
-					);
-				}
-				for (const routePathname of finalImpactedSpeakers) {
-					cleanupBatch.push(
-						c.env.DB.prepare(
-							'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
-						).bind(routePathname, routePathname)
-					);
-				}
-				await withRetry(() => c.env.DB.batch(cleanupBatch));
-			}
-
 			// 失效快取：含 PATCH 前的 section IDs（已刪除的 /speech/:id 仍需 purge）
 			const preexistingSectionIds = oldSections.map((section) => section.section_id);
-			await invalidateSpeechCaches(c, filename, preexistingSectionIds);
-			const affectedAlternateFilenames = Array.from(
-				new Set([currentAlternateFilename, desiredAlternateFilename].filter((value): value is string => Boolean(value && value !== filename)))
-			);
-			for (const alternateFilename of affectedAlternateFilenames) {
-				await invalidateSpeechCaches(c, alternateFilename);
+			const purgeResults = await Promise.all([
+				invalidateSpeechCaches(c, filename, preexistingSectionIds),
+				...Array.from(
+					new Set(
+						[currentAlternateFilename, desiredAlternateFilename].filter(
+							(value): value is string => Boolean(value && value !== filename)
+						)
+					)
+				).map((alternateFilename) => invalidateSpeechCaches(c, alternateFilename)),
+				invalidateSpeakerCaches(c, finalImpactedSpeakers),
+				invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+			]);
+			const cachePurge = purgeResults.every(Boolean);
+			if (!cachePurge) {
+				console.error('[upload_markdown] PATCH cache purge incomplete after D1 commit', { filename });
 			}
-			await invalidateSpeakerCaches(c, finalImpactedSpeakers);
-			await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 			await syncSearchArtifactsAfterUpsert(c, filename);
 
 			return c.json(
@@ -1276,9 +1295,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					sectionsCount: normalized.length,
 					insertedCount: normalized.filter((section) => !oldSectionIds.has(section.section_id)).length,
 					updatedCount: normalized.filter((section) => oldSectionIds.has(section.section_id)).length,
-					deletedCount: oldSections.filter((section) => !finalSectionIds.has(section.section_id)).length
+					deletedCount: oldSections.filter((section) => !finalSectionIds.has(section.section_id)).length,
+					cachePurge
 				},
-				200,
+				// 503 when D1 wrote but long-SWR front cache may still serve stale HTML
+				cachePurge ? 200 : 503,
 				corsHeadersWithMethods
 			);
 		} else {

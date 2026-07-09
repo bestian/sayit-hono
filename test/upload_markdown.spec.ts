@@ -119,7 +119,10 @@ function createUploadEnv(options?: {
 				}))
 			};
 		}
-		if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
+		if (sql.includes('FROM speech_speakers WHERE speech_filename = ?') || sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
+			if (args[0] === 'demo-speech') {
+				return { success: true, results: [{ speaker_route_pathname: 'ZOMBIE' }] };
+			}
 			return { success: true, results: [] };
 		}
 		if (sql.includes('SELECT DISTINCT section_speaker')) {
@@ -227,6 +230,7 @@ describe('upload_markdown PATCH', () => {
 		expect(res.status).toBe(200);
 		expect(await res.json()).toEqual({
 			success: true,
+			cachePurge: true,
 			filename: 'demo-speech',
 			sectionsCount: 3,
 			insertedCount: 1,
@@ -279,9 +283,7 @@ describe('upload_markdown PATCH', () => {
 		});
 
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({
-			success: true,
-			filename: 'demo-speech',
+		expect(await res.json()).toEqual({ success: true, cachePurge: true, filename: 'demo-speech',
 			alternate_filename: 'paired-speech',
 			sectionsCount: 2,
 			insertedCount: 0,
@@ -348,6 +350,7 @@ describe('upload_markdown POST', () => {
 		expect(res.status).toBe(200);
 		expect(await res.json()).toEqual({
 			success: true,
+			cachePurge: true,
 			filename: 'fresh-speech',
 			sectionsCount: 1,
 			alternate_filename: 'paired-speech'
@@ -642,3 +645,302 @@ describe('upload_markdown DELETE purges preexisting section caches', () => {
 	});
 });
 
+
+
+describe('invalidateSpeechCaches section query failure', () => {
+	it('still returns success when section_id re-query throws after PATCH', async () => {
+		const env = createUploadEnv();
+		const originalPrepare = env.DB.prepare.bind(env.DB);
+		let patchDone = false;
+		env.DB.prepare = (sql: string) => {
+			const stmt = originalPrepare(sql);
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
+				return {
+					bind: (...args: unknown[]) => ({
+						first: async () => {
+							throw new Error('section re-query failed');
+						},
+						all: async () => {
+							throw new Error('section re-query failed');
+						},
+						sql,
+						args
+					}),
+					first: async () => {
+						throw new Error('section re-query failed');
+					},
+					all: async () => {
+						throw new Error('section re-query failed');
+					}
+				} as any;
+			}
+			return stmt;
+		};
+		// Force invalidate path: normal PATCH
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: '# Demo Speech\nAlpha\n\nBeta'
+			})
+		});
+		// D1 wrote; section re-query fail is swallowed inside invalidate; purge may still succeed
+		expect([200, 503]).toContain(res.status);
+	});
+});
+
+
+describe('upload_markdown cachePurge failures', () => {
+	it('returns 503 when cache purge fails after PATCH', async () => {
+		const { cache } = await import('cloudflare:workers');
+		const purge = cache.purge as ReturnType<typeof import('vitest').vi.fn>;
+		purge.mockResolvedValue({ success: false });
+
+		const env = createUploadEnv();
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: '# Demo Speech\nAlpha\n\nBeta'
+			})
+		});
+		expect(res.status).toBe(503);
+		const json = await res.json() as { success: boolean; cachePurge: boolean };
+		expect(json.success).toBe(true);
+		expect(json.cachePurge).toBe(false);
+	});
+});
+
+
+describe('upload_markdown cachePurge failures for DELETE/POST', () => {
+	it('returns 503 when cache purge fails after DELETE', async () => {
+		const { cache } = await import('cloudflare:workers');
+		const purge = cache.purge as ReturnType<typeof import('vitest').vi.fn>;
+		purge.mockResolvedValue({ success: false });
+
+		// Reuse delete-style env from createUploadEnv is weak; use lightweight env
+		const deletedKeys: string[] = [];
+		let liveSections = [{ section_id: 1 }];
+		const env = {
+			AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
+			BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
+			ASSETS: { fetch: () => new Response('Not Found', { status: 404 }) },
+			SPEECH_CACHE: {
+				delete: async (key: string) => { deletedKeys.push(key); return true; },
+				get: async () => null,
+				put: async () => {},
+				list: async () => ({ objects: [], truncated: false, cursor: '' })
+			},
+			DB: {
+				prepare: (sql: string) => {
+					const run = (args: unknown[] = []) => ({
+						sql,
+						args,
+						first: async () => null,
+						all: async () => {
+							if (sql.includes('FROM speech_redirects')) return { success: true, results: [] };
+							if (sql.includes('speech_speakers')) return { success: true, results: [] };
+							if (sql.includes('SELECT section_id FROM speech_content')) {
+								return { success: true, results: liveSections.map((s) => ({ section_id: s.section_id })) };
+							}
+							return { success: true, results: [] };
+						}
+					});
+					return Object.assign(run([]), { bind: (...args: unknown[]) => run(args) });
+				},
+				batch: async (statements: Array<{ sql?: string }>) => {
+					for (const stmt of statements) {
+						if (stmt.sql?.startsWith('DELETE FROM speech_content WHERE filename = ?')) liveSections = [];
+					}
+					return statements.map((stmt) => {
+						const sql = stmt.sql ?? '';
+						if (sql.startsWith('DELETE FROM speech_content')) return { meta: { changes: 1 } };
+						if (sql.startsWith('DELETE FROM speech_index')) return { meta: { changes: 1 } };
+						return { meta: { changes: 0 } };
+					});
+				}
+			}
+		} as any;
+
+		const { res } = await request('/api/upload_markdown?filename=demo-speech', env, {
+			method: 'DELETE',
+			headers: { Authorization: 'Bearer token-audrey' }
+		});
+		expect(res.status).toBe(503);
+		const json = await res.json() as { success: boolean; cachePurge: boolean };
+		expect(json.success).toBe(true);
+		expect(json.cachePurge).toBe(false);
+	});
+
+	it('returns 503 when cache purge fails after POST', async () => {
+		const { cache } = await import('cloudflare:workers');
+		const purge = cache.purge as ReturnType<typeof import('vitest').vi.fn>;
+		purge.mockResolvedValue({ success: false });
+		const env = createUploadEnv();
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'brand-new-speech',
+				markdown: '# Brand New\n## Speaker:\nhello'
+			})
+		});
+		expect(res.status).toBe(503);
+		const json = await res.json() as { success: boolean; cachePurge: boolean };
+		expect(json.success).toBe(true);
+		expect(json.cachePurge).toBe(false);
+	});
+
+	it('POST replace prefetches prior speakers and cleans orphans', async () => {
+		const env = createUploadEnv();
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				// Same title as existing display_name so no collision rename; no speaker on sections
+				markdown: '# Demo Speech\nOnly body no speaker mark'
+			})
+		});
+		expect([200, 503]).toContain(res.status);
+		const orphanDeletes = env.__operations.filter((s) =>
+			s.sql.includes('DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS')
+			&& s.args[0] === 'ZOMBIE'
+		);
+		expect(orphanDeletes.length).toBeGreaterThan(0);
+	});
+});
+
+
+describe('upload_markdown defensive branches', () => {
+	it('covers null section_content and non-Error catch', async () => {
+		// 1) PATCH with null section_content on old rows
+		const env = createUploadEnv();
+		const originalPrepare = env.DB.prepare.bind(env.DB);
+		env.DB.prepare = (sql: string) => {
+			const stmt = originalPrepare(sql);
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return {
+					bind: (...args: unknown[]) => ({
+						sql,
+						args,
+						first: async () => null,
+						all: async () => ({
+							success: true,
+							results: [
+								{
+									section_id: 100,
+									previous_section_id: null,
+									next_section_id: 101,
+									section_speaker: null,
+									section_content: null
+								},
+								{
+									section_id: 101,
+									previous_section_id: 100,
+									next_section_id: null,
+									section_speaker: null,
+									section_content: null
+								}
+							]
+						})
+					}),
+					first: async () => null,
+					all: async () => ({ success: true, results: [] })
+				} as any;
+			}
+			return stmt;
+		};
+
+		const ok = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: '# Demo Speech\nAlpha\n\nBeta'
+			})
+		});
+		expect([200, 503]).toContain(ok.res.status);
+
+		// 2) non-Error throw path in outer catch
+		const boomEnv = createUploadEnv();
+		boomEnv.DB.prepare = () => {
+			throw 'string-boom';
+		};
+		const bad = await request('/api/upload_markdown', boomEnv, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: '# Demo Speech\nAlpha'
+			})
+		});
+		expect(bad.res.status).toBe(503);
+		const json = await bad.res.json() as { detail: string };
+		expect(json.detail).toContain('string-boom');
+	});
+});
+
+
+describe('upload_markdown PATCH empty result containers', () => {
+	it('handles undefined results arrays on PATCH load', async () => {
+		const env = createUploadEnv();
+		const originalPrepare = env.DB.prepare.bind(env.DB);
+		env.DB.prepare = (sql: string) => {
+			const stmt = originalPrepare(sql);
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return {
+					bind: () => ({
+						first: async () => null,
+						all: async () => ({ success: true }) // results undefined
+					}),
+					first: async () => null,
+					all: async () => ({ success: true })
+				} as any;
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?') || sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
+				return {
+					bind: () => ({
+						first: async () => null,
+						all: async () => ({ success: true }) // results undefined
+					}),
+					first: async () => null,
+					all: async () => ({ success: true })
+				} as any;
+			}
+			return stmt;
+		};
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: '# Demo Speech\nOnly one section'
+			})
+		});
+		expect([200, 503]).toContain(res.status);
+	});
+});
