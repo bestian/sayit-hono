@@ -31,6 +31,11 @@ function createDeleteEnv(options: { speakerRoutes?: string[]; redirects?: Record
 			const target = redirects[String(args[0])];
 			return { success: true, results: target ? [{ new_filename: target }] : [] };
 		}
+		if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
+			// Prefetch before DELETE; values only matter for purge key coverage.
+			return { success: true, results: [{ section_id: 100 }, { section_id: 101 }] };
+		}
+
 		throw new Error(`Unexpected query: ${sql}`);
 	}
 

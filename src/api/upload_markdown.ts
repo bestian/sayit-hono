@@ -532,8 +532,15 @@ function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[]
 }
 
 
-/** 演講內容或 .an/.md 更新後，刪除 R2 origin 並 purge Workers Cache */
-async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
+/** 演講內容或 .an/.md 更新後，刪除 R2 origin 並 purge Workers Cache.
+ *  extraSectionIds: section IDs that may no longer exist in D1 (deleted/reassigned on PATCH/DELETE)
+ *  but still need R2 + Workers Cache purge for /speech/:id pages.
+ */
+async function invalidateSpeechCaches(
+	c: Context<ApiEnv>,
+	filename: string,
+	extraSectionIds: Iterable<number> = []
+) {
 	const host = new URL(c.req.url).host;
 	const encodedFilename = encodeURIComponent(filename);
 	const r2Keys = [
@@ -546,18 +553,26 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	// pathPrefixes: request-path encoding only (percent-encoded). Raw Unicode prefixes can fail purge.
 	// List roots use tags only — never pathPrefix '/'.
 	const pathPrefixes = [speechRequestPath(filename)];
+	const sectionIds = new Set<number>();
+	for (const id of extraSectionIds) {
+		if (Number.isFinite(id)) sectionIds.add(Number(id));
+	}
 
 	try {
 		const result = await c.env.DB.prepare(
 			'SELECT section_id FROM speech_content WHERE filename = ?'
 		).bind(filename).all();
 		for (const row of result.results as Array<{ section_id: number }>) {
-			r2Keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${row.section_id}`);
-			r2Keys.push(r2OgSectionKey(row.section_id));
-			pathPrefixes.push(`/speech/${row.section_id}`);
+			sectionIds.add(Number(row.section_id));
 		}
 	} catch (err) {
 		console.error('[invalidate] section query error', err);
+	}
+
+	for (const sectionId of sectionIds) {
+		r2Keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${sectionId}`);
+		r2Keys.push(r2OgSectionKey(sectionId));
+		pathPrefixes.push(`/speech/${sectionId}`);
 	}
 
 	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
@@ -700,7 +715,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				filename = canonicalFilename;
 			}
 
-			// 先查講者清單，再一次 batch 完成所有刪除 + 孤兒清理
+			// 先查講者與段落 ID（刪除後 invalidate 仍需清舊 /speech/:id 快取）
 				const linkedSpeakers = await withRetry(() => c.env.DB.prepare(
 					'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
 				)
@@ -709,6 +724,12 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				const speakerRoutePathnames = Array.from(
 					new Set((linkedSpeakers.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
 				);
+				const preexistingSectionRows = await withRetry(() => c.env.DB.prepare(
+					'SELECT section_id FROM speech_content WHERE filename = ?'
+				)
+					.bind(filename)
+					.all<{ section_id: number }>());
+				const preexistingSectionIds = (preexistingSectionRows.results ?? []).map((row) => Number(row.section_id));
 
 				// 單一 batch：刪段落 + 刪關聯 + 刪索引 + 清孤兒講者（減少 D1 round-trips）
 				console.log('[upload_markdown] DELETE batch for:', filename);
@@ -748,7 +769,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					);
 				}
 
-				await invalidateSpeechCaches(c, filename);
+				await invalidateSpeechCaches(c, filename, preexistingSectionIds);
 				await invalidateSpeakerCaches(c, speakerRoutePathnames);
 				await invalidateListPageCaches(c, { home: true, speeches: true, speakers: true });
 				await syncSearchArtifactsAfterDelete(c, filename);
@@ -1234,8 +1255,9 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				await withRetry(() => c.env.DB.batch(cleanupBatch));
 			}
 
-			// 失效快取（R2，在 D1 交易之外）
-			await invalidateSpeechCaches(c, filename);
+			// 失效快取：含 PATCH 前的 section IDs（已刪除的 /speech/:id 仍需 purge）
+			const preexistingSectionIds = oldSections.map((section) => section.section_id);
+			await invalidateSpeechCaches(c, filename, preexistingSectionIds);
 			const affectedAlternateFilenames = Array.from(
 				new Set([currentAlternateFilename, desiredAlternateFilename].filter((value): value is string => Boolean(value && value !== filename)))
 			);
