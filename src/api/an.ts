@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
-import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache, deleteEdgeCache, deleteR2Cache } from './cache';
+import { ARTIFACT_CACHE_CONTROL, deleteR2Cache, r2AnKey, readR2Cache, writeR2Cache } from './cache';
 import { normalizeSections } from '../utils/sectionUtils';
 import type { ApiEnv } from './types';
 
@@ -203,8 +203,12 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 
 		const headers = new Headers(corsHeaders);
 		headers.set('Content-Type', 'text/plain; charset=utf-8');
-		headers.set('Cache-Control', 'public, max-age=3600');
+		headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 		headers.set('Cache-Tag', `speech:${encodeURIComponent(section.filename)}`);
+		if (headers.has('Access-Control-Allow-Origin')) {
+			headers.set('Vary', 'Origin');
+		}
+
 
 		if (c.req.method === 'HEAD') {
 			headers.set('Content-Length', new TextEncoder().encode(singleAn).length.toString());
@@ -213,38 +217,28 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		return new Response(singleAn, { status: 200, headers });
 	}
 
-	// 完整演講：先查 Edge cache，再查 SPEECH_CACHE（an/filename）
-	const cacheKey = `an/${baseKey}`;
+	// 完整演講：查 SPEECH_CACHE（an/filename）作為 origin 快取
+	const cacheKey = r2AnKey(baseKey);
 	const purge = c.req.url.includes('?');
 
 	if (purge) {
-		await deleteEdgeCache(cacheKey);
 		await deleteR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	} else {
-		const edgeCached = await readEdgeCache(cacheKey);
-		if (edgeCached) {
-			console.log('[an cache] hit edge', cacheKey);
-			const headers = new Headers(edgeCached.headers);
-			headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
-			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-			if (c.req.method === 'HEAD') {
-				return new Response(null, { status: 200, headers });
-			}
-			return new Response(await edgeCached.text(), { status: 200, headers });
-		}
 		const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/plain; charset=utf-8');
 		if (cached) {
 			console.log('[an cache] hit r2', cacheKey);
 			const headers = new Headers(cached.headers);
+			headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 			headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+			if (headers.has('Access-Control-Allow-Origin')) {
+				headers.set('Vary', 'Origin');
+			}
 			if (c.req.method === 'HEAD') {
 				return new Response(null, { status: 200, headers });
 			}
 			const body = await cached.text();
-			const response = new Response(body, { status: 200, headers });
-			await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
-			return response;
+			return new Response(body, { status: 200, headers });
 		}
 	}
 
@@ -292,8 +286,11 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	const headers = new Headers(corsHeaders);
 	headers.set('Content-Type', 'text/plain; charset=utf-8');
-	headers.set('Cache-Control', 'public, max-age=3600');
+	headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 	headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
+	if (headers.has('Access-Control-Allow-Origin')) {
+		headers.set('Vary', 'Origin');
+	}
 
 	if (c.req.method === 'HEAD') {
 		headers.set('Content-Length', new TextEncoder().encode(generatedAn).length.toString());
@@ -302,7 +299,6 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	const response = new Response(generatedAn, { status: 200, headers });
 	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response, 'text/plain; charset=utf-8');
-	await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
 	return response;
 }
 

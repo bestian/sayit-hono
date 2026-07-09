@@ -154,32 +154,18 @@ describe('search branch coverage', () => {
 		expect(res.status).toBe(200);
 	});
 
-	it('renders the /search/ cached-body path (edge cache hit)', async () => {
+	it('sets search HTML cache headers without edge short-circuit', async () => {
 		const env = makeEnv(() => ({ success: true, results: [] }));
-		const edgeKey = `https://edge-cache.local/${CACHE_KEY_VERSION}/example.com/search/?q=cached`;
-		await caches.default.put(
-			edgeKey,
-			new Response('CACHED-SEARCH', { headers: { 'Cache-Control': 'public, max-age=60', 'Content-Type': 'text/html' } })
-		);
-		const { res } = await request('/search/?q=cached', env);
+		const { res } = await request('/search/?q=hello', env);
 		expect(res.status).toBe(200);
-		expect(await res.text()).toBe('CACHED-SEARCH');
-		await caches.default.delete(edgeKey);
+		expect(res.headers.get('Cache-Control') || '').toMatch(/s-maxage=/);
 	});
 
-	it('serves /api/search.json cached body (edge cache hit)', async () => {
+	it('sets search API cache headers without edge short-circuit', async () => {
 		const env = makeEnv(() => ({ success: true, results: [] }));
-		const key = `https://edge-cache.local/${CACHE_KEY_VERSION}/example.com/api/search.json?q=cached`;
-		await caches.default.put(
-			key,
-			new Response(JSON.stringify({ results: ['CACHED'] }), {
-				headers: { 'Cache-Control': 'public, max-age=60', 'Content-Type': 'application/json' }
-			})
-		);
-		const { res } = await request('/api/search.json?q=cached', env);
+		const { res } = await request('/api/search.json?q=hello', env);
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ results: ['CACHED'] });
-		await caches.default.delete(key);
+		expect(res.headers.get('Cache-Control') || '').toMatch(/s-maxage=/);
 	});
 });
 

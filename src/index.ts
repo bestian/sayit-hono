@@ -1,7 +1,19 @@
 import { Hono, type Context } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
-import { CACHE_KEY_VERSION, deleteEdgeCache, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './api/cache';
+import {
+	CACHE_KEY_VERSION,
+	DEFAULT_HTML_CACHE_CONTROL,
+	SEARCH_API_CACHE_CONTROL,
+	SEARCH_HTML_CACHE_CONTROL,
+	buildR2HtmlKey,
+	purgeWorkersCache,
+	readR2Cache,
+	tags,
+	withCacheHeaders,
+	writeR2Cache
+} from './api/cache';
+
 import { speakersIndex } from './api/speakers_index';
 import { speakerDetail } from './api/speaker_detail';
 import { speechContent } from './api/speech';
@@ -58,11 +70,7 @@ type WorkerEnv = ApiEnv['Bindings'];
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
-const EDGE_TTL_SECONDS = 300;
-const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}, stale-while-revalidate=86400`;
 const VOLATILE_HTML_CACHE_CONTROL = 'no-store, no-cache, must-revalidate';
-const SEARCH_API_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
-const SEARCH_HTML_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
 const SEARCH_MIN_QUERY_LENGTH = 2;
 const SEARCH_MAX_QUERY_LENGTH = 80;
 const SEARCH_DEFAULT_PAGE_SIZE = 20;
@@ -192,22 +200,9 @@ app.use('*', staticFirstMiddleware);
 
 
 function buildCacheKey(url: string, { includeSearch = true }: { includeSearch?: boolean } = {}): string {
-	const u = new URL(url);
-	return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${includeSearch ? u.search : ''}`;
+	return buildR2HtmlKey(url, { includeSearch });
 }
 
-function withCacheHeaders(
-	response: Response,
-	cacheControl = DEFAULT_HTML_CACHE_CONTROL,
-	tags?: string[]
-): Response {
-	const res = new Response(response.body, response);
-	res.headers.set('Cache-Control', cacheControl);
-	if (tags && tags.length > 0) {
-		res.headers.set('Cache-Tag', tags.join(','));
-	}
-	return res;
-}
 
 function requestAcceptsBrotli(c: any): boolean {
 	const acceptEncoding = c.req.header('Accept-Encoding') ?? '';
@@ -770,11 +765,7 @@ async function runSearchQuery(
 	};
 }
 
-async function renderSearchPage(c: any) {
-	const cacheKey = buildCacheKey(c.req.url);
-	const cached = await readEdgeCache(cacheKey);
-	if (cached) return cached;
-
+async function renderSearchPage(c: Context<{ Bindings: WorkerEnv }>) {
 	const url = new URL(c.req.url);
 	const query = normalizeSearchQuery(url.searchParams.get('q'));
 	const pageParam = Number(url.searchParams.get('page') || '1');
@@ -800,11 +791,9 @@ async function renderSearchPage(c: any) {
 		scripts: PAGEFIND_SCRIPT
 	});
 
-	const response = c.html(html);
-	response.headers.set('Cache-Control', SEARCH_HTML_CACHE_CONTROL);
-	await writeEdgeCache(cacheKey, response.clone(), SEARCH_HTML_CACHE_CONTROL);
-	return response;
+	return withCacheHeaders(c.html(html), SEARCH_HTML_CACHE_CONTROL, [tags.listSearch]);
 }
+
 
 
 // /、/speeches、/speakers 由 SSR 路由提供，其餘靜態資源由 staticFirstMiddleware 嘗試從 ASSETS 提供
@@ -872,10 +861,6 @@ app.get('/api/speaker_detail/:route_pathname_with_json', (c) => speakerDetail(c)
 app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
 app.get('/api/search.json', async (c) => {
-	const cacheKey = buildCacheKey(c.req.url);
-	const cached = await readEdgeCache(cacheKey);
-	if (cached) return cached;
-
 	const query = normalizeSearchQuery(c.req.query('q'));
 	const requestedLimit = Number(c.req.query('limit') || SEARCH_DEFAULT_PAGE_SIZE);
 	const limit = Number.isFinite(requestedLimit)
@@ -898,12 +883,13 @@ app.get('/api/search.json', async (c) => {
 		};
 	});
 
-	const response = c.json({ results }, 200, {
-		'Cache-Control': SEARCH_API_CACHE_CONTROL
-	});
-	await writeEdgeCache(cacheKey, response.clone(), SEARCH_API_CACHE_CONTROL);
-	return response;
+	return withCacheHeaders(
+		c.json({ results }),
+		SEARCH_API_CACHE_CONTROL,
+		[tags.listSearch]
+	);
 });
+
 // /search is redirected to /search/ by the canonical-URL middleware.
 app.get('/search/', (c) => renderSearchPage(c));
 app.on(['GET', 'HEAD'], '/api/an/:path{[^/]+\\.an}', (c) => speechAn(c));
@@ -936,12 +922,12 @@ app.post('/api/purge_cache', async (c) => {
 		const list = await bucket.list({ cursor, limit: 500 });
 		const keys = list.objects.map((o: { key: string }) => o.key);
 		if (keys.length > 0) {
-			await Promise.all(keys.map((key) => deleteEdgeCache(key)));
 			await bucket.delete(keys);
 			deleted += keys.length;
 		}
 		cursor = list.truncated ? list.cursor : undefined;
 	} while (cursor);
+	await purgeWorkersCache({ purgeEverything: true });
 	return c.json({ deleted });
 });
 
@@ -992,7 +978,7 @@ async function renderPrivacyPage(c: Context<{ Bindings: WorkerEnv }>) {
 		components: { Navbar, Footer },
 		props: {}
 	});
-	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, ['list:privacy']);
+	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.listPrivacy]);
 }
 
 async function renderTermsPage(c: Context<{ Bindings: WorkerEnv }>) {
@@ -1004,7 +990,7 @@ async function renderTermsPage(c: Context<{ Bindings: WorkerEnv }>) {
 		components: { Navbar, Footer },
 		props: {}
 	});
-	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, ['list:terms']);
+	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.listTerms]);
 }
 
 async function renderHomePage(c: Context<{ Bindings: WorkerEnv }>) {
@@ -1018,7 +1004,7 @@ async function renderHomePage(c: Context<{ Bindings: WorkerEnv }>) {
 		scripts: [PAGEFIND_SCRIPT, STATS_SCRIPT].join('\n')
 	});
 
-	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, ['list:home']);
+	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.listHome]);
 }
 
 async function renderSpeechesPage(c: Context<{ Bindings: WorkerEnv }>) {
@@ -1034,7 +1020,7 @@ async function renderSpeechesPage(c: Context<{ Bindings: WorkerEnv }>) {
 	const dataToken = await buildSpeechListDataToken(speeches);
 	const cacheKey = `${baseCacheKey}data-${dataToken}`;
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) return r2Cached;
+	if (r2Cached) return withCacheHeaders(r2Cached, DEFAULT_HTML_CACHE_CONTROL, [tags.listSpeeches]);
 
 	const styles = [SpeechesViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSpeeches();
@@ -1047,7 +1033,7 @@ async function renderSpeechesPage(c: Context<{ Bindings: WorkerEnv }>) {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, ['list:speeches']);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.listSpeeches]);
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	}
@@ -1057,7 +1043,7 @@ async function renderSpeechesPage(c: Context<{ Bindings: WorkerEnv }>) {
 async function renderSpeakersPage(c: Context<{ Bindings: WorkerEnv }>) {
 	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) return r2Cached;
+	if (r2Cached) return withCacheHeaders(r2Cached, DEFAULT_HTML_CACHE_CONTROL, [tags.listSpeakers]);
 
 	let speakers: SpeakerListItem[];
 	try {
@@ -1077,7 +1063,7 @@ async function renderSpeakersPage(c: Context<{ Bindings: WorkerEnv }>) {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, ['list:speakers']);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.listSpeakers]);
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	}
@@ -1111,7 +1097,15 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 
 	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) return r2Cached;
+	// Cache-Tag restored from R2 customMetadata when present (writeR2Cache stores it).
+	if (r2Cached) {
+		const existingTag = r2Cached.headers.get('Cache-Tag');
+		return withCacheHeaders(
+			r2Cached,
+			DEFAULT_HTML_CACHE_CONTROL,
+			existingTag ? existingTag.split(',') : undefined
+		);
+	}
 
 	let section: any;
 	try {
@@ -1142,7 +1136,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
 	});
 
-	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [`speech:${encodeURIComponent(section.filename)}`]);
+	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.speech(section.filename)]);
 	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	return response;
 });
@@ -1150,10 +1144,10 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 // SSR 講者頁
 app.get('/speaker/:route_pathname', async (c) => {
 	const cacheKey = buildCacheKey(c.req.url);
-	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) return r2Cached;
-
 	const routePathname = encodeURIComponent(c.req.param('route_pathname'));
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) return withCacheHeaders(r2Cached, DEFAULT_HTML_CACHE_CONTROL, [tags.speaker(routePathname)]);
+
 	console.log(routePathname);
 
 	let speaker: any;
@@ -1259,7 +1253,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [`speaker:${encodeURIComponent(routePathname)}`]);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.speaker(routePathname)]);
 
 	if (response.ok && response.status < 400) {
 		console.log('writing to R2 cache', cacheKey);
@@ -1275,9 +1269,6 @@ app.get('/speaker/:route_pathname', async (c) => {
 // SSR 巢狀演講內容頁（巢狀子項）
 app.get('/:filename/:nest_filename', async (c) => {
 	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
-	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) return r2Cached;
-
 	const encodedFilename = c.req.param('filename');
 	const encodedNestFilename = c.req.param('nest_filename');
 
@@ -1293,6 +1284,9 @@ app.get('/:filename/:nest_filename', async (c) => {
 	} catch {
 		return c.text('Not Found', 404);
 	}
+
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) return withCacheHeaders(r2Cached, DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
 
 	let speechMeta: SpeechIndexRow | null;
 	try {
@@ -1408,7 +1402,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [`speech:${encodeURIComponent(filename)}`]);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
 
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
@@ -1426,14 +1420,9 @@ app.on(['GET', 'HEAD'], '/:path{[^/]+\\.an}', (c) => serveAnByKey(c, c.req.param
 // SSR 演講頁（單一演講或巢狀清單，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
 app.get('/:filename', async (c) => {
 	const cacheKey = buildCacheKey(c.req.url, { includeSearch: false });
-	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	if (r2Cached) {
-		console.log('[r2 cache] hit', cacheKey);
-		return r2Cached;
-	}
-
-	console.log('SSR Single Speech filename', c.req.param('filename'));
 	const encodedFilename = c.req.param('filename');
+
+	console.log('SSR Single Speech filename', encodedFilename);
 
 	if (isExcludedPath(encodedFilename)) {
 		return c.text('Not Found', 404);
@@ -1449,6 +1438,12 @@ app.get('/:filename', async (c) => {
 		filename = decodeURIComponent(encodedFilename);
 	} catch {
 		return c.text('Not Found', 404);
+	}
+
+	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
+	if (r2Cached) {
+		console.log('[r2 cache] hit', cacheKey);
+		return withCacheHeaders(r2Cached, DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
 	}
 
 	let speechMeta: SpeechIndexRow | null;
@@ -1547,7 +1542,7 @@ app.get('/:filename', async (c) => {
 		});
 
 		let response = c.html(html);
-		response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [`speech:${encodeURIComponent(filename)}`]);
+		response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
 
 		if (response.ok && response.status < 400) {
 			await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
@@ -1622,7 +1617,7 @@ app.get('/:filename', async (c) => {
 	});
 
 	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [`speech:${encodeURIComponent(filename)}`]);
+	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
 
 	if (response.ok && response.status < 400) {
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());

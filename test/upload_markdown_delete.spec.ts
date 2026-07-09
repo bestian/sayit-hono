@@ -134,34 +134,6 @@ describe('DELETE /api/upload_markdown', () => {
 		]));
 	});
 
-	it('purges seeded real URLs from caches.default', async () => {
-		const env = createDeleteEnv({ speakerRoutes: ['audrey-tang'] });
-
-		const urls = [
-			'https://example.com/demo-speech',
-			'https://example.com/speaker/audrey-tang',
-			'https://example.com/speeches',
-			'https://example.com/speakers',
-			'https://example.com/rss.xml',
-			'https://example.com/feed.xml',
-			'https://example.com/'
-		];
-		for (const url of urls) {
-			await caches.default.put(url, new Response('seed', {
-				headers: { 'Cache-Control': 'public, max-age=3600' }
-			}));
-		}
-
-		await request('/api/upload_markdown?filename=demo-speech', env, {
-			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
-		});
-
-		for (const url of urls) {
-			expect(await caches.default.match(url)).toBeUndefined();
-		}
-	});
-
 	it('returns 404 when no rows match', async () => {
 		const env = createDeleteEnv({ speakerRoutes: [] });
 		// Override batch to simulate no-op
