@@ -139,13 +139,15 @@ export async function writeR2Cache(
 	}
 }
 
-/** 刪除 R2 快取 */
-export async function deleteR2Cache(bucket: R2Bucket, cacheKey: string) {
+/** 刪除 R2 origin 快取。成功 true；失敗 false（不可靜默，否則 front MISS 會從髒 R2 回填）。 */
+export async function deleteR2Cache(bucket: R2Bucket, cacheKey: string): Promise<boolean> {
 	try {
 		await bucket.delete(cacheKey);
 		console.log('[r2 cache] deleted', cacheKey);
+		return true;
 	} catch (err) {
 		console.error('[r2 cache] delete error', cacheKey, err);
+		return false;
 	}
 }
 

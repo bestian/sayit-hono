@@ -576,14 +576,19 @@ async function invalidateSpeechCaches(
 	}
 
 	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
+	// Both tiers must clear: R2 origin delete AND Workers Cache purge.
+	// If R2 delete fails but front purge succeeds, the next MISS re-poisons the front from stale R2.
+	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const r2Ok = r2Results.every(Boolean);
+	if (!r2Ok) {
+		console.error('[invalidate] R2 origin delete incomplete', { filename, failed: r2Results.filter((ok) => !ok).length });
+	}
 	// Split tags vs pathPrefixes so a bad prefix cannot block tag purge.
-	// R2 deletes are best-effort; Workers Cache purge success is returned (SWR can keep stale for ~1d).
-	await Promise.allSettled(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 	const [tagsOk, pathsOk] = await Promise.all([
 		purgeWorkersCache({ tags: purgeTags }),
 		purgeWorkersCache({ pathPrefixes }),
 	]);
-	return tagsOk && pathsOk;
+	return r2Ok && tagsOk && pathsOk;
 }
 
 /** 講者或演講-講者關聯更新後，刪除 R2 origin 並 purge Workers Cache */
@@ -602,10 +607,16 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 	const purgeTags = speakerRoutePathnames.map((p) => tags.speaker(p));
 	purgeTags.push(tags.listSpeakers);
 
-	await Promise.allSettled(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const r2Results = await Promise.all(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const r2Ok = r2Results.every(Boolean);
+	if (!r2Ok) {
+		console.error('[invalidate] speaker R2 origin delete incomplete', {
+			failed: r2Results.filter((ok) => !ok).length
+		});
+	}
 	const tagsOk = await purgeWorkersCache({ tags: purgeTags });
 	const pathsOk = pathPrefixes.length > 0 ? await purgeWorkersCache({ pathPrefixes }) : true;
-	return tagsOk && pathsOk;
+	return r2Ok && tagsOk && pathsOk;
 }
 
 /** 失效列表頁快取：tags only for exact list roots; R2 origin keys still deleted */
@@ -636,9 +647,16 @@ async function invalidateListPageCaches(
 	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss);
 	if (speakers) purgeTags.push(tags.listSpeakers);
 
-	await Promise.allSettled(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
-	// Callers always request at least one list surface; empty tags is a no-op success.
-	return purgeTags.length === 0 ? true : purgeWorkersCache({ tags: purgeTags });
+	const r2Results = await Promise.all(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const r2Ok = r2Results.every(Boolean);
+	if (!r2Ok) {
+		console.error('[invalidate] list R2 origin delete incomplete', {
+			failed: r2Results.filter((ok) => !ok).length
+		});
+	}
+	// Callers always request at least one list surface; empty tags is a no-op for front purge.
+	const purgeOk = purgeTags.length === 0 ? true : await purgeWorkersCache({ tags: purgeTags });
+	return r2Ok && purgeOk;
 }
 
 async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: string) {
