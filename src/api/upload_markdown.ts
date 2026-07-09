@@ -575,7 +575,7 @@ async function invalidateSpeechCaches(
 		pathPrefixes.push(`/speech/${sectionId}`);
 	}
 
-	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
+	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss, tags.listSearch];
 	// Both tiers must clear: R2 origin delete AND Workers Cache purge.
 	// If R2 delete fails but front purge succeeds, the next MISS re-poisons the front from stale R2.
 	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
@@ -644,7 +644,7 @@ async function invalidateListPageCaches(
 
 	const purgeTags: string[] = [];
 	if (home) purgeTags.push(tags.listHome);
-	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss);
+	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss, tags.listSearch);
 	if (speakers) purgeTags.push(tags.listSpeakers);
 
 	const r2Results = await Promise.all(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
