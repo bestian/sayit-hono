@@ -125,8 +125,9 @@ describe('POST /api/purge_cache', () => {
 		});
 
 		expect(res.status).toBe(200);
-		const body = (await res.json()) as { deleted: number };
+		const body = (await res.json()) as { deleted: number; purged: boolean };
 		expect(body.deleted).toBe(3);
+		expect(body.purged).toBe(true);
 		expect(env.__r2Store.size).toBe(0);
 	});
 
@@ -145,6 +146,20 @@ describe('POST /api/purge_cache', () => {
 		const env = createSimpleEnv();
 		const { res } = await request('/api/purge_cache', env, { method: 'POST' });
 		expect(res.status).toBe(403);
+	});
+
+	it('front_only skips R2 wipe and reports purge result', async () => {
+		const env = createSimpleEnv();
+		env.__r2Store.set('keep-me', { body: 'x' });
+		const { res } = await request('/api/purge_cache?front_only=1', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey' }
+		});
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as { frontOnly: boolean; purged: boolean };
+		expect(body.frontOnly).toBe(true);
+		expect(body.purged).toBe(true);
+		expect(env.__r2Store.size).toBe(1);
 	});
 });
 
