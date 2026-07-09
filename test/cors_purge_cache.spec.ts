@@ -161,6 +161,21 @@ describe('POST /api/purge_cache', () => {
 		expect(body.purged).toBe(true);
 		expect(env.__r2Store.size).toBe(1);
 	});
+
+	it('returns 503 when front_only purge fails', async () => {
+		const { cache } = await import('cloudflare:workers');
+		const purge = cache.purge as ReturnType<typeof import('vitest').vi.fn>;
+		purge.mockResolvedValue({ success: false });
+		const env = createSimpleEnv();
+		const { res } = await request('/api/purge_cache?front_only=1', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey' }
+		});
+		expect(res.status).toBe(503);
+		const body = (await res.json()) as { frontOnly: boolean; purged: boolean };
+		expect(body.frontOnly).toBe(true);
+		expect(body.purged).toBe(false);
+	});
 });
 
 describe('Read route cache behavior', () => {
