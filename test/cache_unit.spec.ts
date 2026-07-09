@@ -111,7 +111,12 @@ describe('cache.readR2Cache / writeR2Cache', () => {
 
 		expect(await readR2Cache(broken, 'k')).toBeNull();
 		await writeR2Cache(broken, 'k', new Response('x'));
-		await deleteR2Cache(broken, 'k');
+		await expect(deleteR2Cache(broken, 'k')).resolves.toBe(false);
+	});
+
+	it('returns true when R2 delete succeeds', async () => {
+		const { bucket } = createBucket();
+		await expect(deleteR2Cache(bucket, 'missing-is-ok')).resolves.toBe(true);
 	});
 });
 
