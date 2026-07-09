@@ -113,7 +113,8 @@ bun run dev         # = build:views + wrangler dev --remote
 
 `bun run deploy` 已串好下列流程，自寫 CI 時請依序執行：
 
-1. `build:cache-version`（產生 `cacheKeyVersion.ts`，使舊 R2/Edge cache 自動作廢）
+1. `build:cache-version`（產生 `cacheKeyVersion.ts`，使舊 **R2 origin** key 空間自動作廢；front Workers Cache 則依 Worker version 失效）
+
 2. `build:views`（編譯 SFC 到 `src/.generated/`）
 3. `build:assets`（同步 `public/` → `www/`）
 4. `build:search`（產出基線索引與 `stats.json`，並上傳到 R2）
@@ -130,11 +131,13 @@ bun run dev         # = build:views + wrangler dev --remote
 5. **`.md` / `.an` 檔的轉換路由**（兩段：`/:path{[^/]+\.md}`、`/:path{[^/]+\.an}` 以及 `/speech/...`）。
 6. **catch-all `app.get('*', …)`** 回 404。
 
-快取層級：
+快取層級（Workers Cache first）：
 
-- **Edge Cache**（`api/cache.ts` 的 `readEdgeCache` / `writeEdgeCache`）：HTML / API JSON 響應使用，key 為 `${CACHE_KEY_VERSION}/${host}${pathname}[?search]`。
-- **R2 Cache**（`SPEECH_CACHE`，`readR2Cache` / `writeR2Cache`）：較長壽的 SSR 頁面（演講頁、講者頁、巢狀頁）會寫入 R2，部署後依 `CACHE_KEY_VERSION` 失效，搭配 `/api/purge_cache`、`/api/cleanup_old_cache` 維護。
-- **`/api/purge_cache` 與 `/api/cleanup_old_cache`** 受 Bearer token 保護，secrets 為 `AUDREYT_TRANSCRIPT_TOKEN` / `BESTIAN_TRANSCRIPT_TOKEN`。
+- **Front Workers Cache**（`wrangler.jsonc` `cache.enabled: true`）：公開 GET 依 `Cache-Control` / `Cache-Tag` 在 Worker 前命中。平台 key = path+query（+ entrypoint + Worker version），**不含 host**。內容變更用 `purgeWorkersCache({ tags, pathPrefixes? })`（`import { cache } from 'cloudflare:workers'`）。`pathPrefixes` 是真前綴——**不要**用 `'/'` 當「只清首頁」；列表根路徑靠 `list:*` tags。
+- **R2 origin**（`SPEECH_CACHE`，`readR2Cache` / `writeR2Cache`）：昂貴 SSR HTML（演講/講者/列表）與衍生產物（`an/<filename>`、`md/<filename>`、versioned OG）。HTML key：`${CACHE_KEY_VERSION}/${host}${path}`；`an`/`md` 穩定不帶版本。讀回時會還原 `Cache-Tag`（customMetadata）再交給 front cache。
+- **不再使用** in-Worker `caches.default`（`readEdgeCache` / `writeEdgeCache` 已移除）。
+- **`/api/purge_cache`**：清空 R2 後 `purgeWorkersCache({ purgeEverything: true })`。**`/api/cleanup_old_cache`**：只刪非目前 `CACHE_KEY_VERSION/` 的 R2 前綴，不清 front。兩者受 Bearer token 保護（`AUDREYT_TRANSCRIPT_TOKEN` / `BESTIAN_TRANSCRIPT_TOKEN`）。
+
 
 ## 框架使用注意事項
 

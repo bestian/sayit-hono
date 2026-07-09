@@ -1,62 +1,78 @@
+import { cache } from 'cloudflare:workers';
 import { CACHE_KEY_VERSION } from '../cacheKeyVersion';
 
 const DEFAULT_CACHE_CONTROL = 'public, max-age=3600';
 
-// Bump when cached HTML format changes to invalidate stale edge/R2 entries.
+// Bump when cached HTML format changes to invalidate stale R2 origin entries.
 export { CACHE_KEY_VERSION };
 
-function normalizeEdgeCacheKey(cacheKey: string): string {
-	try {
-		return new URL(cacheKey).toString();
-	} catch {
-		const trimmed = cacheKey.startsWith('/') ? cacheKey.slice(1) : cacheKey;
-		const firstSegment = trimmed.split('/')[0] ?? '';
-		const looksLikeHost = firstSegment.includes('.') || firstSegment.includes(':');
-		return looksLikeHost ? `https://${trimmed}` : `https://edge-cache.local/${trimmed}`;
-	}
+/** Front-of-Worker s-maxage for default HTML pages. */
+export const EDGE_TTL_SECONDS = 300;
+export const DEFAULT_HTML_CACHE_CONTROL =
+	`public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}, stale-while-revalidate=86400`;
+export const SEARCH_API_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
+export const SEARCH_HTML_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
+export const FEED_CACHE_CONTROL = 'public, max-age=300, s-maxage=300';
+export const ARTIFACT_CACHE_CONTROL = 'public, max-age=3600, s-maxage=3600';
+export const OG_CACHE_CONTROL = 'public, max-age=86400, s-maxage=86400';
+
+/** Cache-Tag values for Workers Cache purge. */
+export const tags = {
+	listHome: 'list:home',
+	listSpeeches: 'list:speeches',
+	listSpeakers: 'list:speakers',
+	listRss: 'list:rss',
+	listPrivacy: 'list:privacy',
+	listTerms: 'list:terms',
+	listSearch: 'list:search',
+	speech: (filename: string) => `speech:${encodeURIComponent(filename)}`,
+	speaker: (routePathname: string) => `speaker:${encodeURIComponent(routePathname)}`
+} as const;
+
+/**
+ * R2 origin keys for SSR HTML + RSS only — NOT for an/md/search/OG.
+ * Shape: `${CACHE_KEY_VERSION}/${host}${pathname}[?search]`
+ */
+export function buildR2HtmlKey(
+	url: string,
+	{ includeSearch = true }: { includeSearch?: boolean } = {}
+): string {
+	const u = new URL(url);
+	return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${includeSearch ? u.search : ''}`;
 }
 
-/** 從 Edge Cache 讀取快取 */
-export async function readEdgeCache(cacheKey: string): Promise<Response | null> {
-	try {
-		const normalizedKey = normalizeEdgeCacheKey(cacheKey);
-		const cached = await caches.default.match(normalizedKey);
-		return cached ?? null;
-	} catch (err) {
-		console.error('[edge cache] read error', err);
-		return null;
-	}
+/** Stable (unversioned) R2 key for full-speech .an artifacts. */
+export function r2AnKey(filename: string): string {
+	return `an/${filename}`;
 }
 
-/** 寫入 Edge Cache */
-export async function writeEdgeCache(
-	cacheKey: string,
+/** Stable (unversioned) R2 key for full-speech .md artifacts. */
+export function r2MdKey(filename: string): string {
+	return `md/${filename}`;
+}
+
+/** Versioned R2 key for speech OG PNG. */
+export function r2OgSpeechKey(filename: string): string {
+	return `${CACHE_KEY_VERSION}/og/${filename}.png`;
+}
+
+/** Versioned R2 key for section OG PNG. */
+export function r2OgSectionKey(sectionId: number | string): string {
+	return `${CACHE_KEY_VERSION}/og/speech/${sectionId}.png`;
+}
+
+/** Attach Cache-Control and optional Cache-Tag for front Workers Cache. */
+export function withCacheHeaders(
 	response: Response,
-	defaultCacheControl = DEFAULT_CACHE_CONTROL
-) {
-	try {
-		console.log('writing to edge cache', cacheKey);
-		const normalizedKey = normalizeEdgeCacheKey(cacheKey);
-		const cloned = response.clone();
-		const res = new Response(cloned.body, response);
-		res.headers.set('Cache-Control', defaultCacheControl);
-		await caches.default.put(normalizedKey, res);
-	} catch (err) {
-		console.error('[edge cache] write error', err);
+	cacheControl = DEFAULT_HTML_CACHE_CONTROL,
+	tagList?: string[]
+): Response {
+	const res = new Response(response.body, response);
+	res.headers.set('Cache-Control', cacheControl);
+	if (tagList && tagList.length > 0) {
+		res.headers.set('Cache-Tag', tagList.join(','));
 	}
-}
-
-/** 刪除 Edge Cache */
-export async function deleteEdgeCache(cacheKey: string, { silent = false }: { silent?: boolean } = {}) {
-	try {
-		const normalizedKey = normalizeEdgeCacheKey(cacheKey);
-		await caches.default.delete(normalizedKey);
-		if (!silent) {
-			console.log('[edge cache] deleted', cacheKey);
-		}
-	} catch (err) {
-		console.error('[edge cache] delete error', cacheKey, err);
-	}
+	return res;
 }
 
 /** 從 R2 讀取快取，回傳 Response 或 null */
@@ -77,6 +93,11 @@ export async function readR2Cache(
 
 		headers.set('Cache-Control', cacheControl);
 		headers.set('Content-Type', contentType);
+
+		const cacheTag = object.customMetadata?.cacheTag;
+		if (cacheTag) {
+			headers.set('Cache-Tag', cacheTag);
+		}
 
 		if (typeof object.size === 'number') {
 			headers.set('Content-Length', object.size.toString());
@@ -104,12 +125,14 @@ export async function writeR2Cache(
 		const body = await cloned.text();
 		const cacheControl = cloned.headers.get('Cache-Control') ?? DEFAULT_CACHE_CONTROL;
 		const contentType = cloned.headers.get('Content-Type') ?? defaultContentType;
+		const cacheTag = cloned.headers.get('Cache-Tag') ?? undefined;
 
 		await bucket.put(cacheKey, body, {
 			httpMetadata: {
 				cacheControl,
 				contentType
-			}
+			},
+			...(cacheTag ? { customMetadata: { cacheTag } } : {})
 		});
 	} catch (err) {
 		console.error('[r2 cache] write error', err);
@@ -126,30 +149,19 @@ export async function deleteR2Cache(bucket: R2Bucket, cacheKey: string) {
 	}
 }
 
-interface WorkersCache {
-	purge(options: { tags?: string[]; paths?: string[]; purgeEverything?: boolean }): Promise<void>;
-}
+export type PurgeOptions =
+	| { tags: string[]; pathPrefixes?: string[] }
+	| { pathPrefixes: string[]; tags?: string[] }
+	| { purgeEverything: true };
 
-/** 透過 Workers Cache Purge API 刪除 Edge Cache (若支援) */
-export async function purgeWorkersCache(
-	ctx: unknown,
-	options: { tags?: string[]; paths?: string[]; purgeEverything?: boolean }
-): Promise<void> {
+/**
+ * Purge front-of-Worker Workers Cache.
+ * pathPrefixes are true prefixes — never pass '/' for "home only"; use tags for exact list pages.
+ */
+export async function purgeWorkersCache(options: PurgeOptions): Promise<void> {
 	try {
-		if (
-			ctx &&
-			typeof ctx === 'object' &&
-			'cache' in ctx &&
-			ctx.cache &&
-			typeof ctx.cache === 'object' &&
-			'purge' in ctx.cache &&
-			typeof ctx.cache.purge === 'function'
-		) {
-			console.log('[workers cache] purging', options);
-			await (ctx.cache as WorkersCache).purge(options);
-		} else {
-			console.log('[workers cache] purge skipped: API not available in current environment');
-		}
+		console.log('[workers cache] purging', options);
+		await cache.purge(options);
 	} catch (err) {
 		console.error('[workers cache] purge error', err);
 	}
