@@ -83,8 +83,9 @@ describe('ask inline HTML anchors (issue #141)', () => {
 		const html = renderAskInlineMarkdown(
 			'<a href="https://archive.tw">click](https://evil.example)</a>'
 		);
+		// href must stay on archive.tw; label may still show the injection attempt as text
 		expect(html).toContain('href="https://archive.tw"');
-		expect(html).not.toContain('evil.example');
+		expect(html).not.toMatch(/href="[^"]*evil\.example/);
 		expect(html).toContain('click](https://evil.example)');
 	});
 });
