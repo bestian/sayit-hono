@@ -160,7 +160,27 @@
 		}
 	}
 
+
+
+	// Ask backend sometimes returns raw HTML anchors in otherwise-markdown text.
+	// Extract them before escapeHtml and re-inject sanitized <a> tags so labels
+	// cannot inject markdown link syntax (issue #141).
+	function extractAskInlineHtmlAnchors(text) {
+		var anchors = [];
+		var withPlaceholders = String(text || '').replace(
+			/<a\b[^>]*\bhref\s*=\s*(["'])([^"'>\s]+)\1[^>]*>([\s\S]*?)<\/a>/gi,
+			function (_m, _quote, href, label) {
+				var cleanLabel = String(label).replace(/<[^>]+>/g, '').trim() || href;
+				var id = anchors.length;
+				anchors.push({ href: href, label: cleanLabel });
+				return '\u0000ASKA' + id + '\u0000';
+			}
+		);
+		return { text: withPlaceholders, anchors: anchors };
+	}
+
 	function sanitizeHtml(html) {
+
 		var doc = new DOMParser().parseFromString(html, 'text/html');
 		var blocked = doc.body.querySelectorAll('script, iframe, object, embed, base, meta, link');
 		for (var i = 0; i < blocked.length; i++) blocked[i].remove();
@@ -253,9 +273,10 @@
 	}
 
 	function renderAskInlineMarkdown(text, hrefByIndex) {
-		var html = escapeHtml(text || '');
+		var extracted = extractAskInlineHtmlAnchors(text || '');
+		var html = escapeHtml(extracted.text);
 		html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-		html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+		html = html.replace(/(^|[^*])\*([^\*\n]+)\*/g, '$1<em>$2</em>');
 		html = html.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_m, label, href) {
 			if (!isSafeHttpUrl(href)) return escapeHtml(label);
 			return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(label) + '</a>';
@@ -267,6 +288,13 @@
 				return '<sup class="cite"><a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">[' + escapeHtml(num) + ']</a></sup>';
 			});
 		}
+		// Restore extracted HTML anchors as sanitized links (or plain text if unsafe).
+		html = html.replace(/\u0000ASKA(\d+)\u0000/g, function (_m, id) {
+			var item = extracted.anchors[Number(id)];
+			if (!item) return '';
+			if (!isSafeHttpUrl(item.href)) return escapeHtml(item.label);
+			return '<a href="' + escapeHtml(item.href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.label) + '</a>';
+		});
 		return html;
 	}
 
