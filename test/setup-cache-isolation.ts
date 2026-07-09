@@ -1,7 +1,19 @@
 // Public routes no longer use caches.default (Workers Cache is front-of-Worker).
-// Kept as an empty setup file so vitest.config.mts setupFiles path stays valid.
-import { beforeEach } from 'vitest';
+// Mock cloudflare:workers cache.purge so upload invalidation tests can assert
+// success without a real Workers Cache purge API in the vitest pool.
 
-beforeEach(() => {
-	// no-op
+import { beforeEach, vi } from 'vitest';
+
+vi.mock('cloudflare:workers', () => ({
+	cache: {
+		purge: vi.fn(async () => ({ success: true })),
+	},
+}));
+
+beforeEach(async () => {
+	const { cache } = await import('cloudflare:workers');
+	if (cache?.purge && 'mockReset' in cache.purge) {
+		(cache.purge as ReturnType<typeof vi.fn>).mockReset();
+		(cache.purge as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+	}
 });

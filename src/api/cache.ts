@@ -159,19 +159,38 @@ export type PurgeOptions =
  * pathPrefixes are true prefixes — never pass '/' for "home only"; use tags for exact list pages.
  * Prefer tags-only or pathPrefixes-only calls; combining is allowed but a bad prefix must not
  * block tags — callers should split when prefixes may be untrusted.
+ *
+ * Returns true only if purge succeeds. Retries because HTML uses long SWR (86400):
+ * a silent purge miss can serve stale content for up to a day.
  */
-export async function purgeWorkersCache(options: PurgeOptions): Promise<void> {
-	try {
-		console.log('[workers cache] purging', options);
-		const result = await cache.purge(options);
-		console.log('[workers cache] purge result', result);
-		if (result && typeof result === 'object' && 'success' in result && result.success === false) {
-			console.error('[workers cache] purge reported failure', result);
+export async function purgeWorkersCache(options: PurgeOptions): Promise<boolean> {
+	const maxAttempts = 3;
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			console.log('[workers cache] purging', { attempt, options });
+			const result = await cache.purge(options);
+			console.log('[workers cache] purge result', result);
+			// Explicit failure only. Missing/undefined result counts as success (API may return void).
+			if (result && typeof result === 'object' && 'success' in result && (result as { success?: boolean }).success === false) {
+				console.error('[workers cache] purge reported failure', result);
+				lastError = result;
+				continue;
+			}
+			return true;
+		} catch (err) {
+			console.error('[workers cache] purge error', { attempt, err });
+			lastError = err;
 		}
-	} catch (err) {
-		console.error('[workers cache] purge error', err);
 	}
+	if (lastError !== undefined) {
+		console.error('[workers cache] purge giving up', lastError);
+	}
+	return false;
 }
+
+
+
 
 /** Canonical request path for a speech filename (percent-encoded; no raw Unicode). */
 export function speechRequestPath(filename: string): string {
