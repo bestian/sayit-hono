@@ -9,6 +9,8 @@ import {
 	r2OgSectionKey,
 	r2OgSpeechKey,
 	readR2Cache,
+	speechRequestPath,
+	speakerRequestPath,
 	tags,
 	writeR2Cache,
 	type PurgeOptions
@@ -147,5 +149,18 @@ describe('purgeWorkersCache option shape', () => {
 		expect(byTags).toBeTruthy();
 		expect(byPrefix).toBeTruthy();
 		expect(everything).toBeTruthy();
+	});
+});
+
+describe('speech/speaker request paths', () => {
+	it('percent-encodes CJK speech filenames for pathPrefixes', () => {
+		const filename = '2025-11-10-柏林自由會議-ai-的角色';
+		expect(speechRequestPath(filename)).toBe(`/${encodeURIComponent(filename)}`);
+		expect(speechRequestPath(filename)).not.toContain('柏');
+	});
+
+	it('percent-encodes speaker routes', () => {
+		expect(speakerRequestPath('audrey-tang')).toBe('/speaker/audrey-tang');
+		expect(speakerRequestPath('唐鳳')).toBe(`/speaker/${encodeURIComponent('唐鳳')}`);
 	});
 });

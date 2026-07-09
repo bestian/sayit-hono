@@ -157,12 +157,28 @@ export type PurgeOptions =
 /**
  * Purge front-of-Worker Workers Cache.
  * pathPrefixes are true prefixes — never pass '/' for "home only"; use tags for exact list pages.
+ * Prefer tags-only or pathPrefixes-only calls; combining is allowed but a bad prefix must not
+ * block tags — callers should split when prefixes may be untrusted.
  */
 export async function purgeWorkersCache(options: PurgeOptions): Promise<void> {
 	try {
 		console.log('[workers cache] purging', options);
-		await cache.purge(options);
+		const result = await cache.purge(options);
+		console.log('[workers cache] purge result', result);
+		if (result && typeof result === 'object' && 'success' in result && result.success === false) {
+			console.error('[workers cache] purge reported failure', result);
+		}
 	} catch (err) {
 		console.error('[workers cache] purge error', err);
 	}
+}
+
+/** Canonical request path for a speech filename (percent-encoded; no raw Unicode). */
+export function speechRequestPath(filename: string): string {
+	return `/${encodeURIComponent(filename)}`;
+}
+
+/** Canonical request path for a speaker route. */
+export function speakerRequestPath(routePathname: string): string {
+	return `/speaker/${encodeURIComponent(routePathname)}`;
 }
