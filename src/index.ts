@@ -915,6 +915,13 @@ app.post('/api/purge_cache', async (c) => {
 	);
 	if (!authorized) return c.text('Forbidden', 403);
 
+	// Front-only: skip R2 wipe (slow/timeout) and just purge Workers Cache.
+	const frontOnly = new URL(c.req.url).searchParams.get('front_only') === '1';
+	if (frontOnly) {
+		await purgeWorkersCache({ purgeEverything: true });
+		return c.json({ frontOnly: true, purged: true });
+	}
+
 	const bucket = c.env.SPEECH_CACHE;
 	let deleted = 0;
 	let cursor: string | undefined;
