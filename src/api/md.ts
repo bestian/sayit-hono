@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
-import { readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache, deleteEdgeCache, deleteR2Cache } from './cache';
+import { ARTIFACT_CACHE_CONTROL, deleteR2Cache, r2MdKey, readR2Cache, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 import { getAnContentAsString } from './an';
 import { isNumericAnKey } from './an';
@@ -238,29 +238,22 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	// 單一演講才快取，段落不快取
 	if (!isNumericAnKey(anKey)) {
-		const cacheKey = `md/${baseKey}`;
+		const cacheKey = r2MdKey(baseKey);
 
 		if (purge) {
-			await deleteEdgeCache(cacheKey);
 			await deleteR2Cache(c.env.SPEECH_CACHE, cacheKey);
 		} else {
-			const edgeCached = await readEdgeCache(cacheKey);
-			if (edgeCached) {
-				const headers = new Headers(edgeCached.headers);
-				headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
-				Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-				return new Response(await edgeCached.text(), { status: 200, headers });
-			}
-
 			const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/markdown; charset=utf-8');
 			if (cached) {
 				const headers = new Headers(cached.headers);
+				headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 				headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 				Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+				if (headers.has('Access-Control-Allow-Origin')) {
+					headers.set('Vary', 'Origin');
+				}
 				const body = await cached.text();
-				const response = new Response(body, { status: 200, headers });
-				await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
-				return response;
+				return new Response(body, { status: 200, headers });
 			}
 		}
 	}
@@ -275,17 +268,19 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 	const headers = new Headers(corsHeaders);
 	headers.set('Content-Type', 'text/markdown; charset=utf-8');
 	if (!isNumericAnKey(anKey)) {
-		headers.set('Cache-Control', 'public, max-age=3600');
+		headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 		headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 	} else {
 		headers.set('Cache-Control', 'private, no-store');
 	}
 
 	if (!isNumericAnKey(anKey)) {
-		const cacheKey = `md/${baseKey}`;
+		const cacheKey = r2MdKey(baseKey);
+		if (headers.has('Access-Control-Allow-Origin')) {
+			headers.set('Vary', 'Origin');
+		}
 		const response = new Response(mdContent, { status: 200, headers });
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response, 'text/markdown; charset=utf-8');
-		await writeEdgeCache(cacheKey, response, 'public, max-age=3600');
 		return response;
 	}
 

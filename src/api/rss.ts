@@ -1,5 +1,11 @@
 import type { Context } from 'hono';
-import { CACHE_KEY_VERSION, readEdgeCache, readR2Cache, writeEdgeCache, writeR2Cache } from './cache';
+import {
+	FEED_CACHE_CONTROL,
+	buildR2HtmlKey,
+	readR2Cache,
+	tags,
+	writeR2Cache
+} from './cache';
 import type { ApiEnv } from './types';
 
 const SITE_URL = 'https://archive.tw';
@@ -8,7 +14,6 @@ const FEED_TITLE = 'SayIt';
 const FEED_DESCRIPTION = 'Latest transcripts from archive.tw';
 const FEED_LANGUAGE = 'zh-TW';
 const FEED_LIMIT = 30;
-const FEED_CACHE_CONTROL = 'public, max-age=300, s-maxage=300';
 const FEED_CONTENT_TYPE = 'application/rss+xml; charset=utf-8';
 
 type FeedRow = {
@@ -176,27 +181,15 @@ ${itemXml}
 }
 
 
-function buildCacheKey(url: string): string {
-	const u = new URL(url);
-	return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${u.search}`;
-}
 
 export async function rssFeed(c: Context<ApiEnv>) {
-	const cacheKey = buildCacheKey(c.req.url);
-	const edgeCached = await readEdgeCache(cacheKey);
-	if (edgeCached) {
-		const headers = new Headers(edgeCached.headers);
-		headers.set('Cache-Tag', 'list:rss');
-		return new Response(edgeCached.body, { status: 200, headers });
-	}
-
+	const cacheKey = buildR2HtmlKey(c.req.url);
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, FEED_CONTENT_TYPE);
 	if (r2Cached) {
 		const headers = new Headers(r2Cached.headers);
-		headers.set('Cache-Tag', 'list:rss');
-		const res = new Response(r2Cached.body, { status: 200, headers });
-		await writeEdgeCache(cacheKey, res.clone(), FEED_CACHE_CONTROL);
-		return res;
+		headers.set('Cache-Control', FEED_CACHE_CONTROL);
+		headers.set('Cache-Tag', tags.listRss);
+		return new Response(r2Cached.body, { status: 200, headers });
 	}
 	try {
 		const result = await c.env.DB.prepare(
@@ -262,13 +255,11 @@ export async function rssFeed(c: Context<ApiEnv>) {
 			headers: {
 				'Content-Type': FEED_CONTENT_TYPE,
 				'Cache-Control': FEED_CACHE_CONTROL,
-				'Cache-Tag': 'list:rss'
+				'Cache-Tag': tags.listRss
 			}
 		});
 
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone(), FEED_CONTENT_TYPE);
-		await writeEdgeCache(cacheKey, response.clone(), FEED_CACHE_CONTROL);
-
 		return response;
 	} catch (error) {
 		console.error('[rss] query failed', error);

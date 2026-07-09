@@ -56,7 +56,8 @@ bun run preview:assets
 （等同 `python3 -m http.server 4173 -d www`）
 
 ### SSR 路由注意事項
-- 所有頁面皆為 SSR 路由，並搭配 R2/Edge 快取。
+- 所有頁面皆為 SSR 路由，並搭配 front Workers Cache（必要時以 R2 作 origin）。
+
 - 部署或開發前，仍需先執行 `bun run build:views` 生成 `src/.generated/views` 供 Worker 匯入。
 
 ## 部署

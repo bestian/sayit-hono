@@ -3,7 +3,16 @@ import { getCorsHeaders } from './cors';
 import { isAuthorizedFromHeader } from './auth';
 import type { ApiEnv } from './types';
 import { marked } from 'marked';
-import { CACHE_KEY_VERSION, deleteEdgeCache, deleteR2Cache, purgeWorkersCache } from './cache';
+import {
+	CACHE_KEY_VERSION,
+	deleteR2Cache,
+	purgeWorkersCache,
+	r2AnKey,
+	r2MdKey,
+	r2OgSectionKey,
+	r2OgSpeechKey,
+	tags
+} from './cache';
 import {
 	markSpeechDeletedInSearch,
 	syncSearchStats,
@@ -521,117 +530,98 @@ function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[]
 }
 
 
-// CF CDN auto-caches Worker responses based on Cache-Control, keyed by the real
-// request URL (e.g. https://archive.tw/speeches). The versioned R2 key we normally
-// invalidate doesn't reach that entry, so we also purge by real URL here.
-function realUrlsForPaths(host: string, paths: Iterable<string>): string[] {
-	return Array.from(paths, (path) => `https://${host}${path.startsWith('/') ? path : `/${path}`}`);
-}
-
-/** 演講內容或 .an/.md 更新後，刪除 R2 上對應的快取 key */
+/** 演講內容或 .an/.md 更新後，刪除 R2 origin 並 purge Workers Cache */
 async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 	const host = new URL(c.req.url).host;
 	const encodedFilename = encodeURIComponent(filename);
-	const keys = [
-		`an/${filename}`,
-		`md/${filename}`,
+	const r2Keys = [
+		r2AnKey(filename),
+		r2MdKey(filename),
 		`${CACHE_KEY_VERSION}/${host}/${filename}`,
 		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`,
-		`${CACHE_KEY_VERSION}/og/${filename}.png`,
+		r2OgSpeechKey(filename),
 	];
-	const realPaths = new Set<string>([`/${filename}`, `/${encodedFilename}`]);
+	// pathPrefixes only for intentional breadth (speech body + sections). List roots use tags only.
+	const pathPrefixes = [`/${filename}`, `/${encodedFilename}`];
 
-	// Also invalidate cached /speech/:section_id pages for this speech
 	try {
 		const result = await c.env.DB.prepare(
 			'SELECT section_id FROM speech_content WHERE filename = ?'
 		).bind(filename).all();
 		for (const row of result.results as Array<{ section_id: number }>) {
-			keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${row.section_id}`);
-			realPaths.add(`/speech/${row.section_id}`);
+			r2Keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${row.section_id}`);
+			r2Keys.push(r2OgSectionKey(row.section_id));
+			pathPrefixes.push(`/speech/${row.section_id}`);
 		}
 	} catch (err) {
 		console.error('[invalidate] section query error', err);
 	}
 
 	await Promise.allSettled([
-		...keys.flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
-		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url)),
-		purgeWorkersCache(c.executionCtx, {
-			tags: [
-				`speech:${encodeURIComponent(filename)}`,
-				'list:home',
-				'list:speeches',
-				'list:rss'
-			]
-		})
+		...r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)),
+		purgeWorkersCache({
+			tags: [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss],
+			pathPrefixes,
+		}),
 	]);
 }
 
-/** 講者或演講-講者關聯更新後，刪除 R2 上 speakers 列表與各講者頁快取 */
+/** 講者或演講-講者關聯更新後，刪除 R2 origin 並 purge Workers Cache */
 async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]) {
 	const host = new URL(c.req.url).host;
-	const keys = new Set<string>([`${CACHE_KEY_VERSION}/${host}/speakers`]);
-	const realPaths = new Set<string>(['/speakers']);
+	const r2Keys = new Set<string>([`${CACHE_KEY_VERSION}/${host}/speakers`]);
+	const pathPrefixes: string[] = [];
 
 	for (const routePathname of speakerRoutePathnames) {
-		keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${routePathname}`);
-		keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${encodeURIComponent(routePathname)}`);
-		realPaths.add(`/speaker/${routePathname}`);
-		realPaths.add(`/speaker/${encodeURIComponent(routePathname)}`);
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${routePathname}`);
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${encodeURIComponent(routePathname)}`);
+		pathPrefixes.push(`/speaker/${routePathname}`);
+		pathPrefixes.push(`/speaker/${encodeURIComponent(routePathname)}`);
 	}
 
-	const tags = speakerRoutePathnames.map((p) => `speaker:${encodeURIComponent(p)}`);
-	tags.push('list:speakers');
+	const purgeTags = speakerRoutePathnames.map((p) => tags.speaker(p));
+	purgeTags.push(tags.listSpeakers);
 
 	await Promise.allSettled([
-		...Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
-		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url)),
-		purgeWorkersCache(c.executionCtx, { tags })
+		...Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)),
+		purgeWorkersCache({
+			tags: purgeTags,
+			...(pathPrefixes.length > 0 ? { pathPrefixes } : {}),
+		}),
 	]);
 }
 
-/** 失效列表頁快取：可選擇 speeches/speakers */
+/** 失效列表頁快取：tags only for exact list roots; R2 origin keys still deleted */
 async function invalidateListPageCaches(
 	c: Context<ApiEnv>,
 	{ home, speeches, speakers }: { home: boolean; speeches: boolean; speakers: boolean }
 ) {
 	const host = new URL(c.req.url).host;
-	const keys = new Set<string>();
-	const realPaths = new Set<string>();
+	const r2Keys = new Set<string>();
 
 	if (home) {
-		keys.add(`${CACHE_KEY_VERSION}/${host}/`);
-		keys.add(`${CACHE_KEY_VERSION}/${host}/index.html`);
-		realPaths.add('/');
-		realPaths.add('/index.html');
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/`);
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/index.html`);
 	}
 	if (speeches) {
-		keys.add(`${CACHE_KEY_VERSION}/${host}/speeches`);
-		keys.add(`${CACHE_KEY_VERSION}/${host}/speeches/`);
-		keys.add(`${CACHE_KEY_VERSION}/${host}/rss.xml`);
-		keys.add(`${CACHE_KEY_VERSION}/${host}/feed.xml`);
-		realPaths.add('/speeches');
-		realPaths.add('/speeches/');
-		realPaths.add('/rss.xml');
-		realPaths.add('/feed.xml');
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speeches`);
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speeches/`);
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/rss.xml`);
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/feed.xml`);
 	}
 	if (speakers) {
-		keys.add(`${CACHE_KEY_VERSION}/${host}/speakers`);
-		keys.add(`${CACHE_KEY_VERSION}/${host}/speakers/`);
-		realPaths.add('/speakers');
-		realPaths.add('/speakers/');
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speakers`);
+		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speakers/`);
 	}
 
-	const tags: string[] = [];
-	if (home) tags.push('list:home');
-	if (speeches) tags.push('list:speeches', 'list:rss');
-	if (speakers) tags.push('list:speakers');
+	const purgeTags: string[] = [];
+	if (home) purgeTags.push(tags.listHome);
+	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss);
+	if (speakers) purgeTags.push(tags.listSpeakers);
 
 	await Promise.allSettled([
-		...Array.from(keys).flatMap((key) => [deleteR2Cache(c.env.SPEECH_CACHE, key), deleteEdgeCache(key)]),
-		...realUrlsForPaths(host, realPaths).map((url) => deleteEdgeCache(url)),
-		...(tags.length > 0 ? [purgeWorkersCache(c.executionCtx, { tags })] : [])
+		...Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)),
+		...(purgeTags.length > 0 ? [purgeWorkersCache({ tags: purgeTags })] : []),
 	]);
 }
 
