@@ -944,3 +944,28 @@ describe('upload_markdown PATCH empty result containers', () => {
 		expect([200, 503]).toContain(res.status);
 	});
 });
+
+
+describe('upload_markdown R2 origin delete failures', () => {
+	it('returns 503 when R2 origin delete fails after PATCH even if Workers purge succeeds', async () => {
+		const env = createUploadEnv();
+		env.SPEECH_CACHE.delete = async () => {
+			throw new Error('r2 delete failed');
+		};
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: '# Demo Speech\nAlpha\n\nBeta'
+			})
+		});
+		expect(res.status).toBe(503);
+		const json = await res.json() as { success: boolean; cachePurge: boolean };
+		expect(json.success).toBe(true);
+		expect(json.cachePurge).toBe(false);
+	});
+});
