@@ -33,7 +33,8 @@ Closes #42
 核心特性：
 
 - **無 SPA / 無 vue-router**：每個頁面是獨立的 `.vue` 檔，由 Hono 直接 SSR 渲染。
-- **Edge + R2 雙層快取**：HTML 響應同時寫入 Cloudflare Edge Cache 與 R2，重新部署時透過 `CACHE_KEY_VERSION` 自動失效。
+- **Workers Cache + optional R2 origin**：公開 GET 靠 front Workers Cache（`Cache-Control` / `Cache-Tag`）；昂貴 SSR HTML 與 `an`/`md`/OG 另寫 R2 origin。內容變更用 tag purge；R2 部署失效靠 `CACHE_KEY_VERSION`。
+
 - **Static-first**：靜態資源（`www/`）優先由 ASSETS binding 服務，找不到才走 SSR / API。
 - **D1 為資料來源**：所有演講、段落、講者資料都存在 D1，搜尋索引會額外烤成 JSON 放在 R2。
 
