@@ -159,8 +159,11 @@ describe('speech/speaker request paths', () => {
 		expect(speechRequestPath(filename)).not.toContain('柏');
 	});
 
-	it('percent-encodes speaker routes', () => {
+	it('uses stored speaker route keys without double-encoding', () => {
 		expect(speakerRequestPath('audrey-tang')).toBe('/speaker/audrey-tang');
-		expect(speakerRequestPath('唐鳳')).toBe(`/speaker/${encodeURIComponent('唐鳳')}`);
+		const encoded = encodeURIComponent('唐鳳-3');
+		expect(speakerRequestPath(encoded)).toBe(`/speaker/${encoded}`);
+		// already-encoded input must not gain another %25 layer
+		expect(speakerRequestPath(encoded)).not.toContain('%25');
 	});
 });

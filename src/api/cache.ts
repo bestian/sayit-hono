@@ -178,7 +178,12 @@ export function speechRequestPath(filename: string): string {
 	return `/${encodeURIComponent(filename)}`;
 }
 
-/** Canonical request path for a speaker route. */
+/**
+ * Canonical request path for a speaker route.
+ * `routePathname` is already the stored/normalized route key (often percent-encoded);
+ * do not encodeURIComponent again.
+ */
 export function speakerRequestPath(routePathname: string): string {
-	return `/speaker/${encodeURIComponent(routePathname)}`;
+	const key = routePathname.startsWith('/') ? routePathname.slice(1) : routePathname;
+	return `/speaker/${key}`;
 }
