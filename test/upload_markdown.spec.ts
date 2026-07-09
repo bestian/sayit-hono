@@ -364,3 +364,281 @@ describe('upload_markdown POST', () => {
 		expect(env.__putObjects.get('search-index-manifest.json')).toContain('"fresh-speech"');
 	});
 });
+
+
+describe('upload_markdown PATCH deletes stale section caches', () => {
+	it('purges deleted section R2 keys even when they are gone from D1', async () => {
+		const operations: Array<{ sql: string; args: unknown[] }> = [];
+		const deletedKeys: string[] = [];
+		let liveSections = [
+			{ section_id: 100, previous_section_id: null as number | null, next_section_id: 101 as number | null, section_speaker: null as string | null, section_content: '<p>Alpha</p>' },
+			{ section_id: 101, previous_section_id: 100 as number | null, next_section_id: null as number | null, section_speaker: null as string | null, section_content: '<p>Beta</p>' }
+		];
+
+		function query(sql: string, args: unknown[]) {
+			if (sql.includes('SELECT COUNT(*) AS count FROM speech_index')) {
+				return { success: true, results: [{ count: 1 }] };
+			}
+			if (sql.includes('SELECT COUNT(*) AS count FROM speakers')) {
+				return { success: true, results: [{ count: 0 }] };
+			}
+			if (sql.includes('SELECT COUNT(*) AS count FROM speech_content')) {
+				return { success: true, results: [{ count: liveSections.length }] };
+			}
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				return {
+					success: true,
+					results: [{
+						filename: 'demo-speech',
+						display_name: 'Demo Speech',
+						isNested: 0,
+						nest_filenames: '',
+						nest_display_names: '',
+						alternate_filename: null
+					}]
+				};
+			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+				return { success: true, results: [{ next_id: 200 }] };
+			}
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return {
+					success: true,
+					results: liveSections.map((s) => ({
+						filename: 'demo-speech',
+						...s
+					}))
+				};
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
+				// Post-mutation view: only remaining rows (simulates D1 after DELETE)
+				return { success: true, results: liveSections.map(({ section_id }) => ({ section_id })) };
+			}
+			if (sql.includes('FROM speech_speakers')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('SELECT DISTINCT section_speaker')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('FROM speech_redirects')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename != ?')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index')) {
+				return {
+					success: true,
+					results: liveSections.map((s) => ({
+						filename: 'demo-speech',
+						nest_filename: null,
+						section_id: s.section_id,
+						section_content: s.section_content,
+						display_name: 'Demo Speech',
+						name: null
+					}))
+				};
+			}
+			throw new Error(`Unexpected query: ${sql}`);
+		}
+
+		const env = {
+			AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
+			BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
+			ASSETS: { fetch: () => new Response('Not Found', { status: 404 }) },
+			SPEECH_CACHE: {
+				delete: async (key: string) => {
+					deletedKeys.push(key);
+					return true;
+				},
+				get: async () => null,
+				put: async () => {},
+				list: async () => ({ objects: [], truncated: false, cursor: '' })
+			},
+			DB: {
+				prepare: (sql: string) => {
+					const run = (args: unknown[] = []) => ({
+						sql,
+						args,
+						first: async () => {
+							if (sql.includes('section_id_counter') && sql.includes('RETURNING')) {
+								return { next_id: 200 };
+							}
+							const result = query(sql, args);
+							return result.results[0] ?? null;
+						},
+						all: async () => query(sql, args)
+					});
+					// Unbound prepare() must still carry sql for DB.batch([prepare(...)])
+					return Object.assign(run([]), {
+						bind: (...args: unknown[]) => run(args)
+					});
+				},
+				batch: async (statements: Array<{ sql?: string; args?: unknown[] }>) => {
+					for (const stmt of statements) {
+						if (typeof stmt?.sql !== 'string') continue;
+						operations.push({ sql: stmt.sql, args: stmt.args ?? [] });
+						const args = stmt.args ?? [];
+						if (stmt.sql.startsWith('DELETE FROM speech_content WHERE filename = ? AND section_id = ?')) {
+							const id = Number(args[1]);
+							liveSections = liveSections.filter((s) => s.section_id !== id);
+						}
+						if (stmt.sql.startsWith('UPDATE speech_content')) {
+							// bind(previous, next, speaker, content, filename, section_id)
+							const sectionId = Number(args[5]);
+							const content = String(args[3]);
+							const speaker = (args[2] as string | null) ?? null;
+							const prev = (args[0] as number | null) ?? null;
+							const next = (args[1] as number | null) ?? null;
+							liveSections = liveSections.map((s) =>
+								s.section_id === sectionId
+									? {
+											section_id: sectionId,
+											previous_section_id: prev,
+											next_section_id: next,
+											section_speaker: speaker,
+											section_content: content
+										}
+									: s
+							);
+						}
+						if (stmt.sql.startsWith('INSERT INTO speech_content')) {
+							liveSections.push({
+								section_id: Number(args[3]),
+								previous_section_id: (args[4] as number | null) ?? null,
+								next_section_id: (args[5] as number | null) ?? null,
+								section_speaker: (args[6] as string | null) ?? null,
+								section_content: String(args[7])
+							});
+						}
+					}
+					return statements.map(() => ({ meta: { changes: 1 } }));
+				}
+			},
+			__deletedKeys: deletedKeys
+		} as any;
+
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			// Keep only Alpha → section 101 must be deleted and purged
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: '# Demo Speech\nAlpha only'
+			})
+		});
+
+		expect(res.status).toBe(200);
+		const body = await res.json() as { deletedCount: number };
+		expect(body.deletedCount).toBe(1);
+		expect(deletedKeys).toEqual(
+			expect.arrayContaining([
+				`${CACHE_KEY_VERSION}/example.com/speech/101`,
+				`${CACHE_KEY_VERSION}/og/speech/101.png`,
+				// remaining section still purged too
+				`${CACHE_KEY_VERSION}/example.com/speech/100`,
+				`${CACHE_KEY_VERSION}/og/speech/100.png`
+			])
+		);
+		// Ensure we actually removed 101 from live D1 view before invalidate re-query
+		expect(liveSections.map((s) => s.section_id)).toEqual([100]);
+	});
+});
+
+describe('upload_markdown DELETE purges preexisting section caches', () => {
+	it('purges section R2 keys captured before speech_content rows are deleted', async () => {
+		const deletedKeys: string[] = [];
+		let liveSections = [
+			{ section_id: 42, previous_section_id: null as number | null, next_section_id: null as number | null, section_speaker: null as string | null, section_content: '<p>Only</p>' }
+		];
+		let speechExists = true;
+
+		function query(sql: string, args: unknown[]) {
+			if (sql.includes('FROM speech_redirects')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?') || sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
+				return { success: true, results: liveSections.map(({ section_id }) => ({ section_id })) };
+			}
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				return {
+					success: true,
+					results: speechExists
+						? [{ filename: 'demo-speech', display_name: 'Demo', isNested: 0, nest_filenames: '', nest_display_names: '', alternate_filename: null }]
+						: []
+				};
+			}
+			throw new Error(`Unexpected query: ${sql}`);
+		}
+
+		const env = {
+			AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
+			BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
+			ASSETS: { fetch: () => new Response('Not Found', { status: 404 }) },
+			SPEECH_CACHE: {
+				delete: async (key: string) => {
+					deletedKeys.push(key);
+					return true;
+				},
+				get: async () => null,
+				put: async () => {},
+				list: async () => ({ objects: [], truncated: false, cursor: '' })
+			},
+			DB: {
+				prepare: (sql: string) => {
+					const run = (args: unknown[] = []) => ({
+						sql,
+						args,
+						first: async () => query(sql, args).results[0] ?? null,
+						all: async () => query(sql, args)
+					});
+					return Object.assign(run([]), {
+						bind: (...args: unknown[]) => run(args)
+					});
+				},
+				batch: async (statements: Array<{ sql?: string; args?: unknown[]; meta?: { changes: number } }>) => {
+					for (const stmt of statements) {
+						if (typeof stmt?.sql !== 'string') continue;
+						if (stmt.sql.startsWith('DELETE FROM speech_content WHERE filename = ?')) {
+							liveSections = [];
+						}
+						if (stmt.sql.startsWith('DELETE FROM speech_index WHERE filename = ?')) {
+							speechExists = false;
+						}
+					}
+					return statements.map((stmt) => {
+						const sql = stmt?.sql ?? '';
+						// Report real-looking change counts so DELETE does not 404
+						if (sql.startsWith('DELETE FROM speech_content')) return { meta: { changes: 1 } };
+						if (sql.startsWith('DELETE FROM speech_speakers')) return { meta: { changes: 0 } };
+						if (sql.startsWith('DELETE FROM speech_index')) return { meta: { changes: 1 } };
+						return { meta: { changes: 0 } };
+					});
+				}
+			}
+		} as any;
+
+		const { res } = await request('/api/upload_markdown?filename=demo-speech', env, {
+			method: 'DELETE',
+			headers: { Authorization: 'Bearer token-audrey' }
+		});
+		expect(res.status).toBe(200);
+		expect(deletedKeys).toEqual(
+			expect.arrayContaining([
+				`${CACHE_KEY_VERSION}/example.com/speech/42`,
+				`${CACHE_KEY_VERSION}/og/speech/42.png`,
+				`${CACHE_KEY_VERSION}/example.com/demo-speech`,
+				'an/demo-speech',
+				'md/demo-speech'
+			])
+		);
+		expect(liveSections).toEqual([]);
+	});
+});
+
