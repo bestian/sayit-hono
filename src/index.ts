@@ -918,8 +918,11 @@ app.post('/api/purge_cache', async (c) => {
 	// Front-only: skip R2 wipe (slow/timeout) and just purge Workers Cache.
 	const frontOnly = new URL(c.req.url).searchParams.get('front_only') === '1';
 	if (frontOnly) {
-		await purgeWorkersCache({ purgeEverything: true });
-		return c.json({ frontOnly: true, purged: true });
+		const purged = await purgeWorkersCache({ purgeEverything: true });
+		return c.json(
+			{ frontOnly: true, purged },
+			purged ? 200 : 503
+		);
 	}
 
 	const bucket = c.env.SPEECH_CACHE;
@@ -934,8 +937,11 @@ app.post('/api/purge_cache', async (c) => {
 		}
 		cursor = list.truncated ? list.cursor : undefined;
 	} while (cursor);
-	await purgeWorkersCache({ purgeEverything: true });
-	return c.json({ deleted });
+	const purged = await purgeWorkersCache({ purgeEverything: true });
+	return c.json(
+		{ deleted, purged },
+		purged ? 200 : 503
+	);
 });
 
 app.post('/api/cleanup_old_cache', async (c) => {
