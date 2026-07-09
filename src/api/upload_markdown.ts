@@ -11,6 +11,8 @@ import {
 	r2MdKey,
 	r2OgSectionKey,
 	r2OgSpeechKey,
+	speechRequestPath,
+	speakerRequestPath,
 	tags
 } from './cache';
 import {
@@ -541,8 +543,9 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`,
 		r2OgSpeechKey(filename),
 	];
-	// pathPrefixes only for intentional breadth (speech body + sections). List roots use tags only.
-	const pathPrefixes = [`/${filename}`, `/${encodedFilename}`];
+	// pathPrefixes: request-path encoding only (percent-encoded). Raw Unicode prefixes can fail purge.
+	// List roots use tags only — never pathPrefix '/'.
+	const pathPrefixes = [speechRequestPath(filename)];
 
 	try {
 		const result = await c.env.DB.prepare(
@@ -557,12 +560,12 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string) {
 		console.error('[invalidate] section query error', err);
 	}
 
+	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
+	// Split tags vs pathPrefixes so a bad prefix cannot block tag purge.
 	await Promise.allSettled([
 		...r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)),
-		purgeWorkersCache({
-			tags: [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss],
-			pathPrefixes,
-		}),
+		purgeWorkersCache({ tags: purgeTags }),
+		purgeWorkersCache({ pathPrefixes }),
 	]);
 }
 
@@ -575,8 +578,8 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 	for (const routePathname of speakerRoutePathnames) {
 		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${routePathname}`);
 		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${encodeURIComponent(routePathname)}`);
-		pathPrefixes.push(`/speaker/${routePathname}`);
-		pathPrefixes.push(`/speaker/${encodeURIComponent(routePathname)}`);
+		// Request path is percent-encoded; skip raw Unicode prefixes.
+		pathPrefixes.push(speakerRequestPath(routePathname));
 	}
 
 	const purgeTags = speakerRoutePathnames.map((p) => tags.speaker(p));
@@ -584,10 +587,8 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 
 	await Promise.allSettled([
 		...Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)),
-		purgeWorkersCache({
-			tags: purgeTags,
-			...(pathPrefixes.length > 0 ? { pathPrefixes } : {}),
-		}),
+		purgeWorkersCache({ tags: purgeTags }),
+		...(pathPrefixes.length > 0 ? [purgeWorkersCache({ pathPrefixes })] : []),
 	]);
 }
 
