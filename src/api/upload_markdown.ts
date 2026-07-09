@@ -575,7 +575,7 @@ async function invalidateSpeechCaches(
 		pathPrefixes.push(`/speech/${sectionId}`);
 	}
 
-	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss, tags.listSearch];
+	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
 	// Both tiers must clear: R2 origin delete AND Workers Cache purge.
 	// If R2 delete fails but front purge succeeds, the next MISS re-poisons the front from stale R2.
 	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
@@ -644,7 +644,7 @@ async function invalidateListPageCaches(
 
 	const purgeTags: string[] = [];
 	if (home) purgeTags.push(tags.listHome);
-	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss, tags.listSearch);
+	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss);
 	if (speakers) purgeTags.push(tags.listSpeakers);
 
 	const r2Results = await Promise.all(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
@@ -672,6 +672,12 @@ async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: stri
 		}
 	}
 	return ok;
+}
+
+
+/** Purge search HTML/API front cache only after search artifacts are fresh. */
+async function purgeSearchFrontCache(): Promise<boolean> {
+	return purgeWorkersCache({ tags: [tags.listSearch] });
 }
 
 async function syncSearchArtifactsAfterDelete(c: Context<ApiEnv>, filename: string): Promise<boolean> {
@@ -801,11 +807,15 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					]).then((parts) => parts.every(Boolean)),
 					syncSearchArtifactsAfterDelete(c, filename),
 				]);
-				if (!cachePurge || !searchSync) {
+				// Only after search artifacts are fresh: evict /search/ and /api/search.json front cache.
+				const searchFrontPurge = searchSync ? await purgeSearchFrontCache() : false;
+				const searchFresh = searchSync && searchFrontPurge;
+				if (!cachePurge || !searchFresh) {
 					console.error('[upload_markdown] DELETE post-commit invalidation incomplete', {
 						filename,
 						cachePurge,
-						searchSync
+						searchSync,
+						searchFrontPurge
 					});
 				}
 
@@ -813,7 +823,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					{
 						success: true,
 						cachePurge,
-						searchSync,
+						searchSync: searchFresh,
 						message: `Successfully deleted ${filename}`,
 						deleted: {
 							sections: sectionsDeleted,
@@ -822,7 +832,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							speech: speechDeleted
 						}
 					},
-					cachePurge && searchSync ? 200 : 503,
+					cachePurge && searchFresh ? 200 : 503,
 					corsHeadersWithMethods
 				);
 		} else if (method === 'POST') {
@@ -1029,11 +1039,14 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				]).then((parts) => parts.every(Boolean)),
 				syncSearchArtifactsAfterUpsert(c, filename),
 			]);
-			if (!cachePurge || !searchSync) {
+			const searchFrontPurge = searchSync ? await purgeSearchFrontCache() : false;
+			const searchFresh = searchSync && searchFrontPurge;
+			if (!cachePurge || !searchFresh) {
 				console.error('[upload_markdown] POST post-commit invalidation incomplete', {
 					filename,
 					cachePurge,
-					searchSync
+					searchSync,
+					searchFrontPurge
 				});
 			}
 
@@ -1041,12 +1054,12 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				{
 					success: true,
 					cachePurge,
-					searchSync,
+					searchSync: searchFresh,
 					filename,
 					sectionsCount: normalized.length,
 					...(altFilename ? { alternate_filename: altFilename } : {})
 				},
-				cachePurge && searchSync ? 200 : 503,
+				cachePurge && searchFresh ? 200 : 503,
 				corsHeadersWithMethods
 			);
 		} else if (method === 'PATCH') {
@@ -1318,11 +1331,14 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				]).then((parts) => parts.every(Boolean)),
 				syncSearchArtifactsAfterUpsert(c, filename),
 			]);
-			if (!cachePurge || !searchSync) {
+			const searchFrontPurge = searchSync ? await purgeSearchFrontCache() : false;
+			const searchFresh = searchSync && searchFrontPurge;
+			if (!cachePurge || !searchFresh) {
 				console.error('[upload_markdown] PATCH post-commit invalidation incomplete', {
 					filename,
 					cachePurge,
-					searchSync
+					searchSync,
+					searchFrontPurge
 				});
 			}
 
@@ -1336,10 +1352,10 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					updatedCount: normalized.filter((section) => oldSectionIds.has(section.section_id)).length,
 					deletedCount: oldSections.filter((section) => !finalSectionIds.has(section.section_id)).length,
 					cachePurge,
-					searchSync
+					searchSync: searchFresh
 				},
 				// 503 when D1 wrote but cache and/or search artifacts incomplete
-				cachePurge && searchSync ? 200 : 503,
+				cachePurge && searchFresh ? 200 : 503,
 				corsHeadersWithMethods
 			);
 		} else {
