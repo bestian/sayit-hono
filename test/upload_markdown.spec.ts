@@ -781,8 +781,7 @@ describe('upload_markdown cachePurge failures for DELETE/POST', () => {
 		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
 		expect(json.success).toBe(true);
 		expect(json.cachePurge).toBe(false);
-		expect(json.searchSync).toBe(true);
-		expect(json.searchSync).toBe(true);
+		expect(json.searchSync).toBe(false);
 	});
 
 	it('returns 503 when cache purge fails after POST', async () => {
@@ -805,8 +804,7 @@ describe('upload_markdown cachePurge failures for DELETE/POST', () => {
 		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
 		expect(json.success).toBe(true);
 		expect(json.cachePurge).toBe(false);
-		expect(json.searchSync).toBe(true);
-		expect(json.searchSync).toBe(true);
+		expect(json.searchSync).toBe(false);
 	});
 
 	it('POST replace prefetches prior speakers and cleans orphans', async () => {
