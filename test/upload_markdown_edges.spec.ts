@@ -326,7 +326,7 @@ describe('invalidateSpeakerCaches empty-route skip branch', () => {
 });
 
 describe('syncSearchArtifacts error logging', () => {
-	it('logs but does not fail upsert when the search sync rejects', async () => {
+	it('returns 503 with searchSync false when the search sync rejects on upsert', async () => {
 		const env = makeUploadEnv((sql, args) => {
 			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) {
 				return { success: true, results: [] };
@@ -345,13 +345,20 @@ describe('syncSearchArtifacts error logging', () => {
 				markdown: '# Fail\n## A:\nhi'
 			})
 		});
-		expect(res.status).toBe(200);
+		expect(res.status).toBe(503);
+		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
+		expect(json.success).toBe(true);
+		expect(json.cachePurge).toBe(true);
+		expect(json.searchSync).toBe(false);
 	});
 
-	it('logs but does not fail delete when the search sync rejects', async () => {
+	it('returns 503 with searchSync false when the search sync rejects on delete', async () => {
 		const env = makeUploadEnv((sql) => {
 			if (sql.includes('SELECT speaker_route_pathname FROM speech_speakers')) {
 				return { success: true, results: [] };
+			}
+			if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
+				return { success: true, results: [{ section_id: 1 }] };
 			}
 			if (sql.includes('SELECT COUNT(*) AS count')) return { success: true, results: [{ count: 0 }] };
 			return { success: true, results: [] };
@@ -361,8 +368,13 @@ describe('syncSearchArtifacts error logging', () => {
 			method: 'DELETE',
 			headers: { Authorization: 'Bearer token-audrey' }
 		});
-		expect(res.status).toBe(200);
+		expect(res.status).toBe(503);
+		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
+		expect(json.success).toBe(true);
+		expect(json.cachePurge).toBe(true);
+		expect(json.searchSync).toBe(false);
 	});
+
 });
 
 describe('assignPatchedSections branches — many inserted sections', () => {
