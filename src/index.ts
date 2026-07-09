@@ -76,7 +76,7 @@ const SEARCH_MAX_QUERY_LENGTH = 80;
 const SEARCH_DEFAULT_PAGE_SIZE = 20;
 const SEARCH_MAX_PAGE_SIZE = 50;
 const SEARCH_SPEAKER_LIMIT = 10;
-const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js?v=au-fugu-11"></script>';
+const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js?v=au-fugu-12"></script>';
 const TWITTER_WIDGETS_SCRIPT = '<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>';
 
 function hasTwitterEmbed(contents: Array<string | null | undefined>): boolean {
