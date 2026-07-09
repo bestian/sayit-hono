@@ -230,7 +230,7 @@ describe('upload_markdown PATCH', () => {
 		expect(res.status).toBe(200);
 		expect(await res.json()).toEqual({
 			success: true,
-			cachePurge: true,
+			cachePurge: true, searchSync: true,
 			filename: 'demo-speech',
 			sectionsCount: 3,
 			insertedCount: 1,
@@ -283,7 +283,7 @@ describe('upload_markdown PATCH', () => {
 		});
 
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ success: true, cachePurge: true, filename: 'demo-speech',
+		expect(await res.json()).toEqual({ success: true, cachePurge: true, searchSync: true, filename: 'demo-speech',
 			alternate_filename: 'paired-speech',
 			sectionsCount: 2,
 			insertedCount: 0,
@@ -350,7 +350,7 @@ describe('upload_markdown POST', () => {
 		expect(res.status).toBe(200);
 		expect(await res.json()).toEqual({
 			success: true,
-			cachePurge: true,
+			cachePurge: true, searchSync: true,
 			filename: 'fresh-speech',
 			sectionsCount: 1,
 			alternate_filename: 'paired-speech'
@@ -569,6 +569,9 @@ describe('upload_markdown DELETE purges preexisting section caches', () => {
 			if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
 				return { success: true, results: liveSections.map(({ section_id }) => ({ section_id })) };
 			}
+			if (sql.includes('SELECT COUNT(*) AS count')) {
+				return { success: true, results: [{ count: 0 }] };
+			}
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
 				return {
 					success: true,
@@ -713,7 +716,7 @@ describe('upload_markdown cachePurge failures', () => {
 			})
 		});
 		expect(res.status).toBe(503);
-		const json = await res.json() as { success: boolean; cachePurge: boolean };
+		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
 		expect(json.success).toBe(true);
 		expect(json.cachePurge).toBe(false);
 	});
@@ -775,9 +778,11 @@ describe('upload_markdown cachePurge failures for DELETE/POST', () => {
 			headers: { Authorization: 'Bearer token-audrey' }
 		});
 		expect(res.status).toBe(503);
-		const json = await res.json() as { success: boolean; cachePurge: boolean };
+		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
 		expect(json.success).toBe(true);
 		expect(json.cachePurge).toBe(false);
+		expect(json.searchSync).toBe(true);
+		expect(json.searchSync).toBe(true);
 	});
 
 	it('returns 503 when cache purge fails after POST', async () => {
@@ -797,9 +802,11 @@ describe('upload_markdown cachePurge failures for DELETE/POST', () => {
 			})
 		});
 		expect(res.status).toBe(503);
-		const json = await res.json() as { success: boolean; cachePurge: boolean };
+		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
 		expect(json.success).toBe(true);
 		expect(json.cachePurge).toBe(false);
+		expect(json.searchSync).toBe(true);
+		expect(json.searchSync).toBe(true);
 	});
 
 	it('POST replace prefetches prior speakers and cleans orphans', async () => {
@@ -964,8 +971,39 @@ describe('upload_markdown R2 origin delete failures', () => {
 			})
 		});
 		expect(res.status).toBe(503);
-		const json = await res.json() as { success: boolean; cachePurge: boolean };
+		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
 		expect(json.success).toBe(true);
 		expect(json.cachePurge).toBe(false);
+		expect(json.searchSync).toBe(true);
+	});
+});
+
+
+describe('upload_markdown search artifact sync failures', () => {
+	it('returns 503 when search overlay sync fails after PATCH', async () => {
+		const env = createUploadEnv();
+		const originalPut = env.SPEECH_CACHE.put.bind(env.SPEECH_CACHE);
+		env.SPEECH_CACHE.put = async (key: string, body: string) => {
+			if (String(key).startsWith('search-updates/') || key === 'stats.json' || key === 'search-index-manifest.json') {
+				throw new Error('search r2 write failed');
+			}
+			return originalPut(key, body);
+		};
+		const { res } = await request('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: {
+				Authorization: 'Bearer token-audrey',
+				'Content-Type': 'application/json; charset=utf-8'
+			},
+			body: JSON.stringify({
+				filename: 'demo-speech',
+				markdown: '# Demo Speech\nAlpha\n\nBeta'
+			})
+		});
+		expect(res.status).toBe(503);
+		const json = await res.json() as { success: boolean; cachePurge: boolean; searchSync: boolean };
+		expect(json.success).toBe(true);
+		expect(json.cachePurge).toBe(true);
+		expect(json.searchSync).toBe(false);
 	});
 });

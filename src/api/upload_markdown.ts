@@ -659,28 +659,34 @@ async function invalidateListPageCaches(
 	return r2Ok && purgeOk;
 }
 
-async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: string) {
+async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: string): Promise<boolean> {
 	const results = await Promise.allSettled([
 		writeSearchOverlayForSpeech(c, filename),
 		syncSearchStats(c)
 	]);
+	let ok = true;
 	for (const result of results) {
 		if (result.status === 'rejected') {
+			ok = false;
 			console.error('[upload_markdown] search upsert sync error', result.reason);
 		}
 	}
+	return ok;
 }
 
-async function syncSearchArtifactsAfterDelete(c: Context<ApiEnv>, filename: string) {
+async function syncSearchArtifactsAfterDelete(c: Context<ApiEnv>, filename: string): Promise<boolean> {
 	const results = await Promise.allSettled([
 		markSpeechDeletedInSearch(c.env.SPEECH_CACHE, filename),
 		syncSearchStats(c)
 	]);
+	let ok = true;
 	for (const result of results) {
 		if (result.status === 'rejected') {
+			ok = false;
 			console.error('[upload_markdown] search delete sync error', result.reason);
 		}
 	}
+	return ok;
 }
 
 /** 上傳 Markdown API：支援 POST（新增）、PATCH（更新）、DELETE（刪除），需 Bearer token 驗證 */
@@ -787,22 +793,27 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					);
 				}
 
-				const cachePurge = (
-					await Promise.all([
+				const [cachePurge, searchSync] = await Promise.all([
+					Promise.all([
 						invalidateSpeechCaches(c, filename, preexistingSectionIds),
 						invalidateSpeakerCaches(c, speakerRoutePathnames),
 						invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
-					])
-				).every(Boolean);
-				if (!cachePurge) {
-					console.error('[upload_markdown] DELETE cache purge incomplete after D1 commit', { filename });
+					]).then((parts) => parts.every(Boolean)),
+					syncSearchArtifactsAfterDelete(c, filename),
+				]);
+				if (!cachePurge || !searchSync) {
+					console.error('[upload_markdown] DELETE post-commit invalidation incomplete', {
+						filename,
+						cachePurge,
+						searchSync
+					});
 				}
-				await syncSearchArtifactsAfterDelete(c, filename);
 
 				return c.json(
 					{
 						success: true,
 						cachePurge,
+						searchSync,
 						message: `Successfully deleted ${filename}`,
 						deleted: {
 							sections: sectionsDeleted,
@@ -811,7 +822,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							speech: speechDeleted
 						}
 					},
-					cachePurge ? 200 : 503,
+					cachePurge && searchSync ? 200 : 503,
 					corsHeadersWithMethods
 				);
 		} else if (method === 'POST') {
@@ -1009,28 +1020,33 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				await withRetry(() => c.env.DB.batch(sectionBatch));
 			}
 
-			const cachePurge = (
-				await Promise.all([
+			const [cachePurge, searchSync] = await Promise.all([
+				Promise.all([
 					invalidateSpeechCaches(c, filename),
 					...(altFilename && altFilename !== filename ? [invalidateSpeechCaches(c, altFilename)] : []),
 					invalidateSpeakerCaches(c, Array.from(new Set([...speakerRoutePathnames, ...usedSpeakerRoutePathnames]))),
 					invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
-				])
-			).every(Boolean);
-			if (!cachePurge) {
-				console.error('[upload_markdown] POST cache purge incomplete after D1 commit', { filename });
+				]).then((parts) => parts.every(Boolean)),
+				syncSearchArtifactsAfterUpsert(c, filename),
+			]);
+			if (!cachePurge || !searchSync) {
+				console.error('[upload_markdown] POST post-commit invalidation incomplete', {
+					filename,
+					cachePurge,
+					searchSync
+				});
 			}
-			await syncSearchArtifactsAfterUpsert(c, filename);
 
 			return c.json(
 				{
 					success: true,
 					cachePurge,
+					searchSync,
 					filename,
 					sectionsCount: normalized.length,
 					...(altFilename ? { alternate_filename: altFilename } : {})
 				},
-				cachePurge ? 200 : 503,
+				cachePurge && searchSync ? 200 : 503,
 				corsHeadersWithMethods
 			);
 		} else if (method === 'PATCH') {
@@ -1287,23 +1303,28 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			// 失效快取：含 PATCH 前的 section IDs（已刪除的 /speech/:id 仍需 purge）
 			const preexistingSectionIds = oldSections.map((section) => section.section_id);
-			const purgeResults = await Promise.all([
-				invalidateSpeechCaches(c, filename, preexistingSectionIds),
-				...Array.from(
-					new Set(
-						[currentAlternateFilename, desiredAlternateFilename].filter(
-							(value): value is string => Boolean(value && value !== filename)
+			const [cachePurge, searchSync] = await Promise.all([
+				Promise.all([
+					invalidateSpeechCaches(c, filename, preexistingSectionIds),
+					...Array.from(
+						new Set(
+							[currentAlternateFilename, desiredAlternateFilename].filter(
+								(value): value is string => Boolean(value && value !== filename)
+							)
 						)
-					)
-				).map((alternateFilename) => invalidateSpeechCaches(c, alternateFilename)),
-				invalidateSpeakerCaches(c, finalImpactedSpeakers),
-				invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+					).map((alternateFilename) => invalidateSpeechCaches(c, alternateFilename)),
+					invalidateSpeakerCaches(c, finalImpactedSpeakers),
+					invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+				]).then((parts) => parts.every(Boolean)),
+				syncSearchArtifactsAfterUpsert(c, filename),
 			]);
-			const cachePurge = purgeResults.every(Boolean);
-			if (!cachePurge) {
-				console.error('[upload_markdown] PATCH cache purge incomplete after D1 commit', { filename });
+			if (!cachePurge || !searchSync) {
+				console.error('[upload_markdown] PATCH post-commit invalidation incomplete', {
+					filename,
+					cachePurge,
+					searchSync
+				});
 			}
-			await syncSearchArtifactsAfterUpsert(c, filename);
 
 			return c.json(
 				{
@@ -1314,10 +1335,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					insertedCount: normalized.filter((section) => !oldSectionIds.has(section.section_id)).length,
 					updatedCount: normalized.filter((section) => oldSectionIds.has(section.section_id)).length,
 					deletedCount: oldSections.filter((section) => !finalSectionIds.has(section.section_id)).length,
-					cachePurge
+					cachePurge,
+					searchSync
 				},
-				// 503 when D1 wrote but long-SWR front cache may still serve stale HTML
-				cachePurge ? 200 : 503,
+				// 503 when D1 wrote but cache and/or search artifacts incomplete
+				cachePurge && searchSync ? 200 : 503,
 				corsHeadersWithMethods
 			);
 		} else {
