@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { getAnContentAsString, serveAnByKey, speechAn } from '../src/api/an';
 import { speakerDetail } from '../src/api/speaker_detail';
 import { speechIndex } from '../src/api/speech_index';

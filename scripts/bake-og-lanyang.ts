@@ -106,15 +106,14 @@ async function fetchSpeakers(filename: string): Promise<string[]> {
 	const encoded = encodeURIComponent(filename);
 	const res = await fetch(`${API_BASE}/api/speech/${encoded}`);
 	if (!res.ok) return [];
-	const data = (await res.json()) as
-		| Array<{ section_id?: number; name?: string | null }>
-		| { sections?: Array<{ section_id?: number; name?: string | null; speaker_name?: string | null }> };
+	type SpeakerRow = { section_id?: number; name?: string | null; speaker_name?: string | null };
+	const data = (await res.json()) as Array<SpeakerRow> | { sections?: Array<SpeakerRow> };
 
-	const rows = Array.isArray(data) ? data : (data.sections ?? []);
+	const rows: SpeakerRow[] = Array.isArray(data) ? data : (data.sections ?? []);
 	const ordered: { section_id: number; name: string }[] = [];
 	const seen = new Set<string>();
 	for (const row of rows) {
-		const name = (row.name ?? ('speaker_name' in row ? row.speaker_name : null))?.trim();
+		const name = (row.name ?? row.speaker_name)?.trim();
 		if (!name || seen.has(name)) continue;
 		seen.add(name);
 		ordered.push({ section_id: Number(row.section_id ?? 0), name });

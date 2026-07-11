@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { markSpeechDeletedInSearch, readSearchOverlayManifest, syncSearchStats, writeSearchOverlayForSpeech } from '../src/search/runtime';
 import {
 	SEARCH_INDEX_MANIFEST_KEY,

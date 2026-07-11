@@ -13,7 +13,7 @@ export async function resolveCacheKeyVersion(fallback: string): Promise<string> 
 		if (!body.version) throw new Error(`${VERSION_URL}: missing version`);
 		return body.version;
 	} catch (err) {
-		console.warn(`[cache-version] live /version failed (${err}); using fallback ${fallback}`);
+		console.warn(`[cache-version] live /version failed (${String(err)}); using fallback ${fallback}`);
 		return fallback;
 	}
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { renderHtml } from '../src/ssr/render';
 import HomeView, { styles as HomeViewStyles } from '../src/views/HomeView.vue';
 import Navbar, { styles as NavbarStyles } from '../src/components/Navbar.vue';

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { getAnContentAsString, isNumericAnKey, serveAnByKey, speechAn } from '../src/api/an';
 import type { Context } from 'hono';
 import type { ApiEnv } from '../src/api/types';

@@ -30,7 +30,7 @@ async function main() {
 			}
 			console.warn(`  attempt ${attempt}/${maxAttempts}: got ${got ?? 'null'}, want ${CACHE_KEY_VERSION}`);
 		} catch (err) {
-			console.warn(`  attempt ${attempt}/${maxAttempts}: ${err}`);
+			console.warn(`  attempt ${attempt}/${maxAttempts}: ${String(err)}`);
 		}
 		if (attempt < maxAttempts) {
 			await new Promise((r) => setTimeout(r, delayMs));

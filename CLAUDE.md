@@ -40,23 +40,23 @@ Closes #42
 
 ## 技術棧
 
-| 類別 | 技術 |
-|------|------|
-| Runtime | Cloudflare Workers（`compatibility_date` 設於 `wrangler.jsonc`） |
-| 路由框架 | [Hono](https://hono.dev) v4 |
-| UI / 模板 | Vue 3 SFC + `@vue/server-renderer`（SSR only） |
-| 構建工具 | [Vite](https://vite.dev) + `@cloudflare/vite-plugin`（`vp` / Vite+ 相容棧）+ 自寫 `vite-plugin-sfc-ssr.ts`（`.vue` → SSR render function，即時編譯，取代舊的 `scripts/build-views.ts`） |
-| 部署工具 | Wrangler 4（由 Vite 驅動建置，`vp`/Vite+ 相容） |
-| 資料庫 | Cloudflare D1（binding：`DB`） |
-| 物件儲存 | Cloudflare R2（binding：`SPEECH_CACHE`） |
-| 靜態資源 | Cloudflare Workers Assets（binding：`ASSETS`，來源 `public/`，由 Vite `publicDir` 機制建置） |
-| 搜尋 | 自製基線索引 + overlay manifest（R2）+ `fuse.js` |
-| OG 圖片 | `satori` + `@resvg/resvg-wasm` |
-| Markdown | `marked`、`cheerio` |
-| 測試 | Vitest + `@cloudflare/vitest-pool-workers`、`@vitest/coverage-istanbul` |
-| Lint / Format | `oxlint` + `oxfmt`（Oxc 工具鏈，`bun run check`） |
-| 形式驗證 | [LemmaScript](https://github.com/midspiral/lemmascript)（`lsc`）：部分 `src/utils/*` 純函式標註 `//@ ensures` 等，`bun run verify:lsc` 檢查（見下方「形式驗證」一節） |
-| 語言 | TypeScript（嚴格模式，`tsgo --noEmit` 把關） |
+| 類別          | 技術                                                                                                                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime       | Cloudflare Workers（`compatibility_date` 設於 `wrangler.jsonc`）                                                                                                                        |
+| 路由框架      | [Hono](https://hono.dev) v4                                                                                                                                                             |
+| UI / 模板     | Vue 3 SFC + `@vue/server-renderer`（SSR only）                                                                                                                                          |
+| 構建工具      | [Vite](https://vite.dev) + `@cloudflare/vite-plugin`（`vp` / Vite+ 相容棧）+ 自寫 `vite-plugin-sfc-ssr.ts`（`.vue` → SSR render function，即時編譯，取代舊的 `scripts/build-views.ts`） |
+| 部署工具      | Wrangler 4（由 Vite 驅動建置，`vp`/Vite+ 相容）                                                                                                                                         |
+| 資料庫        | Cloudflare D1（binding：`DB`）                                                                                                                                                          |
+| 物件儲存      | Cloudflare R2（binding：`SPEECH_CACHE`）                                                                                                                                                |
+| 靜態資源      | Cloudflare Workers Assets（binding：`ASSETS`，來源 `public/`，由 Vite `publicDir` 機制建置）                                                                                            |
+| 搜尋          | 自製基線索引 + overlay manifest（R2）+ `fuse.js`                                                                                                                                        |
+| OG 圖片       | `satori` + `@resvg/resvg-wasm`                                                                                                                                                          |
+| Markdown      | `marked`、`cheerio`                                                                                                                                                                     |
+| 測試          | Vitest + `@cloudflare/vitest-pool-workers`、`@vitest/coverage-istanbul`                                                                                                                 |
+| Lint / Format | `oxlint` + `oxfmt`（Oxc 工具鏈，`bun run check`）                                                                                                                                       |
+| 形式驗證      | [LemmaScript](https://github.com/midspiral/lemmascript)（`lsc`）：部分 `src/utils/*` 純函式標註 `//@ ensures` 等，`bun run verify:lsc` 檢查（見下方「形式驗證」一節）                   |
+| 語言          | TypeScript（嚴格模式，`tsgo --noEmit` 把關）                                                                                                                                            |
 
 ## 目錄結構
 
@@ -100,29 +100,29 @@ bun run dev         # = vite dev（本地 workerd + 本地 D1/R2 持久化狀態
 
 ### 常用指令
 
-| 指令 | 說明 |
-|------|------|
-| `bun run dev` | 開發伺服器（`vite dev`，本地 workerd + 本地 D1/R2） |
-| `bun run dev:staging` | 開發伺服器，連到 staging 環境（`CLOUDFLARE_ENV=staging vite dev`） |
-| `bun run build` | 建置正式 Worker bundle（`vite build`，輸出到 `dist/`） |
-| `bun run preview` | 建置後用 `vite preview` 在 workerd 內預覽（比純靜態伺服器更接近正式行為） |
-| `bun run build:search` | 重建搜尋基線索引、overlay manifest、`stats.json`，並上傳 R2（`SEARCH_R2_BUCKETS` 可覆寫目標 bucket） |
-| `bun run build:cache-version` | 重新產生 `src/cacheKeyVersion.ts`，做為快取 key 前綴 |
-| `bun run check` | `lint` + `fmt:check` + `typecheck` 一次跑完 |
-| `bun run lint` / `fmt` / `fmt:check` | `oxlint` / `oxfmt --write` / `oxfmt --check` |
-| `bun run test` / `test:watch` / `test:coverage` | Vitest 測試（含覆蓋率） |
-| `bun run typecheck` | `tsgo --noEmit` 全專案型別檢查 |
-| `bun run verify:lsc` | 對已標註 LemmaScript `//@` 的 `src/utils/*` 純函式跑 `lsc gen` + `lsc check --backend=dafny`，比對已知 verified/error 基準，抓 regression |
-| `bun run cf-typegen` | 由 `wrangler.jsonc` 產生 `worker-configuration.d.ts` |
+| 指令                                            | 說明                                                                                                                                      |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run dev`                                   | 開發伺服器（`vite dev`，本地 workerd + 本地 D1/R2）                                                                                       |
+| `bun run dev:staging`                           | 開發伺服器，連到 staging 環境（`CLOUDFLARE_ENV=staging vite dev`）                                                                        |
+| `bun run build`                                 | 建置正式 Worker bundle（`vite build`，輸出到 `dist/`）                                                                                    |
+| `bun run preview`                               | 建置後用 `vite preview` 在 workerd 內預覽（比純靜態伺服器更接近正式行為）                                                                 |
+| `bun run build:search`                          | 重建搜尋基線索引、overlay manifest、`stats.json`，並上傳 R2（`SEARCH_R2_BUCKETS` 可覆寫目標 bucket）                                      |
+| `bun run build:cache-version`                   | 重新產生 `src/cacheKeyVersion.ts`，做為快取 key 前綴                                                                                      |
+| `bun run check`                                 | `lint` + `fmt:check` + `typecheck` 一次跑完                                                                                               |
+| `bun run lint` / `fmt` / `fmt:check`            | `oxlint` / `oxfmt --write` / `oxfmt --check`                                                                                              |
+| `bun run test` / `test:watch` / `test:coverage` | Vitest 測試（含覆蓋率）                                                                                                                   |
+| `bun run typecheck`                             | `tsgo --noEmit` 全專案型別檢查                                                                                                            |
+| `bun run verify:lsc`                            | 對已標註 LemmaScript `//@` 的 `src/utils/*` 純函式跑 `lsc gen` + `lsc check --backend=dafny`，比對已知 verified/error 基準，抓 regression |
+| `bun run cf-typegen`                            | 由 `wrangler.jsonc` 產生 `worker-configuration.d.ts`                                                                                      |
 
 ### 部署
 
 正式環境部署（`bun run deploy` / `deploy:assets` / `deploy:search`）目前**故意被封鎖**，因為 `techdebt/vp-lemmascript-migration` 分支正在進行大規模結構調整，尚未經過人工核准直接上正式站。所有部署動作先走 staging：
 
-| 指令 | 說明 |
-|------|------|
-| `bun run deploy:staging` | 完整 staging 部署：`build:cache-version` → `CLOUDFLARE_ENV=staging vite build` → `SEARCH_R2_BUCKETS=sayit-speech-cache-staging build:search` → `wrangler deploy --env staging` → `verify:deploy` |
-| `bun run deploy:staging:assets` | 略過搜尋索引重建的 staging 部署（純前端 / SSR 修改用） |
+| 指令                            | 說明                                                                                                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bun run deploy:staging`        | 完整 staging 部署：`build:cache-version` → `CLOUDFLARE_ENV=staging vite build` → `SEARCH_R2_BUCKETS=sayit-speech-cache-staging build:search` → `wrangler deploy --env staging` → `verify:deploy` |
+| `bun run deploy:staging:assets` | 略過搜尋索引重建的 staging 部署（純前端 / SSR 修改用）                                                                                                                                           |
 
 **`CLOUDFLARE_ENV=staging` 必須在 `vite build` 之前設定**——`@cloudflare/vite-plugin` 在建置時就決定要用 `wrangler.jsonc` 的哪個 named environment（`env.staging` 的 D1/R2 binding），之後才執行 `wrangler deploy --env staging` 的話，`--env` 旗標**不會**覆寫已經烤進 `dist/` 的 binding——這點已用 `wrangler deploy --dry-run` 實測驗證過。
 
@@ -147,7 +147,6 @@ bun run dev         # = vite dev（本地 workerd + 本地 D1/R2 持久化狀態
 - **R2 origin**（`SPEECH_CACHE`，`readR2Cache` / `writeR2Cache`）：昂貴 SSR HTML（演講/講者/列表）與衍生產物（`an/<filename>`、`md/<filename>`、versioned OG）。HTML key：`${CACHE_KEY_VERSION}/${host}${path}`；`an`/`md` 穩定不帶版本。讀回時會還原 `Cache-Tag`（customMetadata）再交給 front cache。
 - **不再使用** in-Worker `caches.default`（`readEdgeCache` / `writeEdgeCache` 已移除）。
 - **`/api/purge_cache`**：清空 R2 後 `purgeWorkersCache({ purgeEverything: true })`。**`/api/cleanup_old_cache`**：只刪非目前 `CACHE_KEY_VERSION/` 的 R2 前綴，不清 front。兩者受 Bearer token 保護（`AUDREYT_TRANSCRIPT_TOKEN` / `BESTIAN_TRANSCRIPT_TOKEN`）。
-
 
 ## 框架使用注意事項
 
@@ -207,12 +206,14 @@ bun run dev         # = vite dev（本地 workerd + 本地 D1/R2 持久化狀態
 ## 部署資源備忘
 
 **正式環境：**
+
 - 生產 D1：`sayit-database`（id 在 `wrangler.jsonc` 頂層）。
 - R2 bucket：`sayit-speech-cache`（preview：`sayit-speech-cache-preview`）。
 - ASSETS 來源：`./public/`（`vite build` 建置時複製進 `dist/client/`，供 `wrangler deploy` 使用）。
 - Worker 名稱：`sayit-hono`。
 
 **Staging 環境（`wrangler.jsonc` `env.staging`，完全獨立宣告，不繼承頂層 binding）：**
+
 - D1：`sayit-database-staging`。
 - R2 bucket：`sayit-speech-cache-staging`。
 - Worker 名稱：`sayit-hono-staging`。
@@ -220,3 +221,20 @@ bun run dev         # = vite dev（本地 workerd + 本地 D1/R2 持久化狀態
 - upload_markdown 需要的 `AUDREYT_TRANSCRIPT_TOKEN`／`BESTIAN_TRANSCRIPT_TOKEN` secrets 預設不會隨部署建立（`wrangler secret list --env staging` 初始是空的）；要測 staging 上的認證寫入路徑，先 `echo <token> | npx wrangler secret put AUDREYT_TRANSCRIPT_TOKEN --env staging` 補一個（僅此環境，正式環境的 secret 另外管理，不要沿用同一組）。
 
 - 觀測：`observability.enabled = true`，請善用 Cloudflare Logs。
+
+<!--VITE PLUS START-->
+
+# Using Vite+, the Unified Toolchain for the Web
+
+This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called `vp`. Vite+ is distinct from Vite, and it invokes Vite through `vp dev` and `vp build`. Run `vp help` to print a list of commands and `vp <command> --help` for information about a specific command.
+
+Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.dev/guide/.
+
+## Review Checklist
+
+- [ ] Run `vp install` after pulling remote changes and before getting started.
+- [ ] Run `vp check` and `vp test` to format, lint, type check and test changes.
+- [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
+- [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
+
+<!--VITE PLUS END-->

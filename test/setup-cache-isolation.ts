@@ -2,7 +2,7 @@
 // Mock cloudflare:workers cache.purge so upload invalidation tests can assert
 // success without a real Workers Cache purge API in the vitest pool.
 
-import { beforeEach, vi } from 'vitest';
+import { beforeEach, vi } from 'vite-plus/test';
 
 vi.mock('cloudflare:workers', () => ({
 	cache: {

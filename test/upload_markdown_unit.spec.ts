@@ -10,7 +10,7 @@
  * Some tests call uploadMarkdown() directly (not via dispatch) to exercise
  * internal branching that is hard to reach through the HTTP layer alone.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import { uploadMarkdown } from '../src/api/upload_markdown';
 import type { Context } from 'hono';

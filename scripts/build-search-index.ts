@@ -150,7 +150,7 @@ async function buildSearchIndex() {
 		dbEntries = (await resp.json()) as Array<{ filename: string; display_name: string }>;
 		console.log(`[build-search] Got ${dbEntries.length} entries from DB`);
 	} catch (err) {
-		console.warn(`[build-search] speech_index.json fetch failed (${err}), using filenames from markdown`);
+		console.warn(`[build-search] speech_index.json fetch failed (${String(err)}), using filenames from markdown`);
 	}
 
 	const speakersApiUrl = apiUrl.replace('speech_index.json', 'speakers_index.json');
@@ -205,7 +205,7 @@ async function buildSearchIndex() {
 			dump = JSON.parse(text) as SectionsDump;
 			console.log(`[build-search] Downloaded dump via HTTP (${Object.keys(dump).length} speeches)`);
 		} catch (err) {
-			console.log(`[build-search] HTTP dump download failed (${err}), will fetch from API`);
+			console.log(`[build-search] HTTP dump download failed (${String(err)}), will fetch from API`);
 		}
 	}
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { createMockEnv, dispatch, type MockR2Entry } from './helpers/mockEnv';
 
 function makeEnv(preSeedR2: Record<string, { body: string; contentType?: string; cacheControl?: string; cacheTag?: string }>) {

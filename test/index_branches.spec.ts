@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { createMockEnv, dispatch } from './helpers/mockEnv';
 
 describe('buildSearchSnippet middle-of-text match', () => {

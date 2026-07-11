@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { parseRedirectsText, planRedirectDiff } from '../src/api/redirects';
 import { createMockEnv, dispatch, type MockWorkerEnv } from './helpers/mockEnv';
 
