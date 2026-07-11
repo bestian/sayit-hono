@@ -59,7 +59,48 @@
 		"process.env.JEST_WORKER_ID": "undefined",
 		"process.env": "{}",
 		"process": "{\"env\":{}}"
-	}
+	},
+	/**
+	 * Staging environment — fully self-contained (named environments do NOT
+	 * inherit top-level bindings in Wrangler; every binding is redeclared here
+	 * pointing at dedicated staging resources). Deploy with:
+	 *   npx wrangler deploy --env staging
+	 * NEVER deploy this repo's default (unnamed) environment during the
+	 * techdebt/vp-lemmascript-migration branch — that targets production.
+	 */
+	"env": {
+		"staging": {
+			"name": "sayit-hono-staging",
+			"compatibility_date": "2026-07-07",
+			"observability": {
+				"enabled": true
+			},
+			"cache": {
+				"enabled": true
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "sayit-database-staging",
+					"database_id": "0b9ee830-1162-4fd4-92e2-d60a98031b86"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "SPEECH_CACHE",
+					"bucket_name": "sayit-speech-cache-staging"
+				}
+			],
+			"assets": { "directory": "./www/", "binding": "ASSETS" },
+			"define": {
+				"process.env.NODE_ENV": "\"production\"",
+				"process.env.SATORI_STANDALONE": "undefined",
+				"process.env.JEST_WORKER_ID": "undefined",
+				"process.env": "{}",
+				"process": "{\"env\":{}}"
+			}
+		}
+	},
 	/**
 	 * Service Bindings (communicate between multiple Workers)
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
