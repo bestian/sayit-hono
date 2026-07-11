@@ -4,7 +4,7 @@
 
 **Goal:** Reach actual 100% statements, branches, functions, and lines coverage across all 18 files in the codebase, and enforce it with `thresholds.branches = 100` and `perFile = true` in Vitest configuration.
 
-**Architecture:** We will systematically address each file. For reachable branch arms (Type 1), we will write targeted test assertions in their respective behavior-owning specs. For unreachable or redundant branches (Type 2), we will treat them as hypotheses and verify them against actual types/callers/schema before simplification. If they cannot be proven unreachable, we will write a reachable boundary/error test instead. Instrumentation anomalies (Type 3) will be resolved via minor structural changes. No new tests will be added to the coverage-theater files (`final_gaps.spec.ts`, `final_gap_close.spec.ts`, `index_branches.spec.ts`, `search_branches.spec.ts`, `heads_branches.spec.ts`).
+**Architecture:** We will systematically address each file. For reachable branch arms, we will write targeted test assertions in their respective behavior-owning specs. For unreachable or redundant branches, we will treat them as hypotheses and verify them against actual types/callers/schema before simplification. If they cannot be proven unreachable, we will write a reachable boundary/error test instead. No code modifications will be made to reshape production code solely to satisfy coverage tools. No new tests will be added to the coverage-theater files (`final_gaps.spec.ts`, `final_gap_close.spec.ts`, `index_branches.spec.ts`, `search_branches.spec.ts`, `heads_branches.spec.ts`).
 
 **Tech Stack:** Vitest 4.1.10, Hono 4.12.15, TypeScript, D1, R2
 
@@ -185,7 +185,7 @@ In `test/upload_markdown_unit.spec.ts` and `test/upload_markdown_integration.spe
 - Verify execution without worker cache invalidations (skip purge) (line 359).
 - Verify PATCH with empty alternate filename falls back to null (line 831).
 - Verify display name fallback to filename (line 614, 845).
-Ensure D1 results mocks return empty arrays safely (lines 449, 454, 603).
+- Verify trailing empty blank lines in parser correctly flushes remaining buffer (line 174 `buf.length > 0`).
 
 Add these tests to `test/upload_markdown_unit.spec.ts`:
 ```typescript
@@ -212,6 +212,20 @@ hi' })
 		});
 		expect(res.status).toBe(200);
 	});
+
+	it('handles document with trailing empty blank lines to flush buffer', async () => {
+		const env = createMockEnv(demoSpeechResolver());
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: 'test-trailing-empty', markdown: '# Title
+## Audrey:
+hi
+
+' })
+		});
+		expect(res.status).toBe(200);
+	});
 });
 ```
 
@@ -221,7 +235,8 @@ Expected: FAIL or missing coverage
 
 - [ ] **Step 3: Verify and resolve source simplification hypotheses**
 - *Hypothesis 1 (Line 252)*: `marked.parse` returns a string for standard inputs. Simplify `typeof html === 'string'` check to direct string input type.
-- *Hypothesis 2 (Lines 474-479)*: D1 batch results metadata change counts. Verify if D1 driver always populates it on success. If so, clean up nullish coalescing to avoid redundant fallbacks.
+- *Hypothesis 2 (Lines 449, 454, 603)*: D1 results `.results` array is guaranteed non-null by `D1Result<T>` type definition. Redundant `?? []` coalescing can be safely deleted.
+- *Hypothesis 3 (Lines 474-479)*: D1 batch results metadata change counts. Verify if D1 driver always populates it on success. If so, clean up nullish coalescing to avoid redundant fallbacks.
 - Apply updates to `src/api/upload_markdown.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -442,12 +457,13 @@ git commit -m "test: cover and simplify branches in index.ts"
 - Produces: 100% branch coverage on search render pages
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/ssr_routes.spec.ts` to cover lines 98, 110, 129, 130:
+Add the following tests to `test/ssr_routes.spec.ts` to cover lines 98, 110, 118, 119, 129, 130:
 ```typescript
 describe('search page rendering branch edge cases (remapped to ssr_routes)', () => {
-	it('handles extreme query pagination fallbacks', async () => {
+	it('handles extreme query pagination fallbacks and default parameters', async () => {
 		const env = createMockEnv(() => ({ success: true, results: [] }));
-		const { res } = await dispatch('/search/?q=needle&page=0&limit=0', env);
+		// Test standard search without page and pageSize to trigger default arguments
+		const { res } = await dispatch('/search/?q=needle', env);
 		expect(res.status).toBe(200);
 	});
 
@@ -481,7 +497,7 @@ Expected: FAIL or missing coverage
 - [ ] **Step 3: Verify and resolve source simplification hypotheses**
 - *Hypothesis 1 (Line 142)*: Speaker name constraint in DB. Verify schema definition. Delete fallback if redundant.
 - *Hypothesis 2 (Line 263)*: `section_content` is NOT NULL. Verify schema and simplify.
-- Restructure default arguments in search.ts (lines 118, 119) to standard declarations.
+- *Hypothesis 3 (Lines 247, 253)*: D1 results arrays are guaranteed non-null. Verify and remove redundant `speakerResult.results ?? []` fallback coalescing.
 
 - [ ] **Step 4: Run test to verify it passes**
 Run: `vp test run test/ssr_routes.spec.ts --coverage`
@@ -656,10 +672,10 @@ git commit -m "test: cover and simplify branches in api/md"
 - Produces: 100% branch coverage on cache utility handlers
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/cache_unit.spec.ts` to cover lines 119, 180, 197:
+Add the following tests to `test/cache_unit.spec.ts` to cover lines 61, 119, 180, 197:
 ```typescript
 describe('cache utility branch coverages', () => {
-	it('handles write cache without contentType and format speaker route path without slash', async () => {
+	it('handles write cache without contentType, format speaker route path without slash, and default cacheHeaders', async () => {
 		const env = createMockEnv(() => ({ success: true, results: [] }));
 		const response = new Response('ok');
 		await writeR2Cache(env.SPEECH_CACHE, 'key-nocontent', response);
@@ -667,6 +683,10 @@ describe('cache utility branch coverages', () => {
 
 		const path = speakerRequestPath('audrey-tang');
 		expect(path).toBe('/speaker/audrey-tang');
+
+		// Trigger default argument evaluation on withCacheHeaders
+		const testRes = withCacheHeaders(new Response('html'));
+		expect(testRes.headers.get('Cache-Control')).toContain('stale-while-revalidate');
 	});
 });
 ```
@@ -677,7 +697,6 @@ Expected: FAIL or missing coverage
 
 - [ ] **Step 3: Verify and resolve source simplification hypotheses**
 - *Hypothesis 1 (Line 94)*: Size check is always numeric on active R2 objects. Verify R2 typings. Simplify.
-- Restructure default arguments (line 61).
 - Apply updates to `src/api/cache.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -737,7 +756,7 @@ Expected: FAIL or missing coverage
 
 - [ ] **Step 3: Verify and resolve source simplification hypotheses**
 - *Hypothesis 1 (Line 133)*: `section_content` database constraint is NOT NULL. Verify schema and simplify.
-- Remove D1 results wrapper fallback (line 127).
+- *Hypothesis 2 (Line 127)*: D1 results wrapper fallback `rows.results ?? []`. Verify typings and delete.
 - Apply updates to `src/search/runtime.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1108,7 +1127,7 @@ describe('decodeHtmlEntities extra branches (remapped to md.spec.ts)', () => {
 Run: `vp test run test/md.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Run test to verify it passes**
+- [ ] **Step-3: Run test to verify it passes**
 Run: `vp test run test/md.spec.ts --coverage`
 Expected: PASS and 100% branch coverage on `src/utils/textUtils.ts`.
 
