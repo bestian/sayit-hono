@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 
 // Mirrors public/static/speeches/js/pagefind-search.js ask inline rendering
 // (static IIFE asset; keep logic in sync when changing either side).

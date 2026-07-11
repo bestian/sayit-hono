@@ -38,7 +38,7 @@ async function fetchLiveSha(): Promise<string | null> {
 		}
 		body = (await res.json()) as { version?: string };
 	} catch (err) {
-		console.warn(`[preflight] could not reach ${url} (${err}); skipping ancestor check`);
+		console.warn(`[preflight] could not reach ${url} (${String(err)}); skipping ancestor check`);
 		return null;
 	}
 	const version = body.version ?? '';

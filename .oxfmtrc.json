@@ -1,9 +1,0 @@
-{
-  "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "printWidth": 140,
-  "singleQuote": true,
-  "semi": true,
-  "useTabs": true,
-  "sortPackageJson": false,
-  "ignorePatterns": ["**/*.vue"]
-}

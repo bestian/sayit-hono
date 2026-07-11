@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { createMockEnv, dispatch, type QueryResolver } from './helpers/mockEnv';
 
 describe('GET /api/speakers_index.json', () => {

@@ -1,5 +1,5 @@
 import { createExecutionContext } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import worker from '../src/index';
 
@@ -164,7 +164,7 @@ describe('POST /api/purge_cache', () => {
 
 	it('returns 503 when front_only purge fails', async () => {
 		const { cache } = await import('cloudflare:workers');
-		const purge = cache.purge as ReturnType<typeof import('vitest').vi.fn>;
+		const purge = cache.purge as ReturnType<typeof import('vite-plus/test').vi.fn>;
 		purge.mockResolvedValue({ success: false });
 		const env = createSimpleEnv();
 		const { res } = await request('/api/purge_cache?front_only=1', env, {

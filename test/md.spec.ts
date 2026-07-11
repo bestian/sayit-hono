@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { __test__ } from '../src/api/md';
 
 describe('md conversion', () => {

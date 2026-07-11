@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import { cloudflare } from '@cloudflare/vite-plugin';
 import { sfcSsrPlugin } from './vite-plugin-sfc-ssr';
 
@@ -10,7 +10,44 @@ import { sfcSsrPlugin } from './vite-plugin-sfc-ssr';
 // pipeline exists to attach scoped styles to; every view inlines its own
 // compiled `styles` string into the response HTML instead).
 export default defineConfig({
-	plugins: [cloudflare(), sfcSsrPlugin()],
+	staged: {
+		'src/**/*.{ts,vue}': 'vp check --fix',
+		'scripts/**/*.ts': 'vp check --fix',
+		'vite.config.ts': 'vp check --fix',
+		'vite-plugin-sfc-ssr.ts': 'vp check --fix',
+		'test/**/*.ts': 'vp fmt --write',
+	},
+	fmt: {
+		printWidth: 140,
+		singleQuote: true,
+		semi: true,
+		useTabs: true,
+		sortPackageJson: false,
+		ignorePatterns: ['**/*.vue'],
+	},
+	lint: {
+		plugins: ['typescript', 'unicorn', 'oxc'],
+		categories: {
+			correctness: 'error',
+		},
+		rules: {
+			'vite-plus/prefer-vite-plus-imports': 'error',
+		},
+		env: {
+			builtin: true,
+		},
+		options: {
+			typeAware: true,
+			typeCheck: true,
+		},
+		jsPlugins: [
+			{
+				name: 'vite-plus',
+				specifier: 'vite-plus/oxlint-plugin',
+			},
+		],
+	},
+	plugins: lazyPlugins(() => [cloudflare(), sfcSsrPlugin()]),
 	// satori references process / process.env, which don't exist in Workers.
 	// Previously lived in wrangler.jsonc's `define` — the Vite build path
 	// ignores that (Vite owns `define` once the Cloudflare Vite plugin is in

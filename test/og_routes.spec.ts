@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { handleOgImage, handleOgSpeechImage, type OgGenerators, type OgLoader } from '../src/api/og_routes';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import type { Context } from 'hono';

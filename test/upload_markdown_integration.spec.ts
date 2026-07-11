@@ -6,7 +6,7 @@
  * uses the shared createMockEnv/dispatch helper from test/helpers/mockEnv.ts;
  * per-test SQL-matching resolver logic stays inline.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 // vi.mock in setup-cache-isolation.ts hoists this; static import is fine.
 import { cache as workersCache } from 'cloudflare:workers';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';

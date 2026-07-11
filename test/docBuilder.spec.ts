@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { docsFromSections, docsFromMarkdown, extractDate, stripHtml, type ApiSection } from '../src/search/docBuilder';
 
 describe('search/docBuilder', () => {

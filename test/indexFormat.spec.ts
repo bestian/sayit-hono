@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import {
 	SEARCH_INDEX_FORMAT_VERSION,
 	SEARCH_INDEX_MANIFEST_VERSION,

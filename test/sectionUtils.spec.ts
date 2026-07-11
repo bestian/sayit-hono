@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { checkMonotonic, reorderSections, normalizeSections, type SectionLike } from '../src/utils/sectionUtils';
 
 const mk = (id: number, prev: number | null, next: number | null): SectionLike => ({

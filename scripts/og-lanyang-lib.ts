@@ -3,6 +3,7 @@
  * Fonts read from ~/Library/Fonts only — for licensed-device bake, not Workers.
  */
 import satori from 'satori';
+import type { FontWeight } from 'satori';
 import { Resvg, initWasm } from '@resvg/resvg-wasm';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -253,7 +254,7 @@ export async function renderLanyangSpeechPng(filename: string, displayName: stri
 			{ name: FAMILY_MING, data: mingRegular, weight: 400, style: 'normal' },
 			{ name: FAMILY_MING, data: mingMedium, weight: 500, style: 'normal' },
 			{ name: FAMILY_HEI, data: heiW8, weight: 800, style: 'normal' },
-			{ name: FAMILY_HEI, data: heiW10, weight: 920, style: 'normal' },
+			{ name: FAMILY_HEI, data: heiW10, weight: 920 as FontWeight, style: 'normal' },
 		],
 	});
 
