@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	docsFromSections,
-	docsFromMarkdown,
-	extractDate,
-	stripHtml,
-	type ApiSection
-} from '../src/search/docBuilder';
+import { docsFromSections, docsFromMarkdown, extractDate, stripHtml, type ApiSection } from '../src/search/docBuilder';
 
 describe('search/docBuilder', () => {
 	describe('extractDate', () => {
@@ -39,7 +33,7 @@ describe('search/docBuilder', () => {
 			section_content: '<p>Hi</p>',
 			display_name: '2026-03-24 Demo Speech',
 			name: 'Audrey',
-			...overrides
+			...overrides,
 		});
 
 		it('returns a single doc for flat speeches', () => {
@@ -51,10 +45,10 @@ describe('search/docBuilder', () => {
 		});
 
 		it('splits nested filename groups into separate docs with encoded URLs', () => {
-			const docs = docsFromSections([
-				section({ nest_filename: 'part-1', section_id: 10 }),
-				section({ nest_filename: 'part-2', section_id: 20, name: 'Bestian' })
-			], baseUrl);
+			const docs = docsFromSections(
+				[section({ nest_filename: 'part-1', section_id: 10 }), section({ nest_filename: 'part-2', section_id: 20, name: 'Bestian' })],
+				baseUrl,
+			);
 			expect(docs.map((d) => d.pageUrl)).toEqual([`${baseUrl}/part-1`, `${baseUrl}/part-2`]);
 			expect(docs[0].speaker).toBe('Audrey');
 			expect(docs[1].speaker).toBe('Bestian');
@@ -66,9 +60,7 @@ describe('search/docBuilder', () => {
 		});
 
 		it('summarizes more than limit speakers with "+N more"', () => {
-			const sections = [1, 2, 3, 4, 5].map((i) =>
-				section({ section_id: i, name: `Speaker${i}` })
-			);
+			const sections = [1, 2, 3, 4, 5].map((i) => section({ section_id: i, name: `Speaker${i}` }));
 			const docs = docsFromSections(sections, baseUrl);
 			expect(docs[0].speaker).toBe('Speaker1, Speaker2, Speaker3, +2 more');
 		});
@@ -92,14 +84,7 @@ describe('search/docBuilder', () => {
 		});
 
 		it('splits by speaker headings and summarizes speakers', () => {
-			const md = [
-				'# Title',
-				'## Audrey:',
-				'Hello.',
-				'',
-				'## Bestian:',
-				'Hi back.'
-			].join('\n');
+			const md = ['# Title', '## Audrey:', 'Hello.', '', '## Bestian:', 'Hi back.'].join('\n');
 			const docs = docsFromMarkdown(md, '/p', 'p');
 			expect(docs).toHaveLength(1);
 			expect(docs[0].title).toBe('Title');

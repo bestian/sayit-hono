@@ -37,13 +37,17 @@ Job `bake-og-lanyang` in `upload-markdown-on-change.yml`:
 
 Register runner once on the Mac: [GitHub self-hosted runners](https://docs.github.com/en/actions/hosting-your-own-runners).
 
-## Local `git push` (transcript repo)
+## Local publish (transcript repo)
 
-One-time: `cd transcript && bun run setup-hooks` (chains `.githooks/pre-push-lanyang` + `post-push-lanyang`).
+Git has **no** `post-push` hook. One-time: `cd transcript && bun run setup-hooks` (installs **pre-push** only — records `@{u}`..`HEAD` for root `*.md` in `.git/og-lanyang-push.json`).
 
-On push of root `*.md`: pre-push records `@{u}`..`HEAD`; GitHub Actions sync/deploy/bake; post-push runs `bake_lanyang_after_push.ts` against `../sayit-hono` with retries until `speech_index` has the new slug.
+**Normal flow:** `bun run push -- origin main` (= `git push` then `bake_lanyang_after_push.ts` polling `../sayit-hono` until `speech_index` has the new slug). Plain `git push` triggers GitHub Actions sync/deploy/self-hosted bake only; it does **not** run local bake.
 
-Skip local bake: `TRANSCRIPT_SKIP_LANYANG_OG=1 git push`. Push **sayit-hono** `main` (cache-version helper + bake script) before relying on CI bake.
+- No jf fonts on this machine → bake scripts **noop** (exit 0); OG stays Noto until a licensed bake runs (CI self-hosted or another Mac).
+
+**Deploy ordering:** Pushing `sayit-hono` alone does not bump live `/version` until transcript **rebuild-search-index** runs `bun run deploy`. If you `bun run push` transcript right after merging sayit-hono, local bake may upload under the **old** `CACHE_KEY_VERSION` while `speech_index` already has the new speech. Prefer: merge sayit-hono → push transcript (let Actions deploy) → confirm `https://archive.tw/version` → then `bun run push` for local bake; or skip local bake on that first push (`TRANSCRIPT_SKIP_LANYANG_OG=1`) and rely on **bake-og-lanyang** after deploy.
+
+Skip local bake: `TRANSCRIPT_SKIP_LANYANG_OG=1 bun run push -- …`. Push **sayit-hono** `main` (cache-version helper + bake script) before relying on CI bake.
 
 ## Manual
 

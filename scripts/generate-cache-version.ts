@@ -13,7 +13,7 @@ writeFileSync(
 	`// Auto-generated at deploy time by scripts/generate-cache-version.ts\n` +
 		`// Do not edit manually — this is overwritten on every deploy.\n` +
 		`export const CACHE_KEY_VERSION = '${version}';\n` +
-		`export const OLD_CACHE_VERSIONS: string[] = [];\n`
+		`export const OLD_CACHE_VERSIONS: string[] = [];\n`,
 );
 
 console.log(`Cache version: ${version}`);

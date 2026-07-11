@@ -1,16 +1,9 @@
 import type { SearchDocRecord } from './indexFormat';
+import { toPlainText } from '../utils/textUtils';
 
 /** Regex to detect speaker heading lines: 1-6 # followed by name ending in : or ： */
 const speakerLineRegExp = /^(#{1,6})\s*(.+?)\s*[:：]\s*$/;
 const MAX_OFFLINE_CONTENT_CHARS = 360;
-const NAMED_ENTITIES: Record<string, string> = {
-	amp: '&',
-	lt: '<',
-	gt: '>',
-	quot: '"',
-	apos: "'",
-	nbsp: ' '
-};
 
 export type ApiSection = {
 	filename: string;
@@ -27,34 +20,9 @@ function extractTitle(markdown: string): string {
 	return firstLine.replace(/^#\s*/, '') || '';
 }
 
-function decodeHtmlEntities(value: string): string {
-	return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {
-		if (entity[0] === '#') {
-			const isHex = entity[1]?.toLowerCase() === 'x';
-			const raw = isHex ? entity.slice(2) : entity.slice(1);
-			const parsed = Number.parseInt(raw, isHex ? 16 : 10);
-			if (!Number.isFinite(parsed) || parsed < 0 || parsed > 0x10ffff) {
-				return match;
-			}
-			return String.fromCodePoint(parsed);
-		}
-
-		return NAMED_ENTITIES[entity] ?? match;
-	});
-}
-
-/** Strip HTML tags and collapse whitespace */
+/** Strip HTML tags and collapse whitespace (delegates to canonical {@link toPlainText}). */
 export function stripHtml(html: string): string {
-	return decodeHtmlEntities(
-		html
-			.replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-			.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-			.replace(/<br\s*\/?>/gi, ' ')
-			.replace(/<\/(p|div|section|article|li|blockquote|h[1-6]|tr|td|th)>/gi, ' ')
-			.replace(/<[^>]+>/g, ' ')
-	)
-		.replace(/\s+/g, ' ')
-		.trim();
+	return toPlainText(html);
 }
 
 /** Strip markdown formatting for plain text */
@@ -113,11 +81,7 @@ function buildOfflineExcerpt(content: string, maxChars = MAX_OFFLINE_CONTENT_CHA
 	return `${normalized.slice(0, maxChars).trimEnd()}...`;
 }
 
-export function docsFromSections(
-	sections: ApiSection[],
-	baseUrl: string,
-	filename = sections[0]?.filename || ''
-): SearchDocRecord[] {
+export function docsFromSections(sections: ApiSection[], baseUrl: string, filename = sections[0]?.filename || ''): SearchDocRecord[] {
 	const title = sections[0]?.display_name || '';
 	const docs: SearchDocRecord[] = [];
 
@@ -130,15 +94,15 @@ export function docsFromSections(
 	}
 
 	for (const [nestFilename, groupSections] of groups) {
-		const pageUrl = nestFilename
-			? `${baseUrl}/${encodeURIComponent(nestFilename)}`
-			: baseUrl;
-		const content = buildOfflineExcerpt(mergeContentBlocks(
-			groupSections.map((section) => ({
-				content: stripHtml(section.section_content || ''),
-				speaker: section.name ?? null
-			}))
-		));
+		const pageUrl = nestFilename ? `${baseUrl}/${encodeURIComponent(nestFilename)}` : baseUrl;
+		const content = buildOfflineExcerpt(
+			mergeContentBlocks(
+				groupSections.map((section) => ({
+					content: stripHtml(section.section_content || ''),
+					speaker: section.name ?? null,
+				})),
+			),
+		);
 		if (!content) continue;
 
 		docs.push({
@@ -147,7 +111,7 @@ export function docsFromSections(
 			title,
 			content,
 			sectionId: null,
-			speaker: summarizeSpeakers(groupSections.map((section) => section.name))
+			speaker: summarizeSpeakers(groupSections.map((section) => section.name)),
 		});
 	}
 
@@ -169,7 +133,7 @@ export function docsFromMarkdown(markdown: string, pageUrl: string, filename: st
 		if (!content) return;
 		blocks.push({
 			content,
-			speaker: currentSpeaker
+			speaker: currentSpeaker,
 		});
 	}
 
@@ -191,7 +155,7 @@ export function docsFromMarkdown(markdown: string, pageUrl: string, filename: st
 		if (content) {
 			blocks.push({
 				content,
-				speaker: null
+				speaker: null,
 			});
 		}
 	}
@@ -199,12 +163,14 @@ export function docsFromMarkdown(markdown: string, pageUrl: string, filename: st
 	const mergedContent = buildOfflineExcerpt(mergeContentBlocks(blocks));
 	if (!mergedContent) return [];
 
-	return [{
-		filename,
-		pageUrl,
-		title,
-		content: mergedContent,
-		sectionId: null,
-		speaker: summarizeSpeakers(blocks.map((block) => block.speaker))
-	}];
+	return [
+		{
+			filename,
+			pageUrl,
+			title,
+			content: mergedContent,
+			sectionId: null,
+			speaker: summarizeSpeakers(blocks.map((block) => block.speaker)),
+		},
+	];
 }

@@ -1,12 +1,7 @@
 import type { Context } from 'hono';
 import type { ApiEnv } from './types';
 
-export const ALLOWED_ORIGINS = [
-	'http://localhost:5173',
-	'https://sayit-f5d.pages.dev',
-	'https://archive.tw',
-	'https://sayit.archive.tw',
-];
+export const ALLOWED_ORIGINS = ['http://localhost:5173', 'https://sayit-f5d.pages.dev', 'https://archive.tw', 'https://sayit.archive.tw'];
 
 const DEFAULT_ALLOWED_METHODS = 'GET, HEAD, OPTIONS, POST, PUT, DELETE';
 const DEFAULT_ALLOWED_HEADERS = 'Content-Type, Authorization, X-GitHub-Repository';
@@ -25,7 +20,7 @@ export function getCorsHeaders(origin: string | null) {
 		'Access-Control-Allow-Methods': DEFAULT_ALLOWED_METHODS,
 		'Access-Control-Allow-Headers': DEFAULT_ALLOWED_HEADERS,
 		'Access-Control-Max-Age': '86400',
-		'Vary': 'Origin',
+		Vary: 'Origin',
 	};
 }
 
@@ -39,4 +34,3 @@ export function handleOptions(c: Context<ApiEnv>) {
 
 	return c.text('', 200, corsHeaders);
 }
-

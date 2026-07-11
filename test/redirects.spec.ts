@@ -1,69 +1,23 @@
-import { createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import worker from '../src/index';
 import { parseRedirectsText, planRedirectDiff } from '../src/api/redirects';
+import { createMockEnv, dispatch, type MockWorkerEnv } from './helpers/mockEnv';
 
-const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
-
-type PreparedStatement = { sql: string; args: unknown[] };
-
-function createRedirectsEnv(options: { existing?: Array<{ old: string; new: string }> } = {}) {
-	const operations: PreparedStatement[] = [];
+function createRedirectsEnv(options: { existing?: Array<{ old: string; new: string }> } = {}): MockWorkerEnv {
 	const existing = options.existing ?? [];
-
-	function query(sql: string, args: unknown[]) {
+	const resolver = (sql: string) => {
 		if (sql.startsWith('SELECT old_filename, new_filename FROM speech_redirects')) {
 			return {
 				success: true,
-				results: existing.map((r) => ({ old_filename: r.old, new_filename: r.new }))
+				results: existing.map((r) => ({ old_filename: r.old, new_filename: r.new })),
 			};
 		}
 		throw new Error(`Unexpected query: ${sql}`);
-	}
-
-	return {
-		AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
-		BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
-		ASSETS: { fetch: () => new Response('Not Found', { status: 404 }) },
-		SPEECH_CACHE: {
-			delete: async () => true,
-			get: async () => null,
-			put: async () => undefined,
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
-		},
-		DB: {
-			prepare: (sql: string) => {
-				const run = (args: unknown[]) => ({
-					sql,
-					args,
-					first: async () => {
-						const r = query(sql, args);
-						return r.results[0] ?? null;
-					},
-					all: async () => query(sql, args)
-				});
-				return {
-					bind: (...args: unknown[]) => run(args),
-					first: async () => run([]).first(),
-					all: async () => run([]).all()
-				};
-			},
-			batch: async (statements: PreparedStatement[]) => {
-				for (const stmt of statements) {
-					operations.push(stmt);
-				}
-				return statements.map(() => ({ meta: { changes: 1 } }));
-			}
-		},
-		__operations: operations
 	};
+	return createMockEnv(resolver);
 }
 
-async function request(env: ReturnType<typeof createRedirectsEnv>, init?: RequestInit<IncomingRequestCfProperties>) {
-	const req = new IncomingRequest('https://example.com/api/redirects', init);
-	const ctx = createExecutionContext();
-	const res = await worker.fetch(req, env as any, ctx);
-	return { res };
+function request(env: MockWorkerEnv, init?: RequestInit<IncomingRequestCfProperties>) {
+	return dispatch('/api/redirects', env, init);
 }
 
 describe('parseRedirectsText', () => {
@@ -83,19 +37,19 @@ describe('parseRedirectsText', () => {
 			'invalid-line-no-tab',
 			'\t', // empty both sides
 			'same\tsame', // self-loop, skipped
-			'only-one-side\t' // empty new side
+			'only-one-side\t', // empty new side
 		].join('\n');
 		expect(parseRedirectsText(text)).toEqual([
 			{ old_filename: 'old1', new_filename: 'new1' },
 			{ old_filename: 'old2', new_filename: 'new2' },
-			{ old_filename: 'old3', new_filename: 'new3' }
+			{ old_filename: 'old3', new_filename: 'new3' },
 		]);
 	});
 
 	it('handles CRLF line endings', () => {
 		expect(parseRedirectsText('a\tb\r\nc\td\r\n')).toEqual([
 			{ old_filename: 'a', new_filename: 'b' },
-			{ old_filename: 'c', new_filename: 'd' }
+			{ old_filename: 'c', new_filename: 'd' },
 		]);
 	});
 });
@@ -105,17 +59,17 @@ describe('planRedirectDiff', () => {
 		const incoming = [
 			{ old_filename: 'a', new_filename: 'a-new' },
 			{ old_filename: 'b', new_filename: 'b-new' }, // unchanged
-			{ old_filename: 'c', new_filename: 'c-changed' } // updated
+			{ old_filename: 'c', new_filename: 'c-changed' }, // updated
 		];
 		const existing = [
 			{ old_filename: 'b', new_filename: 'b-new' },
 			{ old_filename: 'c', new_filename: 'c-old' },
-			{ old_filename: 'd', new_filename: 'd-new' } // not in incoming → delete
+			{ old_filename: 'd', new_filename: 'd-new' }, // not in incoming → delete
 		];
 		expect(planRedirectDiff(incoming, existing)).toEqual({
 			toInsert: [{ old_filename: 'a', new_filename: 'a-new' }],
 			toUpdate: [{ old_filename: 'c', new_filename: 'c-changed' }],
-			toDelete: ['d']
+			toDelete: ['d'],
 		});
 	});
 });
@@ -138,7 +92,7 @@ describe('PUT /api/redirects — auth', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer wrong' },
-			body: ''
+			body: '',
 		});
 		expect(res.status).toBe(400);
 	});
@@ -148,7 +102,7 @@ describe('PUT /api/redirects — auth', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer ' },
-			body: ''
+			body: '',
 		});
 		expect(res.status).toBe(400);
 	});
@@ -158,7 +112,7 @@ describe('PUT /api/redirects — auth', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-bestian' },
-			body: ''
+			body: '',
 		});
 		expect(res.status).toBe(200);
 	});
@@ -170,7 +124,7 @@ describe('PUT /api/redirects — JSON body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: '{nope'
+			body: '{nope',
 		});
 		expect(res.status).toBe(400);
 	});
@@ -180,7 +134,7 @@ describe('PUT /api/redirects — JSON body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pairs: 'nope' })
+			body: JSON.stringify({ pairs: 'nope' }),
 		});
 		expect(res.status).toBe(400);
 	});
@@ -190,7 +144,7 @@ describe('PUT /api/redirects — JSON body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pairs: ['not-an-object'] })
+			body: JSON.stringify({ pairs: ['not-an-object'] }),
 		});
 		expect(res.status).toBe(400);
 	});
@@ -200,7 +154,7 @@ describe('PUT /api/redirects — JSON body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pairs: [null] })
+			body: JSON.stringify({ pairs: [null] }),
 		});
 		expect(res.status).toBe(400);
 	});
@@ -210,7 +164,7 @@ describe('PUT /api/redirects — JSON body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pairs: [{ old: 'x', new: 1 }] })
+			body: JSON.stringify({ pairs: [{ old: 'x', new: 1 }] }),
 		});
 		expect(res.status).toBe(400);
 	});
@@ -220,7 +174,7 @@ describe('PUT /api/redirects — JSON body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pairs: [{ old: '', new: 'y' }] })
+			body: JSON.stringify({ pairs: [{ old: '', new: 'y' }] }),
 		});
 		expect(res.status).toBe(400);
 	});
@@ -230,7 +184,7 @@ describe('PUT /api/redirects — JSON body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pairs: [{ old: 'same', new: 'same' }] })
+			body: JSON.stringify({ pairs: [{ old: 'same', new: 'same' }] }),
 		});
 		expect(res.status).toBe(400);
 	});
@@ -240,7 +194,7 @@ describe('PUT /api/redirects — JSON body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ pairs: [{ old: 'old1', new: 'new1' }] })
+			body: JSON.stringify({ pairs: [{ old: 'old1', new: 'new1' }] }),
 		});
 		expect(res.status).toBe(200);
 		const json = (await res.json()) as { inserted: number; updated: number; deleted: number; total: number };
@@ -254,12 +208,12 @@ describe('PUT /api/redirects — text body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'text/plain' },
-			body: 'old1\tnew1\nold2\tnew2'
+			body: 'old1\tnew1\nold2\tnew2',
 		});
 		expect(res.status).toBe(200);
 		const json = (await res.json()) as { inserted: number; updated: number; deleted: number };
 		expect(json).toEqual({ inserted: 2, updated: 0, deleted: 1, total: 2 });
-		const sqls = env.__operations.map((s) => s.sql.trim().split(' ')[0]);
+		const sqls = env.__batchedStatements.map((s) => s.sql.trim().split(' ')[0]);
 		expect(sqls.filter((s) => s === 'INSERT')).toHaveLength(2);
 		expect(sqls.filter((s) => s === 'DELETE')).toHaveLength(1);
 	});
@@ -269,7 +223,7 @@ describe('PUT /api/redirects — text body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey' },
-			body: 'a\tb\na\tc'
+			body: 'a\tb\na\tc',
 		});
 		expect(res.status).toBe(400);
 		const json = (await res.json()) as { error: string };
@@ -277,16 +231,21 @@ describe('PUT /api/redirects — text body', () => {
 	});
 
 	it('returns zero-counts when snapshot equals DB (idempotent re-run)', async () => {
-		const env = createRedirectsEnv({ existing: [{ old: 'a', new: 'b' }, { old: 'c', new: 'd' }] });
+		const env = createRedirectsEnv({
+			existing: [
+				{ old: 'a', new: 'b' },
+				{ old: 'c', new: 'd' },
+			],
+		});
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey' },
-			body: 'a\tb\nc\td'
+			body: 'a\tb\nc\td',
 		});
 		expect(res.status).toBe(200);
 		const json = (await res.json()) as { inserted: number; updated: number; deleted: number; total: number };
 		expect(json).toEqual({ inserted: 0, updated: 0, deleted: 0, total: 2 });
-		expect(env.__operations).toHaveLength(0);
+		expect(env.__batchedStatements).toHaveLength(0);
 	});
 
 	it('updates rows whose new_filename changed', async () => {
@@ -294,12 +253,12 @@ describe('PUT /api/redirects — text body', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey' },
-			body: 'a\tnew-target'
+			body: 'a\tnew-target',
 		});
 		expect(res.status).toBe(200);
 		const json = (await res.json()) as { inserted: number; updated: number; deleted: number };
 		expect(json).toEqual({ inserted: 0, updated: 1, deleted: 0, total: 1 });
-		expect(env.__operations.some((s) => s.sql.startsWith('UPDATE speech_redirects'))).toBe(true);
+		expect(env.__batchedStatements.some((s) => s.sql.startsWith('UPDATE speech_redirects'))).toBe(true);
 	});
 });
 
@@ -313,9 +272,9 @@ describe('PUT /api/redirects — DB error paths', () => {
 				delete: async () => true,
 				get: async () => null,
 				put: async () => undefined,
-				list: async () => ({ objects: [], truncated: false, cursor: '' })
+				list: async () => ({ objects: [], truncated: false, cursor: '' }),
 			},
-			DB: { prepare: prepareImpl, batch: async () => [] }
+			DB: { prepare: prepareImpl, batch: async () => [] },
 		} as any;
 	}
 
@@ -327,7 +286,7 @@ describe('PUT /api/redirects — DB error paths', () => {
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey' },
-			body: 'a\tb'
+			body: 'a\tb',
 		});
 		expect(res.status).toBe(503);
 	});
@@ -336,15 +295,15 @@ describe('PUT /api/redirects — DB error paths', () => {
 		const env = envWith(() => ({
 			bind: () => ({
 				first: async () => null,
-				all: async () => ({ success: false, results: [] })
+				all: async () => ({ success: false, results: [] }),
 			}),
 			first: async () => null,
-			all: async () => ({ success: false, results: [] })
+			all: async () => ({ success: false, results: [] }),
 		}));
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey' },
-			body: 'a\tb'
+			body: 'a\tb',
 		});
 		expect(res.status).toBe(503);
 	});
@@ -358,7 +317,7 @@ describe('PUT /api/redirects — DB error paths', () => {
 				delete: async () => true,
 				get: async () => null,
 				put: async () => undefined,
-				list: async () => ({ objects: [], truncated: false, cursor: '' })
+				list: async () => ({ objects: [], truncated: false, cursor: '' }),
 			},
 			DB: {
 				prepare: (sql: string) => ({
@@ -366,20 +325,20 @@ describe('PUT /api/redirects — DB error paths', () => {
 						sql,
 						args: [],
 						first: async () => null,
-						all: async () => ({ success: true, results: [] })
+						all: async () => ({ success: true, results: [] }),
 					}),
 					first: async () => null,
-					all: async () => ({ success: true, results: [] })
+					all: async () => ({ success: true, results: [] }),
 				}),
 				batch: async () => {
 					throw new Error('batch boom');
-				}
-			}
+				},
+			},
 		} as any;
 		const { res } = await request(env, {
 			method: 'PUT',
 			headers: { Authorization: 'Bearer token-audrey' },
-			body: 'a\tb'
+			body: 'a\tb',
 		});
 		expect(res.status).toBe(503);
 	});

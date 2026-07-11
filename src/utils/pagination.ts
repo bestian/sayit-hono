@@ -1,4 +1,10 @@
 // 通用的分頁頁碼生成器：固定顯示首尾，當前前後各 1，必要時以省略號銜接
+// not lsc-verifiable: TypeScript union type Array<number | 'ellipsis'> emits seq<number | 'ellipsis'> which is not valid Dafny syntax — 2 parse errors prevent verification
+//@ requires total >= 1
+//@ requires current >= 1 && current <= total
+//@ ensures \result.length > 0
+//@ ensures \result[0] == 1
+//@ ensures \result[\result.length - 1] == total
 export function buildPaginationPages(current: number, total: number): Array<number | 'ellipsis'> {
 	const pages: Array<number | 'ellipsis'> = [];
 
@@ -24,4 +30,3 @@ export function buildPaginationPages(current: number, total: number): Array<numb
 
 	return pages;
 }
-

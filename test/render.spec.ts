@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { renderHtml } from '../src/ssr/render';
-import HomeView, { styles as HomeViewStyles } from '../src/.generated/views/HomeView';
-import Navbar, { styles as NavbarStyles } from '../src/.generated/components/Navbar';
-import Footer, { styles as FooterStyles } from '../src/.generated/components/Footer';
-import SearchResultView, { styles as SearchResultViewStyles } from '../src/.generated/views/SearchResultView';
-import LegalPrivacyView, { styles as LegalPrivacyViewStyles } from '../src/.generated/views/LegalPrivacyView';
+import HomeView, { styles as HomeViewStyles } from '../src/views/HomeView.vue';
+import Navbar, { styles as NavbarStyles } from '../src/components/Navbar.vue';
+import Footer, { styles as FooterStyles } from '../src/components/Footer.vue';
+import SearchResultView, { styles as SearchResultViewStyles } from '../src/views/SearchResultView.vue';
+import LegalPrivacyView, { styles as LegalPrivacyViewStyles } from '../src/views/LegalPrivacyView.vue';
 
 describe('SSR layout', () => {
 	it('renders the global share control and share script', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).toContain('data-sayit-share');
@@ -18,10 +18,31 @@ describe('SSR layout', () => {
 		expect(html).toContain('navigator.share');
 	});
 
+	it('escapes title/meta/link values in the document head (XSS regression, see B5)', async () => {
+		const html = await renderHtml(HomeView, {
+			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer },
+			head: {
+				title: `"><script>alert(1)</script>`,
+				meta: [
+					{ property: 'og:title', content: `Quote " and <tag> & amp` },
+					{ name: 'description', content: `'single' "double"` },
+				],
+				links: [{ rel: 'canonical', href: `https://example.com/?a=1&b="2`, hreflang: 'zh-Hant' }],
+			},
+		});
+
+		expect(html).not.toContain('<script>alert(1)</script>');
+		expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+		expect(html).toContain('Quote &quot; and &lt;tag&gt; &amp; amp');
+		expect(html).toContain('&#39;single&#39; &quot;double&quot;');
+		expect(html).toContain('href="https://example.com/?a=1&amp;b=&quot;2"');
+	});
+
 	it('navbar share control has no legacy margin-top in SSR CSS', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).not.toContain('margin-top: 5px');
@@ -31,7 +52,7 @@ describe('SSR layout', () => {
 	it('renders the homepage Ask UI hidden by default', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).toContain('id="sayit-site-lang-toggle"');
@@ -49,7 +70,7 @@ describe('SSR layout', () => {
 	it('renders homepage site language toggle with emoji flag labels', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		const toggleMatch = html.match(/<button[^>]*id="sayit-site-lang-toggle"[^>]*>[\s\S]*?<\/button>/);
@@ -59,11 +80,10 @@ describe('SSR layout', () => {
 		expect(toggleHtml).toContain('🇹🇼');
 	});
 
-
 	it('renders footer ask notice with local privacy and terms links', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).toContain('sayit-footer-ask-notice');
@@ -84,8 +104,8 @@ describe('SSR layout', () => {
 				page_size: 20,
 				total_pages: 1,
 				total_sections: 0,
-				pagination_pages: [1]
-			}
+				pagination_pages: [1],
+			},
 		});
 
 		expect(html).not.toContain('id="sayit-ask"');
@@ -99,7 +119,7 @@ describe('SSR layout', () => {
 	it('renders bilingual privacy policy content', async () => {
 		const html = await renderHtml(LegalPrivacyView, {
 			styles: [LegalPrivacyViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).toContain('id="privacy-zh"');

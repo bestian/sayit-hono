@@ -30,7 +30,7 @@ function toStringArray(value: unknown): string[] {
 function buildNestPairs(filenames: string[], displayNames: string[]) {
 	return filenames.map((name, index) => ({
 		filename: name,
-		display_name: displayNames[index] ?? name
+		display_name: displayNames[index] ?? name,
 	}));
 }
 
@@ -40,7 +40,7 @@ export async function speechIndex(c: Context<ApiEnv>) {
 
 	try {
 		const result = await c.env.DB.prepare(
-			'SELECT filename, display_name, isNested, nest_filenames, nest_display_names FROM speech_index ORDER BY id ASC'
+			'SELECT filename, display_name, isNested, nest_filenames, nest_display_names FROM speech_index ORDER BY id ASC',
 		).all();
 
 		if (!result.success) {
@@ -53,10 +53,7 @@ export async function speechIndex(c: Context<ApiEnv>) {
 			isNested: Boolean(row.isNested),
 			nest_filenames: toStringArray(row.nest_filenames),
 			nest_display_names: toStringArray(row.nest_display_names),
-			nest: buildNestPairs(
-				toStringArray(row.nest_filenames),
-				toStringArray(row.nest_display_names)
-			)
+			nest: buildNestPairs(toStringArray(row.nest_filenames), toStringArray(row.nest_display_names)),
 		}));
 
 		return c.json(rows, 200, corsHeaders);
@@ -65,4 +62,3 @@ export async function speechIndex(c: Context<ApiEnv>) {
 		return c.json({ error: 'Internal server error' }, 500, corsHeaders);
 	}
 }
-

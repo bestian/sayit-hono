@@ -10,7 +10,7 @@ const delayMs = 2000;
 async function fetchVersion(): Promise<string | null> {
 	const res = await fetch(`${url}?_=${Date.now()}`, {
 		cache: 'no-store',
-		headers: { 'Cache-Control': 'no-cache' }
+		headers: { 'Cache-Control': 'no-cache' },
 	});
 	if (!res.ok) {
 		console.warn(`  HTTP ${res.status} from ${url}`);
@@ -41,7 +41,9 @@ async function main() {
 	console.error(`  ${url} did not return ${CACHE_KEY_VERSION} after ${maxAttempts} attempts.`);
 	console.error(`  The worker is likely still running an older version — wrangler deploy`);
 	console.error(`  silently did nothing (common failure mode under bun runtime).`);
-	console.error(`  Retry with: npx wrangler deploy`);
+	console.error(
+		`  Retry with: ${process.env.DEPLOY_RETRY_HINT ?? 'the same deploy command you just ran (check which --env you targeted before retrying)'}`,
+	);
 	process.exit(1);
 }
 

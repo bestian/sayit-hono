@@ -1,6 +1,7 @@
 import { createSSRApp, type Component } from 'vue';
 import { renderToString } from '@vue/server-renderer';
-import type { HeadSpec, LinkEntry } from './heads';
+import type { HeadSpec } from './heads';
+import { escapeHtml } from '../utils/textUtils';
 
 const BASE_HEAD = `<meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1092,10 +1093,10 @@ function renderMeta(head?: HeadSpec) {
 	return entries
 		.map((meta) => {
 			if (meta.property) {
-				return `<meta property="${meta.property}" content="${meta.content}">`;
+				return `<meta property="${escapeHtml(meta.property)}" content="${escapeHtml(meta.content)}">`;
 			}
 			if (meta.name) {
-				return `<meta name="${meta.name}" content="${meta.content}">`;
+				return `<meta name="${escapeHtml(meta.name)}" content="${escapeHtml(meta.content)}">`;
 			}
 			return '';
 		})
@@ -1107,8 +1108,8 @@ function renderLinks(head?: HeadSpec) {
 	const entries = head?.links ?? [];
 	return entries
 		.map((link) => {
-			const attrs = [`rel="${link.rel}"`, `href="${link.href}"`];
-			if (link.hreflang) attrs.push(`hreflang="${link.hreflang}"`);
+			const attrs = [`rel="${escapeHtml(link.rel)}"`, `href="${escapeHtml(link.href)}"`];
+			if (link.hreflang) attrs.push(`hreflang="${escapeHtml(link.hreflang)}"`);
 			return `<link ${attrs.join(' ')}>`;
 		})
 		.filter(Boolean)
@@ -1116,7 +1117,7 @@ function renderLinks(head?: HeadSpec) {
 }
 
 function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptions) {
-	const headTitle = head?.title ?? (title ? `${title} :: SayIt` : 'SayIt');
+	const headTitle = escapeHtml(head?.title ?? (title ? `${title} :: SayIt` : 'SayIt'));
 	const inlineStyles = styles?.trim() ? `<style>${styles}</style>` : '';
 	const metaTags = renderMeta(head);
 	const linkTags = renderLinks(head);
@@ -1177,10 +1178,7 @@ ${extraScripts}
 </html>`;
 }
 
-export async function renderHtml(
-	component: Component,
-	{ title, styles, components, props, head, scripts }: RenderOptions
-) {
+export async function renderHtml(component: Component, { title, styles, components, props, head, scripts }: RenderOptions) {
 	const app = createSSRApp(component, props);
 
 	if (components) {

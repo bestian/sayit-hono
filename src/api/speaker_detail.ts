@@ -11,7 +11,9 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 		// 參數應為 :route_pathname_with_json，移除末尾 .json 取得實際路由名稱
 		const paramWithJson = c.req.param('route_pathname_with_json') ?? '';
 		const fromParam =
-			paramWithJson && paramWithJson.endsWith('.json') ? encodeURIComponent(paramWithJson.slice(0, -'.json'.length)) : encodeURIComponent(paramWithJson);
+			paramWithJson && paramWithJson.endsWith('.json')
+				? encodeURIComponent(paramWithJson.slice(0, -'.json'.length))
+				: encodeURIComponent(paramWithJson);
 
 		// 後備：直接從 pathname 擷取（保持 URL 原樣，不做 decode，以符合 DB 中的編碼）
 		const match = new URL(c.req.url).pathname.match(/^\/api\/speaker_detail\/([^/]+)\.json$/);
@@ -23,9 +25,7 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			return c.json({ error: 'Invalid speaker route pathname' }, 400, corsHeaders);
 		}
 
-		const speakerRow = await c.env.DB.prepare('SELECT * FROM speakers_view WHERE route_pathname = ?')
-			.bind(routePathname)
-			.first();
+		const speakerRow = await c.env.DB.prepare('SELECT * FROM speakers_view WHERE route_pathname = ?').bind(routePathname).first();
 
 		if (!speakerRow) {
 			return c.json({ error: 'Speaker not found' }, 404, corsHeaders);
@@ -39,14 +39,14 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 		const offset = (page - 1) * pageSize;
 
 		const appearancesCountRow = await c.env.DB.prepare(
-			'SELECT COUNT(DISTINCT speech_filename) AS count FROM speech_speakers WHERE speaker_route_pathname = ?'
+			'SELECT COUNT(DISTINCT speech_filename) AS count FROM speech_speakers WHERE speaker_route_pathname = ?',
 		)
 			.bind(routePathname)
 			.first<{ count: number | string }>();
 		const appearancesCount = Number(appearancesCountRow?.count ?? 0);
 
 		const sectionsCountRow = await c.env.DB.prepare(
-			'SELECT COUNT(DISTINCT section_id) AS count FROM speech_content WHERE section_speaker = ?'
+			'SELECT COUNT(DISTINCT section_id) AS count FROM speech_content WHERE section_speaker = ?',
 		)
 			.bind(routePathname)
 			.first<{ count: number | string }>();
@@ -67,7 +67,7 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			LEFT JOIN speech_index si ON sc.filename = si.filename
 			WHERE sc.section_speaker = ?
 			ORDER BY sc.filename DESC, sc.section_id ASC
-			LIMIT ? OFFSET ?`
+			LIMIT ? OFFSET ?`,
 		)
 			.bind(routePathname, pageSize, offset)
 			.all();
@@ -96,7 +96,7 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 					section_nest_filename: speakerRow.longest_section_nest_filename ?? null,
 					section_nest_display_name: speakerRow.longest_section_nest_display_name ?? null,
 					section_display_name: speakerRow.longest_section_displayname || '',
-			  }
+				}
 			: null;
 
 		const totalSections = Number.isFinite(sectionsCount) && sectionsCount >= 0 ? sectionsCount : sections.length;
@@ -115,7 +115,7 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 			page,
 			page_size: pageSize,
 			total_pages: totalPages,
-			pagination_pages: paginationPages
+			pagination_pages: paginationPages,
 		};
 
 		return c.json(speaker, 200, corsHeaders);
@@ -124,4 +124,3 @@ export async function speakerDetail(c: Context<ApiEnv>) {
 		return c.json({ error: 'Internal server error' }, 500, corsHeaders);
 	}
 }
-

@@ -18,18 +18,9 @@ export type SearchDocRecord = {
 	speaker: string | null;
 };
 
-export type SearchPackedPage = [
-	filename: string,
-	pageUrl: string,
-	title: string,
-];
+export type SearchPackedPage = [filename: string, pageUrl: string, title: string];
 
-export type SearchPackedDoc = [
-	pageIndex: number,
-	sectionId: number | null,
-	speakerIndex: number,
-	content: string,
-];
+export type SearchPackedDoc = [pageIndex: number, sectionId: number | null, speakerIndex: number, content: string];
 
 export type SearchIndexPayload = {
 	v: typeof SEARCH_INDEX_FORMAT_VERSION;
@@ -55,22 +46,16 @@ export function buildSearchOverlayKey(filename: string): string {
 	return `${SEARCH_UPDATES_PREFIX}/${encodeURIComponent(filename)}.json`;
 }
 
-export function createEmptySearchOverlayManifest(
-	baselineVersion = '',
-	updatedAt = new Date().toISOString()
-): SearchOverlayManifest {
+export function createEmptySearchOverlayManifest(baselineVersion = '', updatedAt = new Date().toISOString()): SearchOverlayManifest {
 	return {
 		v: SEARCH_INDEX_MANIFEST_VERSION,
 		baselineVersion,
 		updatedAt,
-		overlays: {}
+		overlays: {},
 	};
 }
 
-export function packSearchDocs(
-	docs: SearchDocRecord[],
-	generatedAt = new Date().toISOString()
-): SearchIndexPayload {
+export function packSearchDocs(docs: SearchDocRecord[], generatedAt = new Date().toISOString()): SearchIndexPayload {
 	const pages: SearchPackedPage[] = [];
 	const pageIndexByKey = new Map<string, number>();
 	const speakers: string[] = [];
@@ -106,7 +91,7 @@ export function packSearchDocs(
 		generatedAt,
 		pages,
 		speakers,
-		docs: packedDocs
+		docs: packedDocs,
 	};
 }
 
@@ -122,7 +107,7 @@ export function unpackSearchDocs(payload: SearchIndexPayload): SearchDocRecord[]
 			title,
 			content,
 			sectionId,
-			speaker: speakerIndex >= 0 ? payload.speakers[speakerIndex] ?? null : null
+			speaker: speakerIndex >= 0 ? (payload.speakers[speakerIndex] ?? null) : null,
 		});
 	}
 	return result;

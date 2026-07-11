@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
 import { ARTIFACT_CACHE_CONTROL, deleteR2Cache, r2AnKey, readR2Cache, writeR2Cache } from './cache';
 import { normalizeSections } from '../utils/sectionUtils';
+import { parseContent } from '../utils/textUtils';
 import type { ApiEnv } from './types';
 
 const SPEECH_API_PREFIX = '/api/an/';
@@ -13,28 +14,20 @@ export function isNumericAnKey(key: string): boolean {
 	return /^\d+$/.test(base);
 }
 
-function parseContent(raw: string | null | undefined): string {
-	if (!raw) return '';
-	try {
-		const parsed = JSON.parse(raw);
-		return typeof parsed === 'string' ? parsed : raw;
-	} catch {
-		return raw;
-	}
-}
-
 /** 僅跳脫未轉義的 & 為 &amp;，確保 XML 合法（不破壞既有實體） */
 function escapeAmp(s: string): string {
 	return s.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#)/g, '&amp;');
 }
 
 /** 從多個 section 生成完整演講的 .an — 呼叫端保證 sections 非空 */
-function generateFullSpeechAn(sections: Array<{
-	section_speaker: string | null;
-	section_content: string | null;
-	display_name: string | null;
-	name: string | null;
-}>): string {
+function generateFullSpeechAn(
+	sections: Array<{
+		section_speaker: string | null;
+		section_content: string | null;
+		display_name: string | null;
+		name: string | null;
+	}>,
+): string {
 	const heading = sections[0]?.display_name ? escapeXml(sections[0].display_name) : '';
 	const seenSpeakers = new Map<string, string>();
 	for (const s of sections) {
@@ -46,16 +39,14 @@ function generateFullSpeechAn(sections: Array<{
 	const tlcPersons = Array.from(seenSpeakers.entries())
 		.map(
 			([id, showAs]) =>
-				`        <TLCPerson href="/ontology/person/13657c62c311/${escapeXml(id)}" id="${escapeXml(id)}" showAs="${escapeXml(showAs)}"/>`
+				`        <TLCPerson href="/ontology/person/13657c62c311/${escapeXml(id)}" id="${escapeXml(id)}" showAs="${escapeXml(showAs)}"/>`,
 		)
 		.join('\n');
 
 	const speechBlocks = sections.map((s) => {
 		const speakerId = s.section_speaker ?? 'unknown';
 		const content = parseContent(s.section_content ?? '');
-		const bodyContent = content.trim().startsWith('<')
-			? escapeAmp(content)
-			: `<p>${escapeXml(content)}</p>`;
+		const bodyContent = content.trim().startsWith('<') ? escapeAmp(content) : `<p>${escapeXml(content)}</p>`;
 		return `            <speech by="#${escapeXml(speakerId)}">
 
 
@@ -101,9 +92,7 @@ function generateSingleSectionAn(section: {
 	const speakerId = section.section_speaker ?? 'unknown';
 	const showAs = section.name ?? section.section_speaker ?? 'Unknown';
 	const content = parseContent(section.section_content ?? '');
-	const bodyContent = content.trim().startsWith('<')
-		? escapeAmp(content)
-		: `<p>${escapeXml(content)}</p>`;
+	const bodyContent = content.trim().startsWith('<') ? escapeAmp(content) : `<p>${escapeXml(content)}</p>`;
 	const heading = section.display_name ? escapeXml(section.display_name) : '';
 
 	const tlcPerson = `<TLCPerson href="/ontology/person/13657c62c311/${escapeXml(speakerId)}" id="${escapeXml(speakerId)}" showAs="${escapeXml(showAs)}"/>`;
@@ -139,12 +128,7 @@ function generateSingleSectionAn(section: {
 }
 
 function escapeXml(s: string): string {
-	return s
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&apos;');
+	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
 /** 從 path 解析出 .an 的 object key（含副檔名），供 speechAn 使用 */
@@ -183,7 +167,7 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		// 單一 section：從 DB 查 section 資料，即時生成 .an（不依賴 R2）
 		const sectionId = parseInt(baseKey, 10);
 		const sectionRow = await c.env.DB.prepare(
-			'SELECT filename, section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?'
+			'SELECT filename, section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?',
 		)
 			.bind(sectionId)
 			.first();
@@ -208,7 +192,6 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		if (headers.has('Access-Control-Allow-Origin')) {
 			headers.set('Vary', 'Origin');
 		}
-
 
 		if (c.req.method === 'HEAD') {
 			headers.set('Content-Length', new TextEncoder().encode(singleAn).length.toString());
@@ -253,7 +236,7 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		 LEFT JOIN speech_index si ON sc.filename = si.filename
 		 LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
 		 WHERE sc.filename = ?
-		 ORDER BY sc.section_id ASC`
+		 ORDER BY sc.section_id ASC`,
 	)
 		.bind(baseKey)
 		.all();
@@ -263,23 +246,25 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 	}
 
 	const sections = normalizeSections(
-		(result.results as Array<{
-			section_id: number;
-			previous_section_id: number | null;
-			next_section_id: number | null;
-			section_speaker: string | null;
-			section_content: string | null;
-			display_name: string | null;
-			name: string | null;
-		}>).map((r) => ({
+		(
+			result.results as Array<{
+				section_id: number;
+				previous_section_id: number | null;
+				next_section_id: number | null;
+				section_speaker: string | null;
+				section_content: string | null;
+				display_name: string | null;
+				name: string | null;
+			}>
+		).map((r) => ({
 			section_id: Number(r.section_id),
 			previous_section_id: r.previous_section_id != null ? Number(r.previous_section_id) : null,
 			next_section_id: r.next_section_id != null ? Number(r.next_section_id) : null,
 			section_speaker: r.section_speaker,
 			section_content: r.section_content,
 			display_name: r.display_name,
-			name: r.name
-		}))
+			name: r.name,
+		})),
 	);
 
 	const generatedAn = generateFullSpeechAn(sections);
@@ -310,7 +295,7 @@ export async function getAnContentAsString(c: Context<ApiEnv>, objectKey: string
 	if (isNumericAnKey(objectKey)) {
 		const sectionId = parseInt(baseKey, 10);
 		const sectionRow = await c.env.DB.prepare(
-			'SELECT filename, section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?'
+			'SELECT filename, section_speaker, section_content, display_name, name FROM sections WHERE section_id = ?',
 		)
 			.bind(sectionId)
 			.first();
@@ -333,29 +318,31 @@ export async function getAnContentAsString(c: Context<ApiEnv>, objectKey: string
 		 LEFT JOIN speech_index si ON sc.filename = si.filename
 		 LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
 		 WHERE sc.filename = ?
-		 ORDER BY sc.section_id ASC`
+		 ORDER BY sc.section_id ASC`,
 	)
 		.bind(filename)
 		.all();
 	if (!result.success || (result.results as unknown[]).length === 0) return null;
 	const sections = normalizeSections(
-		(result.results as Array<{
-			section_id: number;
-			previous_section_id: number | null;
-			next_section_id: number | null;
-			section_speaker: string | null;
-			section_content: string | null;
-			display_name: string | null;
-			name: string | null;
-		}>).map((r) => ({
+		(
+			result.results as Array<{
+				section_id: number;
+				previous_section_id: number | null;
+				next_section_id: number | null;
+				section_speaker: string | null;
+				section_content: string | null;
+				display_name: string | null;
+				name: string | null;
+			}>
+		).map((r) => ({
 			section_id: Number(r.section_id),
 			previous_section_id: r.previous_section_id != null ? Number(r.previous_section_id) : null,
 			next_section_id: r.next_section_id != null ? Number(r.next_section_id) : null,
 			section_speaker: r.section_speaker,
 			section_content: r.section_content,
 			display_name: r.display_name,
-			name: r.name
-		}))
+			name: r.name,
+		})),
 	);
 	return generateFullSpeechAn(sections);
 }
@@ -363,10 +350,7 @@ export async function getAnContentAsString(c: Context<ApiEnv>, objectKey: string
 export async function speechAn(c: Context<ApiEnv>) {
 	// 優先使用 route param（/api/an/:path{...}），否則從 pathname 解析
 	const pathParam = c.req.param('path');
-	let speechObjectKey: string | null =
-		pathParam && pathParam.endsWith(SPEECH_FILE_EXTENSION)
-			? pathParam
-			: getSpeechObjectKey(c.req.path);
+	let speechObjectKey: string | null = pathParam && pathParam.endsWith(SPEECH_FILE_EXTENSION) ? pathParam : getSpeechObjectKey(c.req.path);
 	if (speechObjectKey) {
 		try {
 			speechObjectKey = decodeURIComponent(speechObjectKey);
@@ -380,4 +364,3 @@ export async function speechAn(c: Context<ApiEnv>) {
 	}
 	return serveAnByKey(c, speechObjectKey);
 }
-

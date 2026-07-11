@@ -13,11 +13,14 @@ import {
 	speakerRequestPath,
 	tags,
 	writeR2Cache,
-	type PurgeOptions
+	type PurgeOptions,
 } from '../src/api/cache';
 
 function createBucket() {
-	const store = new Map<string, { body: string; cacheControl?: string; contentType?: string; etag?: string; customMetadata?: Record<string, string> }>();
+	const store = new Map<
+		string,
+		{ body: string; cacheControl?: string; contentType?: string; etag?: string; customMetadata?: Record<string, string> }
+	>();
 	return {
 		store,
 		bucket: {
@@ -30,34 +33,42 @@ function createBucket() {
 					httpEtag: entry.etag ?? null,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
 					customMetadata: entry.customMetadata,
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
-			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string }; customMetadata?: Record<string, string> }) => {
+			put: async (
+				key: string,
+				body: string,
+				options?: { httpMetadata?: { cacheControl?: string; contentType?: string }; customMetadata?: Record<string, string> },
+			) => {
 				store.set(key, {
 					body,
 					cacheControl: options?.httpMetadata?.cacheControl,
 					contentType: options?.httpMetadata?.contentType,
-					customMetadata: options?.customMetadata
+					customMetadata: options?.customMetadata,
 				});
 			},
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) store.delete(key);
-			}
-		} as unknown as R2Bucket
+			},
+		} as unknown as R2Bucket,
 	};
 }
 
 describe('cache.readR2Cache / writeR2Cache', () => {
 	it('round-trips body and honors stored metadata', async () => {
 		const { bucket, store } = createBucket();
-		await writeR2Cache(bucket, 'k1', new Response('hi', {
-			headers: { 'Cache-Control': 'public, max-age=10', 'Content-Type': 'text/plain' }
-		}));
+		await writeR2Cache(
+			bucket,
+			'k1',
+			new Response('hi', {
+				headers: { 'Cache-Control': 'public, max-age=10', 'Content-Type': 'text/plain' },
+			}),
+		);
 		expect(store.get('k1')).toMatchObject({
 			body: 'hi',
 			cacheControl: 'public, max-age=10',
-			contentType: 'text/plain'
+			contentType: 'text/plain',
 		});
 
 		const res = await readR2Cache(bucket, 'k1');
@@ -70,13 +81,17 @@ describe('cache.readR2Cache / writeR2Cache', () => {
 
 	it('preserves Cache-Tag via customMetadata', async () => {
 		const { bucket } = createBucket();
-		await writeR2Cache(bucket, 'tagged', new Response('<html/>', {
-			headers: {
-				'Cache-Control': 'public, max-age=0',
-				'Content-Type': 'text/html',
-				'Cache-Tag': 'list:home,speech:demo'
-			}
-		}));
+		await writeR2Cache(
+			bucket,
+			'tagged',
+			new Response('<html/>', {
+				headers: {
+					'Cache-Control': 'public, max-age=0',
+					'Content-Type': 'text/html',
+					'Cache-Tag': 'list:home,speech:demo',
+				},
+			}),
+		);
 		const res = await readR2Cache(bucket, 'tagged');
 		expect(res?.headers.get('Cache-Tag')).toBe('list:home,speech:demo');
 	});
@@ -104,9 +119,15 @@ describe('cache.readR2Cache / writeR2Cache', () => {
 
 	it('swallows errors from a broken bucket in read/write', async () => {
 		const broken = {
-			get: async () => { throw new Error('io'); },
-			put: async () => { throw new Error('io'); },
-			delete: async () => { throw new Error('io'); }
+			get: async () => {
+				throw new Error('io');
+			},
+			put: async () => {
+				throw new Error('io');
+			},
+			delete: async () => {
+				throw new Error('io');
+			},
 		} as unknown as R2Bucket;
 
 		expect(await readR2Cache(broken, 'k')).toBeNull();
@@ -122,11 +143,9 @@ describe('cache.readR2Cache / writeR2Cache', () => {
 
 describe('cache key taxonomy helpers', () => {
 	it('builds versioned hostful HTML keys only', () => {
-		expect(buildR2HtmlKey('https://example.com/speeches/?q=1')).toBe(
-			`${CACHE_KEY_VERSION}/example.com/speeches/?q=1`
-		);
+		expect(buildR2HtmlKey('https://example.com/speeches/?q=1')).toBe(`${CACHE_KEY_VERSION}/example.com/speeches/?q=1`);
 		expect(buildR2HtmlKey('https://example.com/speeches/?q=1', { includeSearch: false })).toBe(
-			`${CACHE_KEY_VERSION}/example.com/speeches/`
+			`${CACHE_KEY_VERSION}/example.com/speeches/`,
 		);
 	});
 
@@ -172,7 +191,6 @@ describe('speech/speaker request paths', () => {
 		expect(speakerRequestPath(encoded)).not.toContain('%25');
 	});
 });
-
 
 describe('purgeWorkersCache reliability', () => {
 	it('returns true when purge succeeds or returns no explicit failure', async () => {
