@@ -15,6 +15,7 @@ bun run dev
 本專案 package manager 統一用 **bun**（lockfile 為 `bun.lock`）；唯一例外是 `wrangler` 仍走 `npx wrangler …`，因為 bun runtime 已知會讓 `wrangler deploy` 在 async upload 完成前提早 exit。
 
 `bun run dev` 啟動 `vite dev`（本地 workerd + 本地 D1/R2 持久化狀態，不連正式 Cloudflare 資源）。`.vue` 存檔即生效，不需要任何編譯指令。若要對照 staging 環境的真實資料，改用 `bun run dev:staging`。
+`vp test` 使用內嵌的 `@cloudflare/vitest-pool-workers` Miniflare/workerd runtime，不需要啟動 `wrangler dev`、Cloudflare credentials 或任何外部本機服務。
 
 ## 清理快取(暫時)
 

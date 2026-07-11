@@ -27,7 +27,7 @@ export default defineConfig({
 			provider: 'istanbul',
 			reporter: ['text', 'html'],
 			include: ['src/**/*.ts'],
-			exclude: ['src/**/*.vue', 'src/api/og.ts', 'src/api/og_loader.ts', 'src/marked.d.ts', 'src/api/types.ts'],
+			exclude: ['src/**/*.vue', 'src/api/og.ts', 'src/api/og_loader.ts', 'src/marked.d.ts', 'src/api/types.ts', 'src/.generated/**'],
 			thresholds: {
 				// CI fails if any included file dips below 100% statements/lines/functions.
 				// Statements/branches are intentionally loose: istanbul instruments every

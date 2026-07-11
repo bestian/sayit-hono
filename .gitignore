@@ -195,3 +195,6 @@ dist
 og-preview*.png
 .og-bake-tmp/
 local-og-compare/
+
+# Obsolete pre-Vite+ SFC build output
+src/.generated/

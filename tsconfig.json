@@ -40,6 +40,6 @@
 			"./worker-configuration.d.ts"
 		]
 	},
-	"exclude": ["test"],
+	"exclude": ["test", "src/.generated"],
 	"include": ["worker-configuration.d.ts", "src/**/*.ts", "vite.config.ts", "vite-plugin-sfc-ssr.ts"]
 }
