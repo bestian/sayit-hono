@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { renderHtml } from '../src/ssr/render';
-import HomeView, { styles as HomeViewStyles } from '../src/.generated/views/HomeView';
-import Navbar, { styles as NavbarStyles } from '../src/.generated/components/Navbar';
-import Footer, { styles as FooterStyles } from '../src/.generated/components/Footer';
-import SearchResultView, { styles as SearchResultViewStyles } from '../src/.generated/views/SearchResultView';
-import LegalPrivacyView, { styles as LegalPrivacyViewStyles } from '../src/.generated/views/LegalPrivacyView';
+import HomeView, { styles as HomeViewStyles } from '../src/views/HomeView.vue';
+import Navbar, { styles as NavbarStyles } from '../src/components/Navbar.vue';
+import Footer, { styles as FooterStyles } from '../src/components/Footer.vue';
+import SearchResultView, { styles as SearchResultViewStyles } from '../src/views/SearchResultView.vue';
+import LegalPrivacyView, { styles as LegalPrivacyViewStyles } from '../src/views/LegalPrivacyView.vue';
 
 describe('SSR layout', () => {
 	it('renders the global share control and share script', async () => {

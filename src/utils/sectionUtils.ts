@@ -20,9 +20,13 @@ export interface SectionLike {
  * 上它應該在中段。所以這裡要檢查的是「相鄰兩列的 next_section_id / section_id
  * 是否相連」，不是 ID 的大小關係。
  */
+// not lsc-verifiable: lsc emits unresolved type param T, Infinity, != None on datatypes, in on maps with wrong element types — 18 resolution/type errors prevent Dafny verification
+//@ ensures \result ==> forall(i, 0 <= i && i < sections.length - 1 ==> sections[i].next_section_id == sections[i + 1].section_id)
 export function checkMonotonic<T extends SectionLike>(sections: T[]): boolean {
 	if (sections.length <= 1) return true;
 	for (let i = 0; i < sections.length - 1; i++) {
+		//@ invariant 0 <= i && i <= sections.length - 1
+		//@ decreases sections.length - 1 - i
 		const curr = sections[i];
 		const next = sections[i + 1];
 		if (!curr || !next) return false;
@@ -35,6 +39,8 @@ export function checkMonotonic<T extends SectionLike>(sections: T[]): boolean {
  * 依 previous_section_id / next_section_id 頭尾相接重排
  * 使用 Map 達成 O(n) 複雜度，避免大量資料時 O(n²) 導致逾時
  */
+// not lsc-verifiable: lsc emits unresolved type param T, Infinity, != None on datatypes, in on maps with wrong element types — 18 resolution/type errors prevent Dafny verification
+//@ ensures Perm(\result, sections)
 export function reorderSections<T extends SectionLike>(sections: T[]): T[] {
 	if (sections.length === 0) return [];
 
@@ -71,6 +77,7 @@ export function reorderSections<T extends SectionLike>(sections: T[]): T[] {
 
 	const ordered: T[] = [];
 	let current: T | null = first;
+	//@ decreases sections.length - ordered.length
 	while (current) {
 		ordered.push(current);
 		const nextId: number | null = current.next_section_id;
@@ -83,6 +90,9 @@ export function reorderSections<T extends SectionLike>(sections: T[]): T[] {
  * 若已 monotonic 則直接回傳，否則重排
  * @param allowReorder 分頁情境下設為 false，避免因缺前段而提前停止
  */
+// not lsc-verifiable: lsc emits unresolved type param T, Infinity, != None on datatypes, in on maps with wrong element types — 18 resolution/type errors prevent Dafny verification
+//@ ensures !allowReorder ==> \result == rawData
+//@ ensures allowReorder ==> \result == rawData || Perm(\result, rawData)
 export function normalizeSections<T extends SectionLike>(
 	rawData: T[],
 	allowReorder = true
