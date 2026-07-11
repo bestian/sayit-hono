@@ -1,84 +1,10 @@
-import { createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
-import worker from '../src/index';
-
-const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
-
-type Resolver = (sql: string, args: unknown[]) => { success?: boolean; results: any[] };
-
-function makeEnv(
-	resolver: Resolver,
-	preSeedR2: Record<string, { body: string; contentType?: string; cacheControl?: string; etag?: string }> = {},
-) {
-	const r2Store = new Map<string, { body: string; cacheControl?: string; contentType?: string; etag: string | null }>();
-	for (const [k, v] of Object.entries(preSeedR2)) {
-		r2Store.set(k, {
-			body: v.body,
-			cacheControl: v.cacheControl ?? 'public, max-age=3600',
-			contentType: v.contentType ?? 'text/html; charset=utf-8',
-			etag: v.etag ?? null,
-		});
-	}
-	return {
-		__r2Store: r2Store,
-		AUDREYT_TRANSCRIPT_TOKEN: 'x',
-		BESTIAN_TRANSCRIPT_TOKEN: 'y',
-		ASSETS: { fetch: () => new Response('Not Found', { status: 404 }) },
-		SPEECH_CACHE: {
-			get: async (key: string) => {
-				const entry = r2Store.get(key);
-				if (!entry) return null;
-				return {
-					body: entry.body,
-					size: entry.body.length,
-					httpEtag: entry.etag,
-					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body,
-				};
-			},
-			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
-				r2Store.set(key, {
-					body,
-					cacheControl: options?.httpMetadata?.cacheControl,
-					contentType: options?.httpMetadata?.contentType,
-					etag: null,
-				});
-			},
-			delete: async (keys: string | string[]) => {
-				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
-			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' }),
-		},
-		DB: {
-			prepare: (sql: string) => {
-				const run = (args: unknown[]) => ({
-					first: async () => resolver(sql, args).results[0] ?? null,
-					all: async () => {
-						const r = resolver(sql, args);
-						return { success: r.success ?? true, results: r.results };
-					},
-				});
-				return {
-					bind: (...args: unknown[]) => run(args),
-					first: async () => run([]).first(),
-					all: async () => run([]).all(),
-				};
-			},
-		},
-	};
-}
-
-async function request(path: string, env: ReturnType<typeof makeEnv>, init?: RequestInit<IncomingRequestCfProperties>) {
-	const req = new IncomingRequest(`https://example.com${path}`, init);
-	const ctx = createExecutionContext();
-	const res = await worker.fetch(req, env as any, ctx);
-	return { res };
-}
+import { createMockEnv, dispatch } from './helpers/mockEnv';
 
 describe('search branch coverage', () => {
 	it('returns 500 when speakers search query reports failure', async () => {
-		const env = makeEnv((sql) => {
+		const env = createMockEnv((sql) => {
 			if (sql.includes('FROM speakers') && sql.includes('instr(lower(COALESCE(name')) {
 				return { success: false, results: [] };
 			}
@@ -87,12 +13,12 @@ describe('search branch coverage', () => {
 			}
 			return { success: true, results: [] };
 		});
-		const { res } = await request('/api/search.json?q=needle', env);
+		const { res } = await dispatch('/api/search.json?q=needle', env);
 		expect(res.status).toBe(500);
 	});
 
 	it('returns 500 when sections search query reports failure', async () => {
-		const env = makeEnv((sql) => {
+		const env = createMockEnv((sql) => {
 			if (sql.includes('FROM speakers') && sql.includes('instr(lower(COALESCE(name')) {
 				return { success: true, results: [] };
 			}
@@ -104,13 +30,13 @@ describe('search branch coverage', () => {
 			}
 			return { success: true, results: [] };
 		});
-		const { res } = await request('/api/search.json?q=needle', env);
+		const { res } = await dispatch('/api/search.json?q=needle', env);
 		expect(res.status).toBe(500);
 	});
 
 	it('decodes oversized numeric entities in snippet (keeps them as-is)', async () => {
 		const body = '<p>X &#9999999999; Y needle Z</p>';
-		const env = makeEnv((sql) => {
+		const env = createMockEnv((sql) => {
 			if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si') && sql.includes('ORDER BY')) {
 				return {
 					success: true,
@@ -133,7 +59,7 @@ describe('search branch coverage', () => {
 			}
 			return { success: true, results: [] };
 		});
-		const { res } = await request('/api/search.json?q=needle', env);
+		const { res } = await dispatch('/api/search.json?q=needle', env);
 		expect(res.status).toBe(200);
 		const data = (await res.json()) as any;
 		expect(data.results[0].snippet).toContain('&#9999999999;');
@@ -142,7 +68,7 @@ describe('search branch coverage', () => {
 	it('highlights search query matching a speaker with empty name (fall-through branch)', async () => {
 		// runSearchQuery maps speaker rows; highlightSearchText is called on row.name ?? ''.
 		// A row with null name exercises the early-return `if (!value || tokens.length === 0)`.
-		const env = makeEnv((sql) => {
+		const env = createMockEnv((sql) => {
 			if (sql.includes('FROM speakers') && sql.includes('instr(lower(COALESCE(name')) {
 				return { success: true, results: [{ id: 1, route_pathname: 'x', name: null, photoURL: null }] };
 			}
@@ -151,20 +77,20 @@ describe('search branch coverage', () => {
 			}
 			return { success: true, results: [] };
 		});
-		const { res } = await request('/search/?q=needle', env);
+		const { res } = await dispatch('/search/?q=needle', env);
 		expect(res.status).toBe(200);
 	});
 
 	it('sets search HTML cache headers without edge short-circuit', async () => {
-		const env = makeEnv(() => ({ success: true, results: [] }));
-		const { res } = await request('/search/?q=hello', env);
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/search/?q=hello', env);
 		expect(res.status).toBe(200);
 		expect(res.headers.get('Cache-Control') || '').toMatch(/s-maxage=/);
 	});
 
 	it('sets search API cache headers without edge short-circuit', async () => {
-		const env = makeEnv(() => ({ success: true, results: [] }));
-		const { res } = await request('/api/search.json?q=hello', env);
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/api/search.json?q=hello', env);
 		expect(res.status).toBe(200);
 		expect(res.headers.get('Cache-Control') || '').toMatch(/s-maxage=/);
 	});
@@ -173,10 +99,10 @@ describe('search branch coverage', () => {
 describe('/:filename/:nest_filename — R2 cache hit', () => {
 	it('returns the preseeded body without hitting DB', async () => {
 		const cacheKey = `${CACHE_KEY_VERSION}/example.com/2026-p/child`;
-		const env = makeEnv(() => ({ success: false, results: [] }), {
-			[cacheKey]: { body: '<!doctype html><title>NESTED-SEED</title><body>ns</body>' },
+		const env = createMockEnv(() => ({ success: false, results: [] }), {
+			preSeedR2: { [cacheKey]: { body: '<!doctype html><title>NESTED-SEED</title><body>ns</body>' } },
 		});
-		const { res } = await request('/2026-p/child', env);
+		const { res } = await dispatch('/2026-p/child', env);
 		expect(res.status).toBe(200);
 		expect(await res.text()).toContain('NESTED-SEED');
 	});
@@ -185,10 +111,10 @@ describe('/:filename/:nest_filename — R2 cache hit', () => {
 describe('/speech/:section_id — R2 cache hit', () => {
 	it('returns the preseeded section body', async () => {
 		const cacheKey = `${CACHE_KEY_VERSION}/example.com/speech/42`;
-		const env = makeEnv(() => ({ success: false, results: [] }), {
-			[cacheKey]: { body: '<!doctype html><title>SEC-SEED</title>SECTION-SEED' },
+		const env = createMockEnv(() => ({ success: false, results: [] }), {
+			preSeedR2: { [cacheKey]: { body: '<!doctype html><title>SEC-SEED</title>SECTION-SEED' } },
 		});
-		const { res } = await request('/speech/42', env);
+		const { res } = await dispatch('/speech/42', env);
 		expect(res.status).toBe(200);
 		expect(await res.text()).toContain('SECTION-SEED');
 	});
@@ -252,16 +178,16 @@ describe('alternate language links', () => {
 	};
 
 	it('wires hreflang links on the nested parent list page', async () => {
-		const env = makeEnv(withAlternateResolver);
-		const { res } = await request('/2026-parent', env);
+		const env = createMockEnv(withAlternateResolver);
+		const { res } = await dispatch('/2026-parent', env);
 		expect(res.status).toBe(200);
 		const html = await res.text();
 		expect(html).toContain('hreflang');
 	});
 
 	it('wires hreflang links on the nested detail page', async () => {
-		const env = makeEnv(withAlternateResolver);
-		const { res } = await request('/2026-parent/a', env);
+		const env = createMockEnv(withAlternateResolver);
+		const { res } = await dispatch('/2026-parent/a', env);
 		expect(res.status).toBe(200);
 		const html = await res.text();
 		expect(html).toContain('hreflang');
@@ -270,7 +196,7 @@ describe('alternate language links', () => {
 
 describe('loadAlternateInfo error handling', () => {
 	it('silently returns null when alternate_filename query throws', async () => {
-		const env = makeEnv((sql, args) => {
+		const env = createMockEnv((sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
 				if (args[0] === '2026-flat') {
 					return {
@@ -302,7 +228,7 @@ describe('loadAlternateInfo error handling', () => {
 			}
 			return { success: true, results: [] };
 		});
-		const { res } = await request('/2026-flat', env);
+		const { res } = await dispatch('/2026-flat', env);
 		expect(res.status).toBe(200);
 	});
 });
@@ -311,7 +237,7 @@ describe('parseToArray input variants', () => {
 	// nest_filenames comes from speech_index.nest_filenames column. parseContent handles it, then parseToArray.
 	// Covers null-input, pre-parsed array, and non-string non-array (object).
 	it('handles null, JSON-array, and object nest_filenames', async () => {
-		const env = makeEnv((sql, args) => {
+		const env = createMockEnv((sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
 				if (args[0] === 'null-nest') {
 					return {
@@ -390,20 +316,20 @@ describe('parseToArray input variants', () => {
 		});
 
 		// null-nest: parseToArray(null) hits the falsy early return before the route resolves.
-		expect((await request('/null-nest/x', env)).res.status).toBe(200);
+		expect((await dispatch('/null-nest/x', env)).res.status).toBe(200);
 		// string-nest: parseContent('a,b') → throws → returns 'a,b' → typeof string → split by comma
-		expect((await request('/string-nest/a', env)).res.status).toBe(200);
+		expect((await dispatch('/string-nest/a', env)).res.status).toBe(200);
 		// array-nest: parseContent('["n1","n2"]') → parsed array → map values
-		expect((await request('/array-nest/n1', env)).res.status).toBe(200);
+		expect((await dispatch('/array-nest/n1', env)).res.status).toBe(200);
 		// object-nest: parseContent('{"k":"v"}') → parsed object (not string/array) → returns []
-		expect((await request('/object-nest/x', env)).res.status).toBe(200);
+		expect((await dispatch('/object-nest/x', env)).res.status).toBe(200);
 	});
 });
 
 describe('parseContent empty/falsy input', () => {
 	// Exercised via /speech/:id page where section.section_content might be empty.
 	it('handles sections with null content', async () => {
-		const env = makeEnv((sql, args) => {
+		const env = createMockEnv((sql, args) => {
 			if (sql.includes('FROM speech_content a') && sql.includes('WHERE a.section_id = ?')) {
 				if (args[0] === 200) {
 					return {
@@ -430,7 +356,7 @@ describe('parseContent empty/falsy input', () => {
 			}
 			return { success: true, results: [] };
 		});
-		const { res } = await request('/speech/200', env);
+		const { res } = await dispatch('/speech/200', env);
 		expect(res.status).toBe(200);
 	});
 });
@@ -439,8 +365,8 @@ describe('/:filename — empty-filename guard', () => {
 	// Normally unreachable via route (param can't be empty), but guard is inline.
 	// Test the other leaf: an allowed filename that matches static first middleware.
 	it('returns 404 for excluded static filename', async () => {
-		const env = makeEnv(() => ({ success: true, results: [] }));
-		const { res } = await request('/favicon.ico', env);
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/favicon.ico', env);
 		// favicon.ico is in excludedPaths + ASSETS returns 404 → 404
 		expect(res.status).toBe(404);
 	});

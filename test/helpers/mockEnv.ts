@@ -44,7 +44,7 @@ interface MockR2Bucket {
 	put: (
 		key: string,
 		body: string,
-		options?: { httpMetadata?: { cacheControl?: string; contentType?: string }; customMetadata?: Record<string, string> }
+		options?: { httpMetadata?: { cacheControl?: string; contentType?: string }; customMetadata?: Record<string, string> },
 	) => Promise<void>;
 	delete: (keys: string | string[]) => Promise<void>;
 	list: () => Promise<{ objects: unknown[]; truncated: boolean; cursor: string }>;
@@ -106,10 +106,7 @@ function resolveOnMicrotask(resolver: QueryResolver, sql: string, args: unknown[
  * shapes cloudflare:workers bindings for tests — SQL-matching logic stays
  * in each spec file's own resolver, since that's genuinely test-specific.
  */
-export function createMockEnv(
-	resolver: QueryResolver,
-	options: { preSeedR2?: Record<string, MockR2Entry> } = {}
-): MockWorkerEnv {
+export function createMockEnv(resolver: QueryResolver, options: { preSeedR2?: Record<string, MockR2Entry> } = {}): MockWorkerEnv {
 	const r2Store = new Map<string, MockR2Entry>();
 	for (const [key, entry] of Object.entries(options.preSeedR2 ?? {})) {
 		r2Store.set(key, { cacheControl: 'public, max-age=3600', contentType: 'text/html; charset=utf-8', ...entry });
@@ -136,7 +133,7 @@ export function createMockEnv(
 					// content type — src/api/cache.ts's readR2Cache calls it
 					// unconditionally even for binary (PNG) entries, so the mock
 					// matches that exact behavior rather than special-casing it.
-					text: async () => (typeof entry.body === 'string' ? entry.body : new TextDecoder().decode(entry.body))
+					text: async () => (typeof entry.body === 'string' ? entry.body : new TextDecoder().decode(entry.body)),
 				};
 			},
 			put: async (key, body, putOptions) => {
@@ -144,13 +141,13 @@ export function createMockEnv(
 					body,
 					cacheControl: putOptions?.httpMetadata?.cacheControl,
 					contentType: putOptions?.httpMetadata?.contentType,
-					customMetadata: putOptions?.customMetadata
+					customMetadata: putOptions?.customMetadata,
 				});
 			},
 			delete: async (keys) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql) => {
@@ -162,18 +159,18 @@ export function createMockEnv(
 					run: async () => {
 						directStatements.push({ sql, args });
 						return resolveOnMicrotask(resolver, sql, args);
-					}
+					},
 				});
 				return { bind, first: () => bind().first(), all: () => bind().all(), run: () => bind().run() };
 			},
 			batch: async (statements) => {
 				batchedStatements.push(...statements);
 				return statements.map(() => ({ meta: { changes: 1 } }));
-			}
+			},
 		},
 		__batchedStatements: batchedStatements,
 		__directStatements: directStatements,
-		__r2Store: r2Store
+		__r2Store: r2Store,
 	};
 }
 
@@ -183,7 +180,7 @@ const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 export async function dispatch(
 	path: string,
 	env: MockWorkerEnv,
-	init?: RequestInit<IncomingRequestCfProperties>
+	init?: RequestInit<IncomingRequestCfProperties>,
 ): Promise<{ res: Response }> {
 	const req = new IncomingRequest(`https://example.com${path}`, init);
 	const ctx = createExecutionContext();

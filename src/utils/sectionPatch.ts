@@ -162,6 +162,13 @@ export function orderSectionsByLinks(rows: ExistingSection[]): ExistingSection[]
 	//@ ensures Perm(\result, rows)
 	//@ ensures \result.length == rows.length
 	if (rows.length <= 1) return rows;
+	// (No null-guard here, unlike sectionUtils.ts's reorderSections: this
+	// function's one real caller in upload_markdown.ts always supplies
+	// `.map()`-constructed rows, which structurally cannot contain a null
+	// element — verified by reading that call site. reorderSections's
+	// equivalent guard is pre-existing legacy defensive code whose own
+	// real callers have the same property; kept there only because it
+	// predates this session and removing it is an unrelated cleanup.)
 	const byId = new Map<number, ExistingSection>();
 	for (const row of rows) {
 		byId.set(row.section_id, row);

@@ -1,17 +1,10 @@
-import { createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import worker from '../src/index';
 import { parseRedirectsText, planRedirectDiff } from '../src/api/redirects';
+import { createMockEnv, dispatch, type MockWorkerEnv } from './helpers/mockEnv';
 
-const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
-
-type PreparedStatement = { sql: string; args: unknown[] };
-
-function createRedirectsEnv(options: { existing?: Array<{ old: string; new: string }> } = {}) {
-	const operations: PreparedStatement[] = [];
+function createRedirectsEnv(options: { existing?: Array<{ old: string; new: string }> } = {}): MockWorkerEnv {
 	const existing = options.existing ?? [];
-
-	function query(sql: string, args: unknown[]) {
+	const resolver = (sql: string) => {
 		if (sql.startsWith('SELECT old_filename, new_filename FROM speech_redirects')) {
 			return {
 				success: true,
@@ -19,51 +12,12 @@ function createRedirectsEnv(options: { existing?: Array<{ old: string; new: stri
 			};
 		}
 		throw new Error(`Unexpected query: ${sql}`);
-	}
-
-	return {
-		AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
-		BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
-		ASSETS: { fetch: () => new Response('Not Found', { status: 404 }) },
-		SPEECH_CACHE: {
-			delete: async () => true,
-			get: async () => null,
-			put: async () => undefined,
-			list: async () => ({ objects: [], truncated: false, cursor: '' }),
-		},
-		DB: {
-			prepare: (sql: string) => {
-				const run = (args: unknown[]) => ({
-					sql,
-					args,
-					first: async () => {
-						const r = query(sql, args);
-						return r.results[0] ?? null;
-					},
-					all: async () => query(sql, args),
-				});
-				return {
-					bind: (...args: unknown[]) => run(args),
-					first: async () => run([]).first(),
-					all: async () => run([]).all(),
-				};
-			},
-			batch: async (statements: PreparedStatement[]) => {
-				for (const stmt of statements) {
-					operations.push(stmt);
-				}
-				return statements.map(() => ({ meta: { changes: 1 } }));
-			},
-		},
-		__operations: operations,
 	};
+	return createMockEnv(resolver);
 }
 
-async function request(env: ReturnType<typeof createRedirectsEnv>, init?: RequestInit<IncomingRequestCfProperties>) {
-	const req = new IncomingRequest('https://example.com/api/redirects', init);
-	const ctx = createExecutionContext();
-	const res = await worker.fetch(req, env as any, ctx);
-	return { res };
+function request(env: MockWorkerEnv, init?: RequestInit<IncomingRequestCfProperties>) {
+	return dispatch('/api/redirects', env, init);
 }
 
 describe('parseRedirectsText', () => {
@@ -259,7 +213,7 @@ describe('PUT /api/redirects — text body', () => {
 		expect(res.status).toBe(200);
 		const json = (await res.json()) as { inserted: number; updated: number; deleted: number };
 		expect(json).toEqual({ inserted: 2, updated: 0, deleted: 1, total: 2 });
-		const sqls = env.__operations.map((s) => s.sql.trim().split(' ')[0]);
+		const sqls = env.__batchedStatements.map((s) => s.sql.trim().split(' ')[0]);
 		expect(sqls.filter((s) => s === 'INSERT')).toHaveLength(2);
 		expect(sqls.filter((s) => s === 'DELETE')).toHaveLength(1);
 	});
@@ -291,7 +245,7 @@ describe('PUT /api/redirects — text body', () => {
 		expect(res.status).toBe(200);
 		const json = (await res.json()) as { inserted: number; updated: number; deleted: number; total: number };
 		expect(json).toEqual({ inserted: 0, updated: 0, deleted: 0, total: 2 });
-		expect(env.__operations).toHaveLength(0);
+		expect(env.__batchedStatements).toHaveLength(0);
 	});
 
 	it('updates rows whose new_filename changed', async () => {
@@ -304,7 +258,7 @@ describe('PUT /api/redirects — text body', () => {
 		expect(res.status).toBe(200);
 		const json = (await res.json()) as { inserted: number; updated: number; deleted: number };
 		expect(json).toEqual({ inserted: 0, updated: 1, deleted: 0, total: 1 });
-		expect(env.__operations.some((s) => s.sql.startsWith('UPDATE speech_redirects'))).toBe(true);
+		expect(env.__batchedStatements.some((s) => s.sql.startsWith('UPDATE speech_redirects'))).toBe(true);
 	});
 });
 

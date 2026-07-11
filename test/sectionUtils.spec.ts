@@ -83,8 +83,26 @@ describe('sectionUtils', () => {
 			expect(result.map((s) => s.section_id).sort((x, y) => x - y)).toEqual([1, 2, 3]);
 			expect(result).toHaveLength(3);
 		});
+		it('略過 null/undefined 元素而非拋出（防禦 D1 join 可能產生的空列，型別系統無法在 runtime 強制）', () => {
+			// sections: T[] 的靜態型別保證每個元素都是 T，但實際呼叫端資料源自
+			// D1 query 結果轉型（例如 LEFT JOIN 缺列），TypeScript 的型別斷言不會
+			// 在 runtime 驗證——這裡用型別斷言模擬那個外部邊界，而非純粹「型別
+			// 系統禁止」的合成輸入。
+			const a = mk(1, null, 2);
+			const b = mk(2, 1, null);
+			const withHole = [a, null, b] as unknown as SectionLike[];
+			const result = reorderSections(withHole);
+			expect(result).toEqual([a, b]);
+		});
+		it('互指 fallback：兩筆彼此互指 previous 時以最小 section_id 當起點', () => {
+			// Both sections point at each other as previous; neither starts the chain.
+			const a = mk(3, 4, null);
+			const b = mk(4, 3, null);
+			const result = reorderSections([a, b]);
+			// Fallback picks smallest id (3) as head; no next_section_id means we stop there.
+			expect(result[0].section_id).toBe(3);
+		});
 	});
-
 	describe('normalizeSections', () => {
 		it('已是顯示順序則不重排', () => {
 			const ordered = [mk(1, null, 2), mk(2, 1, null)];

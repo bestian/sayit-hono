@@ -1,67 +1,8 @@
-import { createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import worker from '../src/index';
-import { __test__ } from '../src/api/md';
-
-const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
-
-type Resolver = (sql: string, args: unknown[]) => { success?: boolean; results: any[] };
-
-function createMdEnv(resolver: Resolver, preSeedR2: Record<string, { body: string; contentType?: string }> = {}) {
-	const r2Store = new Map<string, { body: string; cacheControl?: string; contentType?: string }>();
-	for (const [k, v] of Object.entries(preSeedR2)) {
-		r2Store.set(k, { body: v.body, cacheControl: 'public, max-age=3600', contentType: v.contentType ?? 'text/markdown; charset=utf-8' });
-	}
-	return {
-		__r2Store: r2Store,
-		AUDREYT_TRANSCRIPT_TOKEN: 'x',
-		BESTIAN_TRANSCRIPT_TOKEN: 'y',
-		ASSETS: { fetch: () => new Response('Not Found', { status: 404 }) },
-		SPEECH_CACHE: {
-			get: async (key: string) => {
-				const entry = r2Store.get(key);
-				if (!entry) return null;
-				return {
-					body: entry.body,
-					size: entry.body.length,
-					httpEtag: null,
-					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body,
-				};
-			},
-			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
-				r2Store.set(key, { body, cacheControl: options?.httpMetadata?.cacheControl, contentType: options?.httpMetadata?.contentType });
-			},
-			delete: async (keys: string | string[]) => {
-				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
-			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' }),
-		},
-		DB: {
-			prepare: (sql: string) => {
-				const run = (args: unknown[]) => ({
-					first: async () => resolver(sql, args).results[0] ?? null,
-					all: async () => {
-						const r = resolver(sql, args);
-						return { success: r.success ?? true, results: r.results };
-					},
-				});
-				return {
-					bind: (...args: unknown[]) => run(args),
-					first: async () => run([]).first(),
-					all: async () => run([]).all(),
-				};
-			},
-		},
-	};
-}
-
-async function request(path: string, env: ReturnType<typeof createMdEnv>, init?: RequestInit<IncomingRequestCfProperties>) {
-	const req = new IncomingRequest(`https://example.com${path}`, init);
-	const ctx = createExecutionContext();
-	const res = await worker.fetch(req, env as any, ctx);
-	return { res };
-}
+import { __test__, serveMdByKey } from '../src/api/md';
+import type { Context } from 'hono';
+import type { ApiEnv } from '../src/api/types';
+import { createMockEnv, dispatch, type QueryResolver } from './helpers/mockEnv';
 
 describe('md/an2md (unit)', () => {
 	it('preserves <svg>, <br>, <img>, <a>, <iframe> blocks through conversion', () => {
@@ -121,7 +62,7 @@ describe('md/an2md (unit)', () => {
 });
 
 describe('/api/md/* and /speech/:id.md', () => {
-	const sectionResolver: Resolver = (sql, args) => {
+	const sectionResolver: QueryResolver = (sql, args) => {
 		if (sql.includes('FROM sections WHERE section_id = ?')) {
 			if (args[0] === 55) {
 				return {
@@ -142,8 +83,8 @@ describe('/api/md/* and /speech/:id.md', () => {
 	};
 
 	it('generates .md for a single section (no caching)', async () => {
-		const env = createMdEnv(sectionResolver);
-		const { res } = await request('/api/md/55.md', env);
+		const env = createMockEnv(sectionResolver);
+		const { res } = await dispatch('/api/md/55.md', env);
 		expect(res.status).toBe(200);
 		expect(res.headers.get('content-type')).toContain('text/markdown');
 		const body = await res.text();
@@ -154,19 +95,19 @@ describe('/api/md/* and /speech/:id.md', () => {
 	});
 
 	it('serves /speech/:id.md pass-through to md handler', async () => {
-		const env = createMdEnv(sectionResolver);
-		const { res } = await request('/speech/55.md', env);
+		const env = createMockEnv(sectionResolver);
+		const { res } = await dispatch('/speech/55.md', env);
 		expect(res.status).toBe(200);
 		expect(await res.text()).toContain('# Demo');
 	});
 
 	it('returns 404 when the requested section is missing', async () => {
-		const env = createMdEnv(() => ({ success: true, results: [] }));
-		const { res } = await request('/api/md/999.md', env);
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/api/md/999.md', env);
 		expect(res.status).toBe(404);
 	});
 
-	const fullResolver: Resolver = (sql, args) => {
+	const fullResolver: QueryResolver = (sql, args) => {
 		if (
 			sql.includes('FROM speech_content sc') &&
 			sql.includes('LEFT JOIN speech_index si ON sc.filename = si.filename') &&
@@ -184,39 +125,76 @@ describe('/api/md/* and /speech/:id.md', () => {
 	};
 
 	it('caches full-speech .md in R2 and edge on generation', async () => {
-		const env = createMdEnv(fullResolver);
-		const { res } = await request('/api/md/2026-demo.md', env);
+		const env = createMockEnv(fullResolver);
+		const { res } = await dispatch('/api/md/2026-demo.md', env);
 		expect(res.status).toBe(200);
 		expect(env.__r2Store.has('md/2026-demo')).toBe(true);
 	});
 
 	it('serves cached full-speech .md from R2 when pre-seeded', async () => {
-		const env = createMdEnv(fullResolver, {
-			'md/2026-demo': { body: '# cached content', contentType: 'text/markdown; charset=utf-8' },
+		const env = createMockEnv(fullResolver, {
+			preSeedR2: { 'md/2026-demo': { body: '# cached content', contentType: 'text/markdown; charset=utf-8' } },
 		});
-		const { res } = await request('/api/md/2026-demo.md', env);
+		const { res } = await dispatch('/api/md/2026-demo.md', env);
 		expect(res.status).toBe(200);
 		expect(await res.text()).toContain('cached content');
 	});
 
 	it('purges caches when ?purge is present and regenerates the body', async () => {
-		const env = createMdEnv(fullResolver, {
-			'md/2026-demo': { body: 'STALE', contentType: 'text/markdown; charset=utf-8' },
+		const env = createMockEnv(fullResolver, {
+			preSeedR2: { 'md/2026-demo': { body: 'STALE', contentType: 'text/markdown; charset=utf-8' } },
 		});
-		const { res } = await request('/api/md/2026-demo.md?purge', env);
+		const { res } = await dispatch('/api/md/2026-demo.md?purge', env);
 		expect(res.status).toBe(200);
 		expect(env.__r2Store.get('md/2026-demo')!.body).not.toContain('STALE');
 	});
 
 	it('matches /:path{.md} catch-all for a filename', async () => {
-		const env = createMdEnv(fullResolver);
-		const { res } = await request('/2026-demo.md', env);
+		const env = createMockEnv(fullResolver);
+		const { res } = await dispatch('/2026-demo.md', env);
 		expect(res.status).toBe(200);
 	});
 
 	it('returns 404 for an un-mapped full-speech path', async () => {
-		const env = createMdEnv(() => ({ success: true, results: [] }));
-		const { res } = await request('/api/md/unknown.md', env);
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/api/md/unknown.md', env);
+		expect(res.status).toBe(404);
+	});
+});
+
+function createServeContext(overrides: Partial<{ method: string; url: string; origin: string | null }> = {}) {
+	return {
+		req: {
+			method: overrides.method ?? 'GET',
+			url: overrides.url ?? 'https://example.com/api/md/demo.md',
+			header: (k: string) => (k === 'Origin' ? (overrides.origin ?? null) : null),
+		},
+		env: {
+			SPEECH_CACHE: {
+				get: async () => null,
+				put: async () => {},
+				delete: async () => true,
+			},
+			DB: {
+				prepare: () => ({
+					bind: () => ({ first: async () => null, all: async () => ({ success: true, results: [] }) }),
+					first: async () => null,
+					all: async () => ({ success: true, results: [] }),
+				}),
+			},
+		},
+		text: (body: string, status = 200, headers: Record<string, string> = {}) => new Response(body, { status, headers }),
+	} as unknown as Context<ApiEnv>;
+}
+
+describe('serveMdByKey guards', () => {
+	it('returns 404 for an empty object key', async () => {
+		const res = await serveMdByKey(createServeContext(), '');
+		expect(res.status).toBe(404);
+	});
+
+	it('returns 404 for a key without .md extension', async () => {
+		const res = await serveMdByKey(createServeContext(), 'bad-key');
 		expect(res.status).toBe(404);
 	});
 });
