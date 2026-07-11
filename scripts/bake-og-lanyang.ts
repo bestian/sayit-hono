@@ -195,8 +195,8 @@ Committed src/cacheKeyVersion.ts is fallback only when /version is unreachable.`
 	}
 
 	if (!lanyangFontsInstalled()) {
-		console.error('jf Lanyang fonts not found under ~/Library/Fonts — run on licensed Mac/dgx only.');
-		process.exit(1);
+		console.warn('[lanyang-og] jf Lanyang fonts not under ~/Library/Fonts — noop (Worker Noto fallback until licensed bake)');
+		process.exit(0);
 	}
 
 	const cacheKeyVersion = await resolveCacheKeyVersion(BUILT_CACHE_KEY_VERSION);
