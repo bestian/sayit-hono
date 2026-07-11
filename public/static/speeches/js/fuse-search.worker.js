@@ -33,7 +33,7 @@ function deriveFilenameFromUrl(url) {
 		var parsed = new URL(url, 'https://archive.tw');
 		var segments = parsed.pathname.split('/').filter(Boolean);
 		return segments[0] ? decodeURIComponent(segments[0]) : '';
-	} catch (_error) {
+	} catch {
 		return '';
 	}
 }

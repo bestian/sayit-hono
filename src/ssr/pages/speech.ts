@@ -1,4 +1,5 @@
-import type { AppContext, AlternateInfo, Section, SpeechIndexRow } from './shared';
+import type { Context } from 'hono';
+import type { AppContext, AlternateInfo, Section, SpeechIndexRow, WorkerEnv } from './shared';
 import { hasTwitterEmbed, isExcludedPath, PAGEFIND_SCRIPT, TWITTER_WIDGETS_SCRIPT } from './shared';
 import { DEFAULT_HTML_CACHE_CONTROL, buildR2HtmlKey, readR2Cache, tags, withCacheHeaders, writeR2Cache } from '../../api/cache';
 import { renderHtml } from '../render';
@@ -13,6 +14,13 @@ import NestedSpeechView, { styles as NestedSpeechViewStyles } from '../../views/
 import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from '../../views/SingleNestedSpeechView.vue';
 import SingleParagraphView, { styles as SingleParagraphViewStyles } from '../../views/SingleParagraphView.vue';
 import SingleSpeechView, { styles as SingleSpeechViewStyles } from '../../views/SingleSpeechView.vue';
+
+// Route-literal Context types: Hono's own routing guarantees a required named segment is
+// always defined once matched, so `c.req.param(name)` narrows to `string` (never `undefined`)
+// for these exact patterns — matching how each function is actually registered in src/index.ts.
+type SectionPageContext = Context<{ Bindings: WorkerEnv }, '/speech/:section_id'>;
+type NestedSpeechPageContext = Context<{ Bindings: WorkerEnv }, '/:filename/:nest_filename'>;
+type SpeechPageContext = Context<{ Bindings: WorkerEnv }, '/:filename'>;
 
 function parseToArray(raw?: string | null): string[] {
 	if (!raw) return [];
@@ -103,8 +111,8 @@ async function loadAlternateInfo(c: AppContext, filename: string): Promise<Alter
 }
 
 // /speech/:section_id -> .md/.an 轉專用處理，否則為動態段落頁
-export async function renderSectionPage(c: AppContext): Promise<Response> {
-	const param = c.req.param('section_id') ?? '';
+export async function renderSectionPage(c: SectionPageContext): Promise<Response> {
+	const param = c.req.param('section_id');
 	if (param.endsWith('.md')) {
 		console.log('serving md by key', param);
 		return serveMdByKey(c, param);
@@ -162,10 +170,10 @@ export async function renderSectionPage(c: AppContext): Promise<Response> {
 }
 
 // SSR 巢狀演講內容頁（巢狀子項）
-export async function renderNestedSpeechPage(c: AppContext): Promise<Response> {
+export async function renderNestedSpeechPage(c: NestedSpeechPageContext): Promise<Response> {
 	const cacheKey = buildR2HtmlKey(c.req.url, { includeSearch: false });
-	const encodedFilename = c.req.param('filename') ?? '';
-	const encodedNestFilename = c.req.param('nest_filename') ?? '';
+	const encodedFilename = c.req.param('filename');
+	const encodedNestFilename = c.req.param('nest_filename');
 
 	if (isExcludedPath(encodedFilename)) {
 		return c.text('Not Found', 404);
@@ -293,20 +301,16 @@ export async function renderNestedSpeechPage(c: AppContext): Promise<Response> {
 		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
 	});
 
-	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
-
-	if (response.ok && response.status < 400) {
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-	}
+	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
+	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 
 	return response;
 }
 
 // SSR 演講頁（單一演講或巢狀清單，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
-export async function renderSpeechPage(c: AppContext): Promise<Response> {
+export async function renderSpeechPage(c: SpeechPageContext): Promise<Response> {
 	const cacheKey = buildR2HtmlKey(c.req.url, { includeSearch: false });
-	const encodedFilename = c.req.param('filename') ?? '';
+	const encodedFilename = c.req.param('filename');
 
 	console.log('SSR Single Speech filename', encodedFilename);
 
@@ -433,12 +437,8 @@ export async function renderSpeechPage(c: AppContext): Promise<Response> {
 			scripts: PAGEFIND_SCRIPT,
 		});
 
-		let response = c.html(html);
-		response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
-
-		if (response.ok && response.status < 400) {
-			await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-		}
+		const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
+		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 
 		return response;
 	}
@@ -491,7 +491,7 @@ export async function renderSpeechPage(c: AppContext): Promise<Response> {
 		return c.text('Internal Server Error', 500);
 	}
 
-	const displayName = sections[0]?.display_name ?? speechMeta.display_name ?? filename;
+	const displayName = sections[0].display_name;
 	const alternate = await loadAlternateInfo(c, filename);
 	const styles = [SingleSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSingleSpeech(displayName, filename);
@@ -508,12 +508,8 @@ export async function renderSpeechPage(c: AppContext): Promise<Response> {
 		scripts: [PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
 	});
 
-	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
-
-	if (response.ok && response.status < 400) {
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-	}
+	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.speech(filename)]);
+	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 
 	return response;
 }

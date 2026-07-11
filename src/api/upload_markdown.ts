@@ -142,14 +142,14 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 	let hasNonQuoteLine = false;
 
 	const flush = () => {
+		// buf only ever holds lines that already passed the non-blank-after-trim
+		// check below, so the joined+trimmed content is always non-empty here.
 		const content = buf.join('\n').trim();
-		if (content) {
-			sections.push({
-				markdown: content,
-				isFromQuote: !hasNonQuoteLine, // 所有行皆來自 '> ' 時才算 quote 段落
-				startLine: sectionStartLine,
-			});
-		}
+		sections.push({
+			markdown: content,
+			isFromQuote: !hasNonQuoteLine, // 所有行皆來自 '> ' 時才算 quote 段落
+			startLine: sectionStartLine,
+		});
 		buf = [];
 		hasNonQuoteLine = false;
 	};
@@ -248,8 +248,7 @@ async function reserveSectionIds(c: Context<ApiEnv>, count: number): Promise<num
 
 /** Markdown 轉 HTML 並移除 <script> */
 function toHtml(markdown: string): string {
-	const html = marked.parse(markdown);
-	return stripScripts(typeof html === 'string' ? html : '');
+	return stripScripts(marked.parse(markdown) as string);
 }
 
 /** 若第一行是 # 標題則清空，避免重複當成段落內容 */
@@ -340,13 +339,10 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 	return r2Ok && tagsOk && pathsOk;
 }
 
-/** 失效列表頁快取：tags only for exact list roots; R2 origin keys still deleted */
-async function invalidateListPageCaches(
-	c: Context<ApiEnv>,
-	{ home, speeches, speakers }: { home: boolean; speeches: boolean; speakers: boolean },
-): Promise<boolean> {
+/** 失效列表頁快取（home/speeches/speakers 三者皆清）：tags only for exact list roots; R2 origin keys still deleted */
+async function invalidateListPageCaches(c: Context<ApiEnv>): Promise<boolean> {
 	const host = new URL(c.req.url).host;
-	const { r2Keys, tags: purgeTags } = planListInvalidation(host, home, speeches, speakers);
+	const { r2Keys, tags: purgeTags } = planListInvalidation(host, true, true, true);
 
 	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 	const r2Ok = r2Results.every(Boolean);
@@ -355,8 +351,8 @@ async function invalidateListPageCaches(
 			failed: r2Results.filter((ok) => !ok).length,
 		});
 	}
-	// Callers always request at least one list surface; empty tags is a no-op for front purge.
-	const purgeOk = purgeTags.length === 0 ? true : await purgeWorkersCache({ tags: purgeTags });
+	// home is always requested, so purgeTags is never empty.
+	const purgeOk = await purgeWorkersCache({ tags: purgeTags });
 	return r2Ok && purgeOk;
 }
 
@@ -445,13 +441,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					.bind(filename)
 					.all<{ speaker_route_pathname: string }>(),
 			);
-			const speakerRoutePathnames = Array.from(
-				new Set((linkedSpeakers.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean)),
-			);
+			const speakerRoutePathnames = Array.from(new Set(linkedSpeakers.results.map((row) => row.speaker_route_pathname).filter(Boolean)));
 			const preexistingSectionRows = await withRetry(() =>
 				c.env.DB.prepare('SELECT section_id FROM speech_content WHERE filename = ?').bind(filename).all<{ section_id: number }>(),
 			);
-			const preexistingSectionIds = (preexistingSectionRows.results ?? []).map((row) => Number(row.section_id));
+			const preexistingSectionIds = preexistingSectionRows.results.map((row) => Number(row.section_id));
 
 			// 單一 batch：刪段落 + 刪關聯 + 刪索引 + 清孤兒講者（減少 D1 round-trips）
 			console.log('[upload_markdown] DELETE batch for:', filename);
@@ -471,12 +465,12 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			const batchResults = await withRetry(() => c.env.DB.batch(deleteBatch));
 
-			const sectionsDeleted = batchResults[0]?.meta?.changes ?? 0;
-			const relationsDeleted = batchResults[1]?.meta?.changes ?? 0;
-			const speechDeleted = batchResults[2]?.meta?.changes ?? 0;
+			const sectionsDeleted = batchResults[0].meta.changes;
+			const relationsDeleted = batchResults[1].meta.changes;
+			const speechDeleted = batchResults[2].meta.changes;
 			let speakersDeleted = 0;
 			for (let i = 3; i < batchResults.length; i++) {
-				speakersDeleted += batchResults[i]?.meta?.changes ?? 0;
+				speakersDeleted += batchResults[i].meta.changes;
 			}
 
 			if (sectionsDeleted === 0 && relationsDeleted === 0 && speechDeleted === 0) {
@@ -495,7 +489,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				Promise.all([
 					invalidateSpeechCaches(c, filename, preexistingSectionIds),
 					invalidateSpeakerCaches(c, speakerRoutePathnames),
-					invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+					invalidateListPageCaches(c),
 				]).then((parts) => parts.every(Boolean)),
 				syncSearchArtifactsAfterDelete(c, filename),
 			]);
@@ -549,7 +543,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			}
 
 			// 從 markdown 第一行解析標題（display_name）；guard 用它判斷 key 衝突
-			const firstLine = body.markdown.split('\n')[0]?.trim() ?? '';
+			const firstLine = body.markdown.split('\n')[0].trim();
 			const incomingTitle = firstLine.replace(/^#\s*/, '');
 
 			// 冪等：若 speech_index 已有此 filename 則先刪除舊資料再重新寫入
@@ -599,9 +593,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 						.bind(filename)
 						.all<{ speaker_route_pathname: string }>(),
 				);
-				priorSpeakerRoutePathnames = Array.from(
-					new Set((priorSpeakerRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean)),
-				);
+				priorSpeakerRoutePathnames = Array.from(new Set(priorSpeakerRows.results.map((row) => row.speaker_route_pathname).filter(Boolean)));
 				await withRetry(() =>
 					c.env.DB.batch([
 						c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ?').bind(filename),
@@ -725,7 +717,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					invalidateSpeechCaches(c, filename),
 					...(altFilename && altFilename !== filename ? [invalidateSpeechCaches(c, altFilename)] : []),
 					invalidateSpeakerCaches(c, Array.from(new Set([...speakerRoutePathnames, ...usedSpeakerRoutePathnames]))),
-					invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+					invalidateListPageCaches(c),
 				]).then((parts) => parts.every(Boolean)),
 				syncSearchArtifactsAfterUpsert(c, filename),
 			]);
@@ -772,7 +764,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			let filename = transformFilename(rawFilename.trim());
 			const markdown = body.markdown;
-			const patchFirstLine = markdown.split('\n')[0]?.trim() ?? '';
+			const patchFirstLine = markdown.split('\n')[0].trim();
 			const incomingTitle = patchFirstLine.replace(/^#\s*/, '');
 			let existingSpeech = await withRetry(() =>
 				c.env.DB.prepare('SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?')
@@ -854,7 +846,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					.all<ExistingSection>(),
 			);
 			const oldSections = orderSectionsByLinks(
-				(oldSectionsRaw.results ?? []).map((row) => ({
+				oldSectionsRaw.results.map((row) => ({
 					section_id: Number(row.section_id),
 					previous_section_id: row.previous_section_id != null ? Number(row.previous_section_id) : null,
 					next_section_id: row.next_section_id != null ? Number(row.next_section_id) : null,
@@ -867,9 +859,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					.bind(filename)
 					.all<{ speaker_route_pathname: string }>(),
 			);
-			const oldSpeakerRoutePathnames = Array.from(
-				new Set((oldSpeakerRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean)),
-			);
+			const oldSpeakerRoutePathnames = Array.from(new Set(oldSpeakerRows.results.map((row) => row.speaker_route_pathname).filter(Boolean)));
 
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const newSpeakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
@@ -1017,7 +1007,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 						),
 					).map((alternateFilename) => invalidateSpeechCaches(c, alternateFilename)),
 					invalidateSpeakerCaches(c, finalImpactedSpeakers),
-					invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+					invalidateListPageCaches(c),
 				]).then((parts) => parts.every(Boolean)),
 				syncSearchArtifactsAfterUpsert(c, filename),
 			]);

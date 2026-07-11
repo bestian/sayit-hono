@@ -50,9 +50,9 @@ function buildCanonicalPageUrl(requestUrl: string): string | null {
 	const { pathname, search } = url;
 	const segments = pathname.split('/').filter(Boolean);
 	const lastSegment = segments[segments.length - 1] ?? '';
-	const isTopLevelSpeechPath = segments.length === 1 && !isExcludedPath(segments[0] ?? '') && !lastSegment.includes('.');
-	const isNestedSpeechPath = segments.length === 2 && !isExcludedPath(segments[0] ?? '') && !lastSegment.includes('.');
-	const isSectionPagePath = segments.length === 2 && segments[0] === 'speech' && /^\d+$/.test(segments[1] ?? '');
+	const isTopLevelSpeechPath = segments.length === 1 && !isExcludedPath(segments[0]) && !lastSegment.includes('.');
+	const isNestedSpeechPath = segments.length === 2 && !isExcludedPath(segments[0]) && !lastSegment.includes('.');
+	const isSectionPagePath = segments.length === 2 && segments[0] === 'speech' && /^\d+$/.test(segments[1]);
 	const isSpeakerPagePath = segments.length === 2 && segments[0] === 'speaker';
 
 	let canonicalPath = pathname;
@@ -144,9 +144,7 @@ async function serveBucketJson(
 		headers.set('Content-Encoding', contentEncoding);
 		headers.set('Vary', 'Accept-Encoding');
 	}
-	if (typeof object.size === 'number') {
-		headers.set('Content-Length', object.size.toString());
-	}
+	headers.set('Content-Length', object.size.toString());
 	if (object.httpEtag) {
 		headers.set('ETag', object.httpEtag);
 	}
@@ -154,11 +152,10 @@ async function serveBucketJson(
 	return new Response(object.body, { headers });
 }
 
-/** 向 Cloudflare 靜態資源 (ASSETS) 要求檔案，path 可指定子路徑，未指定則用請求 URL */
-async function serveAsset(c: Context<{ Bindings: WorkerEnv }>, path?: string): Promise<Response> {
+/** 向 Cloudflare 靜態資源 (ASSETS) 要求檔案，使用請求 URL */
+async function serveAsset(c: Context<{ Bindings: WorkerEnv }>): Promise<Response> {
 	const url = new URL(c.req.url);
-	const assetUrl = path ? new URL(path, url) : url;
-	return c.env.ASSETS.fetch(assetUrl.toString());
+	return c.env.ASSETS.fetch(url.toString());
 }
 
 /** 優先嘗試從 ASSETS 回應靜態檔，找不到再交給後續 API/SSR 路由 */

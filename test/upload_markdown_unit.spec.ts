@@ -16,7 +16,14 @@ import { uploadMarkdown } from '../src/api/upload_markdown';
 import type { Context } from 'hono';
 import type { ApiEnv } from '../src/api/types';
 import { createMockEnv, dispatch } from './helpers/mockEnv';
-import type { MockWorkerEnv, PreparedStatement, QueryResult, QueryResolver } from './helpers/mockEnv';
+import type {
+	MockD1BoundStatement,
+	MockD1PreparedStatement,
+	MockWorkerEnv,
+	PreparedStatement,
+	QueryResult,
+	QueryResolver,
+} from './helpers/mockEnv';
 // ---------------------------------------------------------------------------
 // Safe filter helper: __batchedStatements contains both bound statements
 // (prepare(sql).bind(args) -> { sql, args }) and unbound prepare(sql) calls
@@ -40,20 +47,6 @@ type SpeechIndexRow = {
 	nest_display_names: string;
 	alternate_filename?: string | null;
 };
-
-/** Structural type for env.DB.prepare() return — MockD1PreparedStatement is not exported. */
-interface MockPreparedStatement {
-	bind: (...args: unknown[]) => {
-		sql: string;
-		args: unknown[];
-		first: () => Promise<unknown>;
-		all: () => Promise<unknown>;
-		run: () => Promise<unknown>;
-	};
-	first: () => Promise<unknown>;
-	all: () => Promise<unknown>;
-	run: () => Promise<unknown>;
-}
 
 // ---------------------------------------------------------------------------
 // Shared resolver helpers (local to this file — domain SQL, not env shape)
@@ -397,12 +390,18 @@ describe('upload_markdown POST — alternate pair', () => {
 describe('upload_markdown PATCH deletes stale section caches', () => {
 	it('purges deleted section R2 keys even when they are gone from D1', async () => {
 		const operations: PreparedStatement[] = [];
-		let liveSections = [
+		let liveSections: {
+			section_id: number;
+			previous_section_id: number | null;
+			next_section_id: number | null;
+			section_speaker: string | null;
+			section_content: string;
+		}[] = [
 			{ section_id: 100, previous_section_id: null, next_section_id: 101, section_speaker: null, section_content: '<p>Alpha</p>' },
 			{ section_id: 101, previous_section_id: 100, next_section_id: null, section_speaker: null, section_content: '<p>Beta</p>' },
 		];
 
-		const resolver: QueryResolver = (sql, args) => {
+		const resolver: QueryResolver = (sql, _args) => {
 			if (sql.includes('SELECT COUNT(*) AS count FROM speech_index')) return { success: true, results: [{ count: 1 }] };
 			if (sql.includes('SELECT COUNT(*) AS count FROM speakers')) return { success: true, results: [{ count: 0 }] };
 			if (sql.includes('SELECT COUNT(*) AS count FROM speech_content')) return { success: true, results: [{ count: liveSections.length }] };
@@ -589,28 +588,18 @@ describe('invalidateSpeechCaches section query failure', () => {
 	it('still returns success when section_id re-query throws after PATCH', async () => {
 		const env = createMockEnv(demoSpeechResolver());
 		const originalPrepare = env.DB.prepare.bind(env.DB);
-		env.DB.prepare = (sql: string) => {
+		env.DB.prepare = (sql: string): MockD1PreparedStatement => {
 			const stmt = originalPrepare(sql);
 			if (sql.includes('SELECT section_id FROM speech_content WHERE filename = ?')) {
+				const fail = async (): Promise<never> => {
+					throw new Error('section re-query failed');
+				};
 				return {
-					bind: (..._args: unknown[]) =>
-						({
-							first: async () => {
-								throw new Error('section re-query failed');
-							},
-							all: async () => {
-								throw new Error('section re-query failed');
-							},
-							sql,
-							args: _args,
-						}) as unknown as MockPreparedStatement,
-					first: async () => {
-						throw new Error('section re-query failed');
-					},
-					all: async () => {
-						throw new Error('section re-query failed');
-					},
-				} as unknown as MockPreparedStatement;
+					bind: (..._args: unknown[]): MockD1BoundStatement => ({ sql, args: _args, first: fail, all: fail, run: fail }),
+					first: fail,
+					all: fail,
+					run: fail,
+				};
 			}
 			return stmt;
 		};
@@ -632,26 +621,28 @@ describe('upload_markdown defensive branches', () => {
 		// 1) PATCH with null section_content on old rows
 		const env = createMockEnv(demoSpeechResolver());
 		const originalPrepare = env.DB.prepare.bind(env.DB);
-		env.DB.prepare = (sql: string) => {
+		env.DB.prepare = (sql: string): MockD1PreparedStatement => {
 			const stmt = originalPrepare(sql);
 			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				const rows: QueryResult = {
+					success: true,
+					results: [
+						{ section_id: 100, previous_section_id: null, next_section_id: 101, section_speaker: null, section_content: null },
+						{ section_id: 101, previous_section_id: 100, next_section_id: null, section_speaker: null, section_content: null },
+					],
+				};
 				return {
-					bind: (..._args: unknown[]) =>
-						({
-							sql,
-							args: _args,
-							first: async () => null,
-							all: async () => ({
-								success: true,
-								results: [
-									{ section_id: 100, previous_section_id: null, next_section_id: 101, section_speaker: null, section_content: null },
-									{ section_id: 101, previous_section_id: 100, next_section_id: null, section_speaker: null, section_content: null },
-								],
-							}),
-						}) as unknown as MockPreparedStatement,
+					bind: (..._args: unknown[]): MockD1BoundStatement => ({
+						sql,
+						args: _args,
+						first: async () => null,
+						all: async () => rows,
+						run: async () => rows,
+					}),
 					first: async () => null,
 					all: async () => ({ success: true, results: [] }),
-				} as unknown as MockPreparedStatement;
+					run: async () => ({ success: true, results: [] }),
+				};
 			}
 			return stmt;
 		};
@@ -664,9 +655,9 @@ describe('upload_markdown defensive branches', () => {
 
 		// 2) non-Error throw path in outer catch
 		const boomEnv = createMockEnv(demoSpeechResolver());
-		boomEnv.DB.prepare = (() => {
+		boomEnv.DB.prepare = () => {
 			throw 'string-boom';
-		}) as unknown as typeof boomEnv.DB.prepare;
+		};
 		const bad = await dispatch('/api/upload_markdown', boomEnv, {
 			method: 'PATCH',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json; charset=utf-8' },
@@ -686,32 +677,30 @@ describe('upload_markdown PATCH empty result containers', () => {
 	it('handles undefined results arrays on PATCH load', async () => {
 		const env = createMockEnv(demoSpeechResolver());
 		const originalPrepare = env.DB.prepare.bind(env.DB);
-		env.DB.prepare = (sql: string) => {
+		env.DB.prepare = (sql: string): MockD1PreparedStatement => {
 			const stmt = originalPrepare(sql);
+			// Simulates a D1 response missing `.results` entirely (downstream reads use
+			// `?? []`); this exercises that defensive fallback. Single narrow cast — `results`
+			// is genuinely absent at runtime, which QueryResult can't express directly.
+			const missingResults = async (): Promise<QueryResult> => ({ success: true }) as QueryResult;
 			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
 				return {
-					bind: () =>
-						({
-							first: async () => null,
-							all: async () => ({ success: true }) as unknown as { success: boolean; results: unknown[] },
-						}) as unknown as MockPreparedStatement,
+					bind: (): MockD1BoundStatement => ({ sql, args: [], first: async () => null, all: missingResults, run: missingResults }),
 					first: async () => null,
-					all: async () => ({ success: true }) as unknown as { success: boolean; results: unknown[] },
-				} as unknown as MockPreparedStatement;
+					all: missingResults,
+					run: missingResults,
+				};
 			}
 			if (
 				sql.includes('FROM speech_speakers WHERE speech_filename = ?') ||
 				sql.includes('SELECT speaker_route_pathname FROM speech_speakers')
 			) {
 				return {
-					bind: () =>
-						({
-							first: async () => null,
-							all: async () => ({ success: true }) as unknown as { success: boolean; results: unknown[] },
-						}) as unknown as MockPreparedStatement,
+					bind: (): MockD1BoundStatement => ({ sql, args: [], first: async () => null, all: missingResults, run: missingResults }),
 					first: async () => null,
-					all: async () => ({ success: true }) as unknown as { success: boolean; results: unknown[] },
-				} as unknown as MockPreparedStatement;
+					all: missingResults,
+					run: missingResults,
+				};
 			}
 			return stmt;
 		};

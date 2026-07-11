@@ -29,11 +29,9 @@ export default defineConfig({
 			include: ['src/**/*.ts'],
 			exclude: ['src/**/*.vue', 'src/api/og.ts', 'src/api/og_loader.ts', 'src/marked.d.ts', 'src/api/types.ts', 'src/.generated/**'],
 			thresholds: {
-				// CI fails if any included file dips below 100% statements/lines/functions.
-				// Statements/branches are intentionally loose: istanbul instruments every
-				// short-circuit (`??`, `||`, `?.`) as a branch; some of those are defensive
-				// paths against runtime-impossible inputs that we don't manufacture in tests.
+				// CI fails if any included file dips below 100% statements/branches/functions/lines.
 				statements: 100,
+				branches: 100,
 				lines: 100,
 				functions: 100,
 				perFile: true,

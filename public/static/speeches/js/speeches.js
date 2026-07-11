@@ -26,7 +26,7 @@ function sayit_enable_date_pickers() {
 
     // Make the speech end date the same as the start the first time people
     // enter something in the start
-    $("#id_start_date").one("changeDate", function(e) {
+    $("#id_start_date").one("changeDate", function(_e) {
         dateString = $("#id_start_date").val();
         $("#id_end_date").val(dateString);
     });
@@ -67,7 +67,7 @@ function sayit_ajax_file_uploads() {
             var progress = parseInt(data.loaded / data.total * 100, 10);
             $('.progress .bar').css( 'width', progress + '%' );
         },
-        always: function(e, data) {
+        always: function(_e, _data) {
             $('#speech_submit').prop('disabled', false).val(submitTxt);
             $('.progress').hide();
         },

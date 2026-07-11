@@ -140,7 +140,6 @@ allSqlStatements.push('-- 使用 INSERT OR IGNORE 避免插入重複的資料');
 allSqlStatements.push('');
 
 // 統計資訊與紀錄
-let totalProcessed = 0;
 let totalSections = 0;
 let totalSpeechSpeakers = 0;
 let successCount = 0;
@@ -266,7 +265,7 @@ speechIndex.forEach((item, index) => {
         });
       });
 
-      const anySectionIdNull = speechData.length > 0 && speechData.some((item) => item.section_id === null);
+      const anySectionIdNull = speechData.some((item) => item.section_id === null);
       if (anySectionIdNull) {
         console.warn(`  警告: 巢狀檔案含 null section_id，跳過輸出`);
         errors.push({ filename, error: '巢狀檔案存在 null section_id' });
@@ -412,7 +411,7 @@ speechIndex.forEach((item, index) => {
     console.log(`  成功解析 ${speechData.length} 筆資料`);
     console.log(`  找到 ${speechSpeakersSet.size} 個唯一的演講-講者關係`);
 
-    const anySectionIdNull = speechData.length > 0 && speechData.some((item) => item.section_id === null);
+    const anySectionIdNull = speechData.some((item) => item.section_id === null);
     if (anySectionIdNull) {
       console.warn(`  警告: 有 section_id 是 null，將此檔案視為例外，不生成 JSON 和 SQL`);
 

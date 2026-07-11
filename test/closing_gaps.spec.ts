@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
-import { createMockEnv, dispatch } from './helpers/mockEnv';
+import { createMockEnv, dispatch, type QueryResolver } from './helpers/mockEnv';
 
 describe('search branch coverage', () => {
 	it('returns 500 when speakers search query reports failure', async () => {
@@ -121,7 +121,7 @@ describe('/speech/:section_id — R2 cache hit', () => {
 });
 
 describe('alternate language links', () => {
-	const withAlternateResolver: Resolver = (sql, args) => {
+	const withAlternateResolver: QueryResolver = (sql, args) => {
 		if (sql.includes('FROM speech_index WHERE filename = ?')) {
 			if (args[0] === '2026-parent') {
 				return {

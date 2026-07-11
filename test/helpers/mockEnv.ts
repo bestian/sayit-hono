@@ -59,14 +59,14 @@ interface MockR2GetResult {
 	text: () => Promise<string>;
 }
 
-interface MockD1PreparedStatement {
+export interface MockD1PreparedStatement {
 	bind: (...args: unknown[]) => MockD1BoundStatement;
 	first: () => Promise<unknown>;
 	all: () => Promise<QueryResult>;
 	run: () => Promise<QueryResult>;
 }
 
-interface MockD1BoundStatement {
+export interface MockD1BoundStatement {
 	sql: string;
 	args: unknown[];
 	first: () => Promise<unknown>;
@@ -184,6 +184,9 @@ export async function dispatch(
 ): Promise<{ res: Response }> {
 	const req = new IncomingRequest(`https://example.com${path}`, init);
 	const ctx = createExecutionContext();
-	const res = await worker.fetch(req, env as unknown as Env, ctx);
+	// Hono's `app.fetch(request, Env?, executionCtx?)` types `Env` as `Bindings | {}` —
+	// the mock env's shape never needs bridging to the real WorkerEnv/D1Database/R2Bucket
+	// types here; any object is structurally accepted, no cast required.
+	const res = await worker.fetch(req, env, ctx);
 	return { res };
 }

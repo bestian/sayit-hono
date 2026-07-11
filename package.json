@@ -24,7 +24,7 @@
 		"test:coverage": "vp test run --coverage",
 		"test:watch": "vp test",
 		"typecheck": "tsgo --noEmit",
-		"lint": "vp lint src scripts vite.config.ts vite-plugin-sfc-ssr.ts",
+		"lint": "vp lint",
 		"fmt": "vp fmt --write src scripts test vite.config.ts vite-plugin-sfc-ssr.ts",
 		"fmt:check": "vp fmt --check src scripts test vite.config.ts vite-plugin-sfc-ssr.ts",
 		"check": "bun run lint && bun run fmt:check && bun run typecheck",

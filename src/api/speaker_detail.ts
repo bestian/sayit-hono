@@ -1,9 +1,27 @@
-import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
-import type { ApiEnv } from './types';
 import { buildPaginationPages } from '../utils/pagination';
 
-export async function speakerDetail(c: Context<ApiEnv>) {
+/** Minimal shape `speakerDetail` actually uses off `c` — real `Context<ApiEnv>` satisfies this structurally, no cast needed at real call sites. */
+interface SpeakerDetailContext {
+	req: {
+		header(name: string): string | undefined;
+		param(name: string): string | undefined;
+		url: string;
+	};
+	env: {
+		DB: {
+			prepare(sql: string): {
+				bind(...args: unknown[]): {
+					first<T = Record<string, unknown>>(): Promise<T | null>;
+					all(): Promise<{ success: boolean; results: unknown[] }>;
+				};
+			};
+		};
+	};
+	json(body: unknown, status?: number, headers?: Record<string, string>): Response;
+}
+
+export async function speakerDetail(c: SpeakerDetailContext) {
 	const origin = c.req.header('Origin') ?? null;
 	const corsHeaders = getCorsHeaders(origin);
 

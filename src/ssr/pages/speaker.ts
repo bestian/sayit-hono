@@ -1,4 +1,5 @@
-import type { AppContext, Section } from './shared';
+import type { Context } from 'hono';
+import type { Section, WorkerEnv } from './shared';
 import { hasTwitterEmbed, PAGEFIND_SCRIPT, TWITTER_WIDGETS_SCRIPT } from './shared';
 import { DEFAULT_HTML_CACHE_CONTROL, buildR2HtmlKey, readR2Cache, tags, withCacheHeaders, writeR2Cache } from '../../api/cache';
 import { renderHtml } from '../render';
@@ -32,10 +33,15 @@ type SpeakerSectionRow = {
 	display_name: string;
 };
 
+// Hono's routing guarantees a required named segment is always defined once matched, so
+// `c.req.param('route_pathname')` narrows to `string` for this exact registered pattern
+// (see src/index.ts's `app.get('/speaker/:route_pathname', ...)`).
+type SpeakerPageContext = Context<{ Bindings: WorkerEnv }, '/speaker/:route_pathname'>;
+
 // SSR 講者頁
-export async function renderSpeakerPage(c: AppContext): Promise<Response> {
+export async function renderSpeakerPage(c: SpeakerPageContext): Promise<Response> {
 	const cacheKey = buildR2HtmlKey(c.req.url);
-	const routePathname = encodeURIComponent(c.req.param('route_pathname') ?? '');
+	const routePathname = encodeURIComponent(c.req.param('route_pathname'));
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
 	if (r2Cached) return withCacheHeaders(r2Cached, DEFAULT_HTML_CACHE_CONTROL, [tags.speaker(routePathname)]);
 
@@ -146,7 +152,7 @@ export async function renderSpeakerPage(c: AppContext): Promise<Response> {
 	const styles = [SingleSpeakerViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSpeaker(speaker.route_pathname);
 
-	const twitterScript = hasTwitterEmbed((speaker.sections ?? []).map((s: Section) => s.section_content)) ? TWITTER_WIDGETS_SCRIPT : '';
+	const twitterScript = hasTwitterEmbed(speaker.sections.map((s: Section) => s.section_content)) ? TWITTER_WIDGETS_SCRIPT : '';
 	const html = await renderHtml(SingleSpeakerView, {
 		head,
 		styles,
@@ -155,13 +161,9 @@ export async function renderSpeakerPage(c: AppContext): Promise<Response> {
 		scripts: ['<script src="/static/speeches/js/masonry.pkgd.min.js"></script>', PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
 	});
 
-	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.speaker(routePathname)]);
-
-	if (response.ok && response.status < 400) {
-		console.log('writing to R2 cache', cacheKey);
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-	}
+	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.speaker(routePathname)]);
+	console.log('writing to R2 cache', cacheKey);
+	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 
 	return response;
 }

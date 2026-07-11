@@ -67,9 +67,18 @@ export function withCacheHeaders(response: Response, cacheControl = DEFAULT_HTML
 	return res;
 }
 
+/** Minimal shape `readR2Cache` actually reads off a `bucket.get()` result — real `R2ObjectBody` satisfies this structurally, no cast needed at real call sites. */
+interface R2CacheReadableObject {
+	text(): Promise<string>;
+	size: number;
+	httpEtag: string | null;
+	httpMetadata?: { cacheControl?: string; contentType?: string };
+	customMetadata?: Record<string, string>;
+}
+
 /** 從 R2 讀取快取，回傳 Response 或 null */
 export async function readR2Cache(
-	bucket: R2Bucket,
+	bucket: { get(key: string): Promise<R2CacheReadableObject | null> },
 	cacheKey: string,
 	defaultContentType = 'text/html; charset=utf-8',
 ): Promise<Response | null> {
@@ -91,9 +100,7 @@ export async function readR2Cache(
 			headers.set('Cache-Tag', cacheTag);
 		}
 
-		if (typeof object.size === 'number') {
-			headers.set('Content-Length', object.size.toString());
-		}
+		headers.set('Content-Length', object.size.toString());
 		if (object.httpEtag) {
 			headers.set('ETag', object.httpEtag);
 		}
@@ -107,7 +114,13 @@ export async function readR2Cache(
 
 /** 寫入 R2 快取 */
 export async function writeR2Cache(
-	bucket: R2Bucket,
+	bucket: {
+		put(
+			key: string,
+			value: string,
+			options?: { httpMetadata?: { cacheControl?: string; contentType?: string }; customMetadata?: Record<string, string> },
+		): Promise<unknown>;
+	},
 	cacheKey: string,
 	response: Response,
 	defaultContentType = 'text/html; charset=utf-8',
@@ -132,7 +145,7 @@ export async function writeR2Cache(
 }
 
 /** 刪除 R2 origin 快取。成功 true；失敗 false（不可靜默，否則 front MISS 會從髒 R2 回填）。 */
-export async function deleteR2Cache(bucket: R2Bucket, cacheKey: string): Promise<boolean> {
+export async function deleteR2Cache(bucket: { delete(keys: string | string[]): Promise<void> }, cacheKey: string): Promise<boolean> {
 	try {
 		await bucket.delete(cacheKey);
 		console.log('[r2 cache] deleted', cacheKey);
@@ -177,9 +190,7 @@ export async function purgeWorkersCache(options: PurgeOptions): Promise<boolean>
 			lastError = err;
 		}
 	}
-	if (lastError !== undefined) {
-		console.error('[workers cache] purge giving up', lastError);
-	}
+	console.error('[workers cache] purge giving up', lastError);
 	return false;
 }
 

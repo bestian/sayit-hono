@@ -24,7 +24,21 @@ interface OgSectionResult {
 	name: string | null;
 }
 
-async function loadSection(c: Context<ApiEnv>, sectionId: number): Promise<OgSectionResult | null> {
+/** Minimal shape `loadSection`, `encodeAvatar`, and `handleOgSpeechImage` actually use off `c` — real `Context<ApiEnv>` satisfies this structurally, no cast needed at real call sites. */
+interface OgSpeechImageContext {
+	req: { param(name: string): string | undefined };
+	env: {
+		SPEECH_CACHE: {
+			get(key: string): Promise<{ body: ReadableStream } | null>;
+			put(key: string, value: Uint8Array, options?: { httpMetadata?: { contentType?: string; cacheControl?: string } }): Promise<unknown>;
+		};
+		DB: { prepare(sql: string): { bind(...args: unknown[]): { first<T>(): Promise<T | null> } } };
+		ASSETS: { fetch(input: Request): Promise<Response> };
+	};
+	text(body: string, status?: number): Response;
+}
+
+async function loadSection(c: OgSpeechImageContext, sectionId: number): Promise<OgSectionResult | null> {
 	return c.env.DB.prepare(
 		`SELECT
 			a.filename,
@@ -51,7 +65,7 @@ async function loadSpeechMeta(c: Context<ApiEnv>, filename: string) {
 		.first() as Promise<{ filename: string; display_name: string; isNested: number | boolean } | null>;
 }
 
-async function encodeAvatar(c: Context<ApiEnv>, photoURL: string): Promise<string | null> {
+async function encodeAvatar(c: OgSpeechImageContext, photoURL: string): Promise<string | null> {
 	try {
 		const assetUrl = new URL(photoURL, 'https://placeholder.host').pathname;
 		const res = await c.env.ASSETS.fetch(new Request(`https://placeholder.host${assetUrl}`));
@@ -68,7 +82,7 @@ async function encodeAvatar(c: Context<ApiEnv>, photoURL: string): Promise<strin
 }
 
 /** /og/speech/:section_id.png — OG image for a single quoted section. */
-export async function handleOgSpeechImage(c: Context<ApiEnv>, loader: OgLoader) {
+export async function handleOgSpeechImage(c: OgSpeechImageContext, loader: OgLoader) {
 	const sectionId = Number((c.req.param('section_id') ?? '').replace(/\.png$/, ''));
 	if (!Number.isInteger(sectionId)) return c.text('Not Found', 404);
 

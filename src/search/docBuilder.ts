@@ -9,14 +9,14 @@ export type ApiSection = {
 	filename: string;
 	nest_filename: string | null;
 	section_id: number;
-	section_content: string;
-	display_name: string;
+	section_content: string | null;
+	display_name: string | null;
 	name: string | null;
 };
 
 /** Extract display name from the first line (strip leading # ) */
 function extractTitle(markdown: string): string {
-	const firstLine = markdown.split('\n')[0]?.trim() ?? '';
+	const firstLine = markdown.split('\n')[0].trim();
 	return firstLine.replace(/^#\s*/, '') || '';
 }
 

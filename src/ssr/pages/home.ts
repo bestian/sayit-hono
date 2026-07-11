@@ -94,11 +94,8 @@ export async function renderSpeechesPage(c: AppContext) {
 		scripts: PAGEFIND_SCRIPT,
 	});
 
-	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.listSpeeches]);
-	if (response.ok && response.status < 400) {
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-	}
+	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.listSpeeches]);
+	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	return response;
 }
 
@@ -124,11 +121,8 @@ export async function renderSpeakersPage(c: AppContext) {
 		props: { speakers },
 	});
 
-	let response = c.html(html);
-	response = withCacheHeaders(response, DEFAULT_HTML_CACHE_CONTROL, [tags.listSpeakers]);
-	if (response.ok && response.status < 400) {
-		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
-	}
+	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.listSpeakers]);
+	await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone());
 	return response;
 }
 
