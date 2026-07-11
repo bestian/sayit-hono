@@ -6,12 +6,7 @@ import worker from '../src/index';
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 function createEnv() {
-	const okPaths = new Set([
-		'/about',
-		'/about/',
-		'/favicon.ico',
-		'/robots.txt'
-	]);
+	const okPaths = new Set(['/about', '/about/', '/favicon.ico', '/robots.txt']);
 	const r2Store = new Map<string, { body: string; cacheControl?: string; contentType?: string }>();
 
 	return {
@@ -26,7 +21,7 @@ function createEnv() {
 					return new Response(`asset:${pathname}`, { status: 200 });
 				}
 				return new Response('Not Found', { status: 404 });
-			}
+			},
 		},
 		SPEECH_CACHE: {
 			get: async (key: string) => {
@@ -38,20 +33,16 @@ function createEnv() {
 					httpEtag: null,
 					httpMetadata: {
 						cacheControl: entry.cacheControl,
-						contentType: entry.contentType
+						contentType: entry.contentType,
 					},
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
-			put: async (
-				key: string,
-				body: string,
-				options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }
-			) => {
+			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
 				r2Store.set(key, {
 					body,
 					cacheControl: options?.httpMetadata?.cacheControl,
-					contentType: options?.httpMetadata?.contentType
+					contentType: options?.httpMetadata?.contentType,
 				});
 			},
 			delete: async (keys: string | string[]) => {
@@ -67,9 +58,9 @@ function createEnv() {
 				return {
 					objects: slice.map((key) => ({ key })),
 					truncated: nextCursor < matchingKeys.length,
-					cursor: `${nextCursor}`
+					cursor: `${nextCursor}`,
 				};
-			}
+			},
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -82,7 +73,7 @@ function createEnv() {
 									display_name: '2026-03-24 Demo Speech',
 									isNested: 0,
 									nest_filenames: null,
-									nest_display_names: null
+									nest_display_names: null,
 								};
 							}
 							return null;
@@ -93,7 +84,7 @@ function createEnv() {
 								return {
 									id: 16224,
 									route_pathname: 'Yoichi%20Ochiai',
-									name: 'Yoichi Ochiai'
+									name: 'Yoichi Ochiai',
 								};
 							}
 							return null;
@@ -126,9 +117,9 @@ function createEnv() {
 										first_nest_filename: null,
 										first_nest_display_name: null,
 										first_section_content: '<p>Demo summary for the RSS feed.</p>',
-										first_speaker_name: 'Audrey Tang'
-									}
-								].slice(0, limit)
+										first_speaker_name: 'Audrey Tang',
+									},
+								].slice(0, limit),
 							};
 						}
 
@@ -145,9 +136,9 @@ function createEnv() {
 											section_speaker: 'Yoichi%20Ochiai',
 											section_content: '<p>We&#39;re shifting from &quot;data oil&quot; to &quot;data soil.&quot;</p>',
 											speaker_name: 'Yoichi Ochiai',
-											photoURL: null
-										}
-									]
+											photoURL: null,
+										},
+									],
 								};
 							}
 							return { success: true, results: [] };
@@ -162,9 +153,9 @@ function createEnv() {
 											id: 16224,
 											route_pathname: 'Yoichi%20Ochiai',
 											name: 'Yoichi Ochiai',
-											photoURL: null
-										}
-									]
+											photoURL: null,
+										},
+									],
 								};
 							}
 							return { success: true, results: [] };
@@ -183,7 +174,7 @@ function createEnv() {
 											section_speaker: 'audrey-tang',
 											section_content: '<p>First paragraph.</p>',
 											photoURL: null,
-											name: 'Audrey Tang'
+											name: 'Audrey Tang',
 										},
 										{
 											filename: '2026-03-24-demo-speech',
@@ -193,9 +184,9 @@ function createEnv() {
 											section_speaker: 'audrey-tang',
 											section_content: '<p>Second paragraph.</p>',
 											photoURL: null,
-											name: 'Audrey Tang'
-										}
-									]
+											name: 'Audrey Tang',
+										},
+									],
 								};
 							}
 							return { success: true, results: [] };
@@ -203,17 +194,17 @@ function createEnv() {
 
 						return {
 							success: true,
-							results: [{ filename: 'demo.an', display_name: 'Demo Speech' }]
+							results: [{ filename: 'demo.an', display_name: 'Demo Speech' }],
 						};
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -282,7 +273,7 @@ describe('Worker routes', () => {
 		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		expect(await res.text()).toContain('Demo Speech');
 		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
-			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`),
 		);
 		expect(speechCacheKeys).toHaveLength(1);
 	});
@@ -291,9 +282,7 @@ describe('Worker routes', () => {
 		const { res } = await request('/api/speech_index.json');
 		expect(res.status).toBe(200);
 		const json = await res.json();
-		expect(json).toEqual([
-			expect.objectContaining({ filename: 'demo.an', display_name: 'Demo Speech' })
-		]);
+		expect(json).toEqual([expect.objectContaining({ filename: 'demo.an', display_name: 'Demo Speech' })]);
 	});
 
 	it('returns transcript search results from D1', async () => {
@@ -306,9 +295,9 @@ describe('Worker routes', () => {
 					title: '2026-03-25 Weekly Ochiai',
 					url: '/2026-03-25-weekly-ochiai#s638607',
 					speaker: 'Yoichi Ochiai',
-					snippet: 'We\'re shifting from "data oil" to "data soil."'
-				})
-			]
+					snippet: 'We\'re shifting from "data oil" to "data soil."',
+				}),
+			],
 		});
 	});
 
@@ -320,7 +309,7 @@ describe('Worker routes', () => {
 		const { res } = await request('/search/?q=ochiai&p=16224');
 		expect(res.status).toBe(200);
 		const html = await res.text();
-		expect(html).toContain('Search this person\'s speeches');
+		expect(html).toContain("Search this person's speeches");
 		expect(html).toContain('2026-03-25 Weekly Ochiai');
 		expect(html).toContain('Yoichi Ochiai');
 	});
@@ -370,7 +359,7 @@ describe('Worker routes', () => {
 
 			const { res } = await request('/api/cleanup_old_cache', env, {
 				method: 'POST',
-				headers: { Authorization: 'Bearer test-audrey' }
+				headers: { Authorization: 'Bearer test-audrey' },
 			});
 
 			expect(res.status).toBe(200);
@@ -390,7 +379,7 @@ describe('Worker routes', () => {
 
 			const { res } = await request('/api/cleanup_old_cache?max_deletes=2', env, {
 				method: 'POST',
-				headers: { Authorization: 'Bearer test-audrey' }
+				headers: { Authorization: 'Bearer test-audrey' },
 			});
 
 			expect(res.status).toBe(200);
@@ -405,7 +394,7 @@ describe('Worker routes', () => {
 
 			const { res } = await request('/api/cleanup_old_cache', env, {
 				method: 'POST',
-				headers: { Authorization: 'Bearer test-bestian' }
+				headers: { Authorization: 'Bearer test-bestian' },
 			});
 
 			expect(res.status).toBe(200);
@@ -422,7 +411,7 @@ describe('Worker routes', () => {
 			const env = createEnv();
 			const { res } = await request('/api/cleanup_old_cache', env, {
 				method: 'POST',
-				headers: { Authorization: 'Basic test-audrey' }
+				headers: { Authorization: 'Basic test-audrey' },
 			});
 			expect(res.status).toBe(403);
 		});
@@ -431,7 +420,7 @@ describe('Worker routes', () => {
 			const env = createEnv();
 			const { res } = await request('/api/cleanup_old_cache', env, {
 				method: 'POST',
-				headers: { Authorization: 'Bearer wrong-token' }
+				headers: { Authorization: 'Bearer wrong-token' },
 			});
 			expect(res.status).toBe(403);
 		});

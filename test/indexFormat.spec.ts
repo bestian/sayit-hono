@@ -6,7 +6,7 @@ import {
 	createEmptySearchOverlayManifest,
 	packSearchDocs,
 	unpackSearchDocs,
-	type SearchDocRecord
+	type SearchDocRecord,
 } from '../src/search/indexFormat';
 
 const doc = (overrides: Partial<SearchDocRecord> = {}): SearchDocRecord => ({
@@ -16,7 +16,7 @@ const doc = (overrides: Partial<SearchDocRecord> = {}): SearchDocRecord => ({
 	content: 'Body',
 	sectionId: null,
 	speaker: null,
-	...overrides
+	...overrides,
 });
 
 describe('search/indexFormat', () => {
@@ -47,7 +47,7 @@ describe('search/indexFormat', () => {
 			const docs = [
 				doc({ speaker: 'A', sectionId: 1, content: 'one' }),
 				doc({ speaker: 'A', sectionId: 2, content: 'two' }),
-				doc({ speaker: 'B', sectionId: 3, content: 'three' })
+				doc({ speaker: 'B', sectionId: 3, content: 'three' }),
 			];
 			const packed = packSearchDocs(docs, '2026-04-01T00:00:00Z');
 			expect(packed.v).toBe(SEARCH_INDEX_FORMAT_VERSION);
@@ -83,10 +83,7 @@ describe('search/indexFormat', () => {
 		});
 
 		it('treats identical (filename,url,title) triples as one page', () => {
-			const packed = packSearchDocs([
-				doc({ content: 'a' }),
-				doc({ content: 'b' })
-			]);
+			const packed = packSearchDocs([doc({ content: 'a' }), doc({ content: 'b' })]);
 			expect(packed.pages).toHaveLength(1);
 			expect(packed.docs.map((d) => d[0])).toEqual([0, 0]);
 		});

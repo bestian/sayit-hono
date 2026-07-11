@@ -32,9 +32,7 @@ export async function verifyTranscriptToken(
 	...allowed: Array<string | null | undefined>
 ): Promise<boolean> {
 	if (!provided) return false;
-	const validAllowed = allowed.filter(
-		(t): t is string => typeof t === 'string' && t.length > 0
-	);
+	const validAllowed = allowed.filter((t): t is string => typeof t === 'string' && t.length > 0);
 	if (validAllowed.length === 0) return false;
 
 	const providedHash = await sha256(provided);
@@ -55,7 +53,7 @@ export async function verifyTranscriptToken(
 export async function isAuthorizedFromHeader(
 	authHeader: string | null | undefined,
 	audreytToken: string | null | undefined,
-	bestianToken: string | null | undefined
+	bestianToken: string | null | undefined,
 ): Promise<boolean> {
 	if (!authHeader || !authHeader.startsWith('Bearer ')) return false;
 	const token = authHeader.slice(7);

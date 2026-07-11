@@ -36,11 +36,7 @@ async function fetchSpeechIndex(): Promise<SpeechRow[]> {
 	return (await res.json()) as SpeechRow[];
 }
 
-async function listAllObjectKeys(
-	accountId: string,
-	token: string,
-	prefix: string
-): Promise<string[]> {
+async function listAllObjectKeys(accountId: string, token: string, prefix: string): Promise<string[]> {
 	const keys: string[] = [];
 	let cursor: string | undefined;
 	let page = 0;
@@ -71,10 +67,6 @@ function isSpeechOgKey(key: string, version: string): boolean {
 	if (key.startsWith(`${version}/og/speech/`)) return false;
 	const rest = key.slice(prefix.length);
 	return rest.length > 0 && !rest.includes('/');
-}
-
-function filenameFromSpeechKey(key: string, version: string): string {
-	return key.slice(`${version}/og/`.length, -4);
 }
 
 async function main(): Promise<void> {
@@ -123,10 +115,7 @@ async function main(): Promise<void> {
 		for (const k of extra.slice(0, 20)) console.log(`  ${k}`);
 	}
 
-	const ok =
-		missing.length === 0 &&
-		extra.length === 0 &&
-		actualSpeechKeys.size === expectedKeys.size;
+	const ok = missing.length === 0 && extra.length === 0 && actualSpeechKeys.size === expectedKeys.size;
 	console.log(ok ? 'MATCH: R2 speech OGs align with speech_index' : 'MISMATCH');
 	process.exit(ok ? 0 : 1);
 }

@@ -3,11 +3,9 @@
 這個專案使用 Hono + Vue 3 在 Cloudflare Workers 上進行 SSR，沒有 App.vue、沒有 vue-router，每個頁面獨立維護於 `src/views`。
 
 ## 檔案結構
-- `src/views/*.vue`：頁面來源。
-- `scripts/build-views.ts`：將 `.vue` 轉成 Worker 可用的 SSR 元件，輸出到 `src/.generated/views`。
-- `scripts/build-assets.ts`：將 `public/` 靜態資源複製到 `www/`（給 ASSETS 使用）。
-- `scripts/build-search-index.ts`：建置搜尋基線索引、manifest 與 `www/stats.json`，並同步到 R2（部署前需執行，見「部署」一節）。
-- `src/index.ts`：Hono Worker，直接渲染各頁。
+- `src/views/*.vue`：頁面來源，由 `vite-plugin-sfc-ssr.ts`（見 `vite.config.ts`）即時編譯成 SSR 元件，不需手動編譯步驟。
+- `scripts/build-search-index.ts`：建置搜尋基線索引、manifest 與 `stats.json`，並同步到 R2（部署前需執行，見「部署」一節）。
+- `src/index.ts`：Hono Worker 入口（middleware + route table），頁面 handler 在 `src/ssr/pages/`。
 
 ## 開發
 ```bash
@@ -16,7 +14,7 @@ bun run dev
 ```
 本專案 package manager 統一用 **bun**（lockfile 為 `bun.lock`）；唯一例外是 `wrangler` 仍走 `npx wrangler …`，因為 bun runtime 已知會讓 `wrangler deploy` 在 async upload 完成前提早 exit。
 
-`bun run dev` 會先把 `.vue` 編譯到 `src/.generated/views`，再啟動 `wrangler dev`。修改 `.vue` 後需重跑一次 `bun run dev` 或單獨執行 `bun run build:views` 讓編譯檔更新。
+`bun run dev` 啟動 `vite dev`（本地 workerd + 本地 D1/R2 持久化狀態，不連正式 Cloudflare 資源）。`.vue` 存檔即生效，不需要任何編譯指令。若要對照 staging 環境的真實資料，改用 `bun run dev:staging`。
 
 ## 清理快取(暫時)
 
@@ -46,23 +44,27 @@ bun run dev
 
 
 ## 靜態資源建置
+
+靜態資源來源是 `public/`，`vite build` 會用 Vite 內建的 `publicDir` 機制原樣複製進 `dist/client/`，不需要任何手動同步指令。若要在 workerd 內近端預覽建置結果：
 ```bash
-bun run build:assets
+bun run preview
 ```
-會把 `public/` 同步到 `www/`。若要近端預覽靜態檔：
-```bash
-bun run preview:assets
-```
-（等同 `python3 -m http.server 4173 -d www`）
+（`vite build && vite preview`，比純靜態伺服器更接近正式行為，因為是在真的 workerd 裡跑。）
 
 ### SSR 路由注意事項
 - 所有頁面皆為 SSR 路由，並搭配 front Workers Cache（必要時以 R2 作 origin）。
-
-- 部署或開發前，仍需先執行 `bun run build:views` 生成 `src/.generated/views` 供 Worker 匯入。
+- `.vue` 存檔即生效，不需要任何編譯步驟。
 
 ## 部署
 
-`bun run deploy` 預設已包含搜尋索引建置；若只想單獨重建搜尋資料，也可直接執行 `bun run build:search`。
+**正式環境部署目前故意被封鎖**（`bun run deploy` / `deploy:assets` / `deploy:search` 都會印錯誤訊息並以非 0 結束）——`techdebt/vp-lemmascript-migration` 分支正在做大規模結構調整，尚未核准直接上正式站。所有部署先走 staging：
+
+```bash
+bun run deploy:staging          # 完整部署（含搜尋索引重建）
+bun run deploy:staging:assets   # 略過搜尋索引重建（純前端/SSR 修改用）
+```
+
+兩者都會依序執行：`build:cache-version` → `CLOUDFLARE_ENV=staging vite build` → （`deploy:staging` 才有）`build:search`（`SEARCH_R2_BUCKETS` 已指向 staging bucket，不會動到正式索引）→ `wrangler deploy --env staging` → `verify:deploy`。**`CLOUDFLARE_ENV=staging` 必須在 `vite build` 之前設定**，`@cloudflare/vite-plugin` 在建置當下就決定要用哪個 named environment 的 binding，之後 `wrangler deploy --env staging` 不會覆寫已經烤進 `dist/` 的值。
 
 ### 搜尋索引建置（build:search）
 
@@ -70,31 +72,9 @@ bun run preview:assets
 bun run build:search
 ```
 
-- **產出**：`scripts/build-search-index.ts` 會產生壓縮後的搜尋基線索引、即時 overlay manifest、以及首頁統計用的 `www/stats.json`。大型搜尋索引會上傳到 R2，部署時不直接塞進 ASSETS。
+- **產出**：`scripts/build-search-index.ts` 會產生壓縮後的搜尋基線索引、即時 overlay manifest、以及首頁統計用的 `stats.json`，上傳到 `R2_BUCKETS`（可用 `SEARCH_R2_BUCKETS` 環境變數覆寫目標 bucket，預設是正式 bucket——本機單獨跑這個指令前請先確認要不要覆寫）。
 - **特性**：建置腳本會保留本地快取供下次增量建置使用，並重新抓取變動過的 speeches，避免沿用過期 dump。
-
-一鍵完成搜尋建置＋部署：
-
-```bash
-bun run deploy
-```
-
-等同 `bun run build:views && bun run build:assets && bun run build:search && npx wrangler deploy`。
-
-### 只更新 Worker / ASSETS
-
-```bash
-bun run deploy:assets
-```
-
-只重建視圖與靜態資源，不重建搜尋索引；適合純版面或資產更新。
-
-### 先建置資源再部署 Worker（ASSETS）
-若要在遠端或本地先跑完 `build:assets` 後，再像 `bun run deploy` 一樣更新 Worker 與 ASSETS：
-```bash
-bun run deploy:assets
-```
-等同 `bun run build:assets && npx wrangler deploy`：先產出 `www/`，再一併上傳 Worker 與靜態資源。CI 上可依序執行 `build:assets` 與 `npx wrangler deploy` 達到相同效果。
+- 任何會對 R2 執行 `--remote` 寫入的腳本都經過 `scripts/lib/assert-not-prod.ts` 把關：目標 bucket 名稱不是以 `-staging`/`-preview` 結尾就預設拒絕，除非明確設 `ALLOW_PROD_R2=1`。
 
 
 

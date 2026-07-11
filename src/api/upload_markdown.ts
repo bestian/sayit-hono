@@ -3,23 +3,11 @@ import { getCorsHeaders } from './cors';
 import { isAuthorizedFromHeader } from './auth';
 import type { ApiEnv } from './types';
 import { marked } from 'marked';
-import {
-	CACHE_KEY_VERSION,
-	deleteR2Cache,
-	purgeWorkersCache,
-	r2AnKey,
-	r2MdKey,
-	r2OgSectionKey,
-	r2OgSpeechKey,
-	speechRequestPath,
-	speakerRequestPath,
-	tags
-} from './cache';
-import {
-	markSpeechDeletedInSearch,
-	syncSearchStats,
-	writeSearchOverlayForSpeech
-} from '../search/runtime';
+import { deleteR2Cache, purgeWorkersCache, speechRequestPath, speakerRequestPath, tags } from './cache';
+import { markSpeechDeletedInSearch, syncSearchStats, writeSearchOverlayForSpeech } from '../search/runtime';
+import { orderSectionsByLinks, assignPatchedSections, withSectionLinks } from '../utils/sectionPatch';
+import type { NormalizedSection, ExistingSection, PatchAssignedSection } from '../utils/sectionPatch';
+import { planSpeechInvalidation, planSpeakerInvalidation, planListInvalidation } from '../utils/cachePlan';
 
 const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
 
@@ -82,11 +70,9 @@ function collisionResistantKey(input: string): string {
  * 此函式，避免被合併掉的 deprecated filename 又被自動 upsert 出新一份重複。
  */
 async function lookupRedirectTarget(c: any, filename: string): Promise<string | null> {
-	const row = await withRetry(() => c.env.DB.prepare(
-		'SELECT new_filename FROM speech_redirects WHERE old_filename = ?'
-	)
-		.bind(filename)
-		.first());
+	const row = await withRetry(() =>
+		c.env.DB.prepare('SELECT new_filename FROM speech_redirects WHERE old_filename = ?').bind(filename).first(),
+	);
 	const target = (row as { new_filename?: string } | null)?.new_filename;
 	return typeof target === 'string' && target.length > 0 ? target : null;
 }
@@ -102,38 +88,10 @@ type ParsedSection = {
 	startLine: number;
 };
 
-type NormalizedSection = {
-	section_id: number;
-	previous_section_id: number | null;
-	next_section_id: number | null;
-	section_speaker: string | null;
-	section_content: string;
-};
-
-type ExistingSection = {
-	section_id: number;
-	previous_section_id: number | null;
-	next_section_id: number | null;
-	section_speaker: string | null;
-	section_content: string;
-};
-
-type SectionPayload = {
-	markdown: string;
-	speaker: string | null;
-	section_content: string;
-};
-
-type PatchAssignedSection = SectionPayload & { section_id: number };
-
 /** 從講者標記陣列取出不重複的 route_pathname（用於 DB 關聯與快取失效） */
 function getUniqueSpeakerRoutePathnames(speakerMarks: SpeakerMark[]): string[] {
 	return Array.from(
-		new Set(
-			speakerMarks
-				.map((s) => s.speakerSlug)
-				.filter((slug): slug is string => typeof slug === 'string' && slug.length > 0)
-		)
+		new Set(speakerMarks.map((s) => s.speakerSlug).filter((slug): slug is string => typeof slug === 'string' && slug.length > 0)),
 	);
 }
 
@@ -189,7 +147,7 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 			sections.push({
 				markdown: content,
 				isFromQuote: !hasNonQuoteLine, // 所有行皆來自 '> ' 時才算 quote 段落
-				startLine: sectionStartLine
+				startLine: sectionStartLine,
 			});
 		}
 		buf = [];
@@ -264,11 +222,9 @@ async function reserveSectionIds(c: Context<ApiEnv>, count: number): Promise<num
 	// (0) is irrelevant because the reservation below floors next_id at MAX+1.
 	await withRetry(() =>
 		c.env.DB.batch([
-			c.env.DB.prepare(
-				'CREATE TABLE IF NOT EXISTS section_id_counter (id INTEGER PRIMARY KEY, next_id INTEGER NOT NULL)'
-			),
-			c.env.DB.prepare('INSERT OR IGNORE INTO section_id_counter (id, next_id) VALUES (1, 0)')
-		])
+			c.env.DB.prepare('CREATE TABLE IF NOT EXISTS section_id_counter (id INTEGER PRIMARY KEY, next_id INTEGER NOT NULL)'),
+			c.env.DB.prepare('INSERT OR IGNORE INTO section_id_counter (id, next_id) VALUES (1, 0)'),
+		]),
 	);
 	// The atomic reservation: one statement, serialised by SQLite's write lock.
 	// next_id := max(current counter, MAX(section_id)+1) + n ; reserved block is
@@ -278,10 +234,10 @@ async function reserveSectionIds(c: Context<ApiEnv>, count: number): Promise<num
 			`UPDATE section_id_counter
 			 SET next_id = MAX(next_id, (SELECT COALESCE(MAX(section_id), 0) + 1 FROM speech_content)) + ?
 			 WHERE id = 1
-			 RETURNING next_id`
+			 RETURNING next_id`,
 		)
 			.bind(n)
-			.first<{ next_id: number | string }>()
+			.first<{ next_id: number | string }>(),
 	);
 	const newNext = row != null ? Number(row.next_id) : NaN;
 	if (!Number.isFinite(newNext)) {
@@ -305,206 +261,6 @@ function stripMarkdownTitleLine(markdown: string): string {
 	return mdLines.join('\n');
 }
 
-/** 段落比對鍵：用於 LCS 判斷「同一段」是否相同（講者 + 內容） */
-function normalizeSectionComparableContent(input: string): string {
-	return input
-		// 先把常見換行型標記轉成空白，再移除其餘 HTML 標記
-		.replace(/<br\s*\/?>/gi, ' ')
-		.replace(/<\/?p\b[^>]*>/gi, ' ')
-		.replace(/<[^>]+>/g, ' ')
-		// Markdown link/image：保留可讀文字，移除 URL
-		.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-		.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-		// Markdown inline code
-		.replace(/`([^`]+)`/g, '$1')
-		// 行首 markdown 記號（標題、引用、清單）
-		.replace(/^\s{0,3}#{1,6}\s+/gm, '')
-		.replace(/^\s{0,3}>\s?/gm, '')
-		.replace(/^\s{0,3}[-*+]\s+/gm, '')
-		// decode 常見 HTML entity（避免同內容不同編碼）
-		.replace(/&nbsp;/gi, ' ')
-		.replace(/&amp;/gi, '&')
-		.replace(/&lt;/gi, '<')
-		.replace(/&gt;/gi, '>')
-		.replace(/&quot;/gi, '"')
-		.replace(/&apos;/gi, "'")
-		// 斷行與多空白差異一律視為同值
-		.replace(/\s+/g, ' ')
-		.trim();
-}
-
-/** 偵測段落是否「以 svg / iframe 嵌入區塊為主體」；若是，回傳該標籤名 */
-function detectEmbeddedMediaTag(input: string): 'svg' | 'iframe' | null {
-	let detected: 'svg' | 'iframe' | null = null;
-	let stripped = input;
-	for (const tag of ['svg', 'iframe'] as const) {
-		const re = new RegExp(`<\\s*${tag}\\b[^>]*>[\\s\\S]*?<\\s*/\\s*${tag}\\s*>`, 'gi');
-		const replaced = stripped.replace(re, ' ');
-		if (replaced !== stripped) {
-			detected ??= tag;
-			stripped = replaced;
-		}
-	}
-	if (!detected) return null;
-	// 只有「去掉媒體區塊與 HTML 標記後幾乎沒剩文字」才視為純嵌入段落，避免誤傷夾帶說明文字的段落
-	const remainder = stripped.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-	return remainder === '' ? detected : null;
-}
-
-function sectionMatchKey(section: { markdown: string; speaker: string | null }) {
-	// svg / iframe 區塊內部小幅變動（viewBox、src query）不應觸發 LCS 重排，直接以標籤類型作 key
-	const mediaTag = detectEmbeddedMediaTag(section.markdown);
-	if (mediaTag) {
-		return `${section.speaker ?? ''}\u0000__embedded_${mediaTag}__`;
-	}
-	return `${section.speaker ?? ''}\u0000${normalizeSectionComparableContent(section.markdown)}`;
-}
-
-/** 依 previous/next 鏈結將 DB 取出的段落排成正確順序；找不到頭則改依 section_id 排序 */
-function orderSectionsByLinks(rows: ExistingSection[]): ExistingSection[] {
-	if (rows.length <= 1) return rows;
-	const byId = new Map<number, ExistingSection>();
-	for (const row of rows) {
-		byId.set(row.section_id, row);
-	}
-
-	// 找出「頭」：previous 為 null 或不在列表內的段落
-	let head: ExistingSection | null = null;
-	for (const row of rows) {
-		if (row.previous_section_id == null || !byId.has(row.previous_section_id)) {
-			if (!head || row.section_id < head.section_id) {
-				head = row;
-			}
-		}
-	}
-
-	if (!head) return [...rows].sort((a, b) => a.section_id - b.section_id);
-
-	const ordered: ExistingSection[] = [];
-	const visited = new Set<number>();
-	let current: ExistingSection | null = head;
-	while (current && !visited.has(current.section_id)) {
-		ordered.push(current);
-		visited.add(current.section_id);
-		const nextId: number | null = current.next_section_id;
-		current = nextId != null ? byId.get(nextId) ?? null : null;
-	}
-
-	if (ordered.length !== rows.length) {
-		const remains: ExistingSection[] = [];
-		for (const row of rows) {
-			if (!visited.has(row.section_id)) remains.push(row);
-		}
-		remains.sort((a, b) => a.section_id - b.section_id);
-		ordered.push(...remains);
-	}
-
-	return ordered;
-}
-
-/** PATCH 用：以 LCS（最長共同子序列）找出舊/新段落對應的 (oldIdx, newIdx)  pairs，供 assignPatchedSections 沿用 section_id */
-function buildLcsPairs(oldSections: SectionPayload[], newSections: SectionPayload[]): Array<[number, number]> {
-	const n = oldSections.length;
-	const m = newSections.length;
-	const oldKeys = oldSections.map(sectionMatchKey);
-	const newKeys = newSections.map(sectionMatchKey);
-	const dp: number[][] = Array.from({ length: n + 1 }, () => Array.from({ length: m + 1 }, () => 0));
-
-	for (let i = 1; i <= n; i += 1) {
-		for (let j = 1; j <= m; j += 1) {
-			if (oldKeys[i - 1] === newKeys[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
-			else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-		}
-	}
-
-	const pairs: Array<[number, number]> = [];
-	let i = n;
-	let j = m;
-	while (i > 0 && j > 0) {
-		if (oldKeys[i - 1] === newKeys[j - 1]) {
-			pairs.push([i - 1, j - 1]);
-			i -= 1;
-			j -= 1;
-		} else if (dp[i - 1][j] >= dp[i][j - 1]) {
-			i -= 1;
-		} else {
-			j -= 1;
-		}
-	}
-
-	return pairs.reverse();
-}
-
-/**
- * PATCH 用：以 LCS 對齊舊/新段落，能對上的沿用舊 section_id（URL 穩定），多出來
- * 的新段落用 `allocateFresh()` 取得全域唯一的新 ID。
- *
- * allocateFresh() draws sequentially from a block pre-reserved via
- * reserveSectionIds (globalMax+1..), so every inserted id is strictly greater
- * than every existing section_id and than every other id minted this request —
- * cross-speech / intra-request UNIQUE-PK collisions are impossible by
- * construction. There is no positional `base*100+N` scheme any more: section_id
- * is pure identity and display order comes from the previous/next link chain
- * (withSectionLinks + sectionUtils), so non-local inserted ids are fine.
- */
-function assignPatchedSections(
-	oldRows: ExistingSection[],
-	newSections: SectionPayload[],
-	allocateFresh: () => number
-): PatchAssignedSection[] {
-	const oldSections: Array<SectionPayload & { section_id: number }> = oldRows.map((row) => ({
-		section_id: row.section_id,
-		markdown: row.section_content,
-		speaker: row.section_speaker,
-		section_content: row.section_content
-	}));
-	const output: PatchAssignedSection[] = [];
-	let oldCursor = 0;
-	let newCursor = 0;
-
-	const emit = (section: SectionPayload, sectionId: number) => {
-		output.push({ ...section, section_id: sectionId });
-	};
-
-	// Special case: 改第一段（新第一段是陌生內容）時，強制沿用舊第一段 section_id
-	if (
-		oldSections.length > 0 &&
-		newSections.length > 0 &&
-		sectionMatchKey(oldSections[0]) !== sectionMatchKey(newSections[0])
-	) {
-		emit(newSections[0], oldSections[0].section_id);
-		oldCursor = 1;
-		newCursor = 1;
-	}
-
-	const lcsPairs = buildLcsPairs(oldSections.slice(oldCursor), newSections.slice(newCursor)).map(
-		([oldIdx, newIdx]) => [oldIdx + oldCursor, newIdx + newCursor] as [number, number]
-	);
-
-	for (const [oldMatchIdx, newMatchIdx] of lcsPairs) {
-		const oldGap = oldSections.slice(oldCursor, oldMatchIdx);
-		const newGap = newSections.slice(newCursor, newMatchIdx);
-		const pairedCount = Math.min(oldGap.length, newGap.length);
-
-		// Reuse old ids for paired sections in the gap; fresh ids for the rest.
-		for (let k = 0; k < pairedCount; k += 1) emit(newGap[k], oldGap[k].section_id);
-		for (let k = pairedCount; k < newGap.length; k += 1) emit(newGap[k], allocateFresh());
-
-		emit(newSections[newMatchIdx], oldSections[oldMatchIdx].section_id);
-		oldCursor = oldMatchIdx + 1;
-		newCursor = newMatchIdx + 1;
-	}
-
-	const oldTail = oldSections.slice(oldCursor);
-	const newTail = newSections.slice(newCursor);
-	const tailPairCount = Math.min(oldTail.length, newTail.length);
-
-	for (let k = 0; k < tailPairCount; k += 1) emit(newTail[k], oldTail[k].section_id);
-	for (let k = tailPairCount; k < newTail.length; k += 1) emit(newTail[k], allocateFresh());
-
-	return output;
-}
-
 /** 解析上傳的 Markdown：去標題行、切段落、指派講者、轉 HTML，回傳 speakers 與 sectionPayloads */
 async function parseIncomingMarkdown(markdown: string) {
 	const markdownForParsing = stripMarkdownTitleLine(markdown);
@@ -515,41 +271,17 @@ async function parseIncomingMarkdown(markdown: string) {
 		sectionPayloads: sectionsWithSpeaker.map((section) => ({
 			markdown: section.markdown,
 			speaker: section.speaker,
-			section_content: toHtml(section.markdown)
-		}))
+			section_content: toHtml(section.markdown),
+		})),
 	};
 }
-
-/** 為已分配 section_id 的段落補上 previous_section_id / next_section_id 鏈結 */
-function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[] {
-	return sections.map((section, idx) => ({
-		section_id: section.section_id,
-		previous_section_id: idx === 0 ? null : sections[idx - 1].section_id,
-		next_section_id: idx === sections.length - 1 ? null : sections[idx + 1].section_id,
-		section_speaker: section.speaker,
-		section_content: section.section_content
-	}));
-}
-
 
 /** 演講內容或 .an/.md 更新後，刪除 R2 origin 並 purge Workers Cache.
  *  extraSectionIds: section IDs that may no longer exist in D1 (deleted/reassigned on PATCH/DELETE)
  *  but still need R2 + Workers Cache purge for /speech/:id pages.
  */
-async function invalidateSpeechCaches(
-	c: Context<ApiEnv>,
-	filename: string,
-	extraSectionIds: Iterable<number> = []
-): Promise<boolean> {
+async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string, extraSectionIds: Iterable<number> = []): Promise<boolean> {
 	const host = new URL(c.req.url).host;
-	const encodedFilename = encodeURIComponent(filename);
-	const r2Keys = [
-		r2AnKey(filename),
-		r2MdKey(filename),
-		`${CACHE_KEY_VERSION}/${host}/${filename}`,
-		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`,
-		r2OgSpeechKey(filename),
-	];
 	// pathPrefixes: request-path encoding only (percent-encoded). Raw Unicode prefixes can fail purge.
 	// List roots use tags only — never pathPrefix '/'.
 	const pathPrefixes = [speechRequestPath(filename)];
@@ -559,9 +291,7 @@ async function invalidateSpeechCaches(
 	}
 
 	try {
-		const result = await c.env.DB.prepare(
-			'SELECT section_id FROM speech_content WHERE filename = ?'
-		).bind(filename).all();
+		const result = await c.env.DB.prepare('SELECT section_id FROM speech_content WHERE filename = ?').bind(filename).all();
 		for (const row of result.results as Array<{ section_id: number }>) {
 			sectionIds.add(Number(row.section_id));
 		}
@@ -570,12 +300,10 @@ async function invalidateSpeechCaches(
 	}
 
 	for (const sectionId of sectionIds) {
-		r2Keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${sectionId}`);
-		r2Keys.push(r2OgSectionKey(sectionId));
 		pathPrefixes.push(`/speech/${sectionId}`);
 	}
 
-	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
+	const { r2Keys, tags: purgeTags } = planSpeechInvalidation(host, filename, [...sectionIds]);
 	// Both tiers must clear: R2 origin delete AND Workers Cache purge.
 	// If R2 delete fails but front purge succeeds, the next MISS re-poisons the front from stale R2.
 	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
@@ -584,34 +312,27 @@ async function invalidateSpeechCaches(
 		console.error('[invalidate] R2 origin delete incomplete', { filename, failed: r2Results.filter((ok) => !ok).length });
 	}
 	// Split tags vs pathPrefixes so a bad prefix cannot block tag purge.
-	const [tagsOk, pathsOk] = await Promise.all([
-		purgeWorkersCache({ tags: purgeTags }),
-		purgeWorkersCache({ pathPrefixes }),
-	]);
+	const [tagsOk, pathsOk] = await Promise.all([purgeWorkersCache({ tags: purgeTags }), purgeWorkersCache({ pathPrefixes })]);
 	return r2Ok && tagsOk && pathsOk;
 }
 
 /** 講者或演講-講者關聯更新後，刪除 R2 origin 並 purge Workers Cache */
 async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]): Promise<boolean> {
 	const host = new URL(c.req.url).host;
-	const r2Keys = new Set<string>([`${CACHE_KEY_VERSION}/${host}/speakers`]);
 	const pathPrefixes: string[] = [];
 
 	for (const routePathname of speakerRoutePathnames) {
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${routePathname}`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${encodeURIComponent(routePathname)}`);
 		// Request path is percent-encoded; skip raw Unicode prefixes.
 		pathPrefixes.push(speakerRequestPath(routePathname));
 	}
 
-	const purgeTags = speakerRoutePathnames.map((p) => tags.speaker(p));
-	purgeTags.push(tags.listSpeakers);
+	const { r2Keys, tags: purgeTags } = planSpeakerInvalidation(host, speakerRoutePathnames);
 
-	const r2Results = await Promise.all(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 	const r2Ok = r2Results.every(Boolean);
 	if (!r2Ok) {
 		console.error('[invalidate] speaker R2 origin delete incomplete', {
-			failed: r2Results.filter((ok) => !ok).length
+			failed: r2Results.filter((ok) => !ok).length,
 		});
 	}
 	const tagsOk = await purgeWorkersCache({ tags: purgeTags });
@@ -622,36 +343,16 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 /** 失效列表頁快取：tags only for exact list roots; R2 origin keys still deleted */
 async function invalidateListPageCaches(
 	c: Context<ApiEnv>,
-	{ home, speeches, speakers }: { home: boolean; speeches: boolean; speakers: boolean }
+	{ home, speeches, speakers }: { home: boolean; speeches: boolean; speakers: boolean },
 ): Promise<boolean> {
 	const host = new URL(c.req.url).host;
-	const r2Keys = new Set<string>();
+	const { r2Keys, tags: purgeTags } = planListInvalidation(host, home, speeches, speakers);
 
-	if (home) {
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/index.html`);
-	}
-	if (speeches) {
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speeches`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speeches/`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/rss.xml`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/feed.xml`);
-	}
-	if (speakers) {
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speakers`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speakers/`);
-	}
-
-	const purgeTags: string[] = [];
-	if (home) purgeTags.push(tags.listHome);
-	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss);
-	if (speakers) purgeTags.push(tags.listSpeakers);
-
-	const r2Results = await Promise.all(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 	const r2Ok = r2Results.every(Boolean);
 	if (!r2Ok) {
 		console.error('[invalidate] list R2 origin delete incomplete', {
-			failed: r2Results.filter((ok) => !ok).length
+			failed: r2Results.filter((ok) => !ok).length,
 		});
 	}
 	// Callers always request at least one list surface; empty tags is a no-op for front purge.
@@ -660,10 +361,7 @@ async function invalidateListPageCaches(
 }
 
 async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: string): Promise<boolean> {
-	const results = await Promise.allSettled([
-		writeSearchOverlayForSpeech(c, filename),
-		syncSearchStats(c)
-	]);
+	const results = await Promise.allSettled([writeSearchOverlayForSpeech(c, filename), syncSearchStats(c)]);
 	let ok = true;
 	for (const result of results) {
 		if (result.status === 'rejected') {
@@ -674,17 +372,13 @@ async function syncSearchArtifactsAfterUpsert(c: Context<ApiEnv>, filename: stri
 	return ok;
 }
 
-
 /** Purge search HTML/API front cache only after search artifacts are fresh. */
 async function purgeSearchFrontCache(): Promise<boolean> {
 	return purgeWorkersCache({ tags: [tags.listSearch] });
 }
 
 async function syncSearchArtifactsAfterDelete(c: Context<ApiEnv>, filename: string): Promise<boolean> {
-	const results = await Promise.allSettled([
-		markSpeechDeletedInSearch(c.env.SPEECH_CACHE, filename),
-		syncSearchStats(c)
-	]);
+	const results = await Promise.allSettled([markSpeechDeletedInSearch(c.env.SPEECH_CACHE, filename), syncSearchStats(c)]);
 	let ok = true;
 	for (const result of results) {
 		if (result.status === 'rejected') {
@@ -701,7 +395,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 	const corsHeaders = getCorsHeaders(origin);
 	const corsHeadersWithMethods = {
 		...corsHeaders,
-		'Access-Control-Allow-Methods': corsMethods
+		'Access-Control-Allow-Methods': corsMethods,
 	};
 
 	try {
@@ -709,7 +403,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 		const authorized = await isAuthorizedFromHeader(
 			c.req.header('Authorization'),
 			c.env.AUDREYT_TRANSCRIPT_TOKEN,
-			c.env.BESTIAN_TRANSCRIPT_TOKEN
+			c.env.BESTIAN_TRANSCRIPT_TOKEN,
 		);
 		if (!authorized) {
 			return c.text('Forbidden', 400, corsHeadersWithMethods);
@@ -746,95 +440,93 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			}
 
 			// 先查講者與段落 ID（刪除後 invalidate 仍需清舊 /speech/:id 快取）
-				const linkedSpeakers = await withRetry(() => c.env.DB.prepare(
-					'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
-				)
+			const linkedSpeakers = await withRetry(() =>
+				c.env.DB.prepare('SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?')
 					.bind(filename)
-					.all<{ speaker_route_pathname: string }>());
-				const speakerRoutePathnames = Array.from(
-					new Set((linkedSpeakers.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
+					.all<{ speaker_route_pathname: string }>(),
+			);
+			const speakerRoutePathnames = Array.from(
+				new Set((linkedSpeakers.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean)),
+			);
+			const preexistingSectionRows = await withRetry(() =>
+				c.env.DB.prepare('SELECT section_id FROM speech_content WHERE filename = ?').bind(filename).all<{ section_id: number }>(),
+			);
+			const preexistingSectionIds = (preexistingSectionRows.results ?? []).map((row) => Number(row.section_id));
+
+			// 單一 batch：刪段落 + 刪關聯 + 刪索引 + 清孤兒講者（減少 D1 round-trips）
+			console.log('[upload_markdown] DELETE batch for:', filename);
+			const deleteBatch: Parameters<typeof c.env.DB.batch>[0] = [
+				c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ?').bind(filename),
+				c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
+				c.env.DB.prepare('DELETE FROM speech_index WHERE filename = ?').bind(filename),
+			];
+			// 用 NOT EXISTS 子查詢一次刪除孤兒講者，不需逐一查再刪
+			for (const routePathname of speakerRoutePathnames) {
+				deleteBatch.push(
+					c.env.DB.prepare(
+						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)',
+					).bind(routePathname, routePathname),
 				);
-				const preexistingSectionRows = await withRetry(() => c.env.DB.prepare(
-					'SELECT section_id FROM speech_content WHERE filename = ?'
-				)
-					.bind(filename)
-					.all<{ section_id: number }>());
-				const preexistingSectionIds = (preexistingSectionRows.results ?? []).map((row) => Number(row.section_id));
+			}
 
-				// 單一 batch：刪段落 + 刪關聯 + 刪索引 + 清孤兒講者（減少 D1 round-trips）
-				console.log('[upload_markdown] DELETE batch for:', filename);
-				const deleteBatch: Parameters<typeof c.env.DB.batch>[0] = [
-					c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ?').bind(filename),
-					c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
-					c.env.DB.prepare('DELETE FROM speech_index WHERE filename = ?').bind(filename),
-				];
-				// 用 NOT EXISTS 子查詢一次刪除孤兒講者，不需逐一查再刪
-				for (const routePathname of speakerRoutePathnames) {
-					deleteBatch.push(
-						c.env.DB.prepare(
-							'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
-						).bind(routePathname, routePathname)
-					);
-				}
+			const batchResults = await withRetry(() => c.env.DB.batch(deleteBatch));
 
-				const batchResults = await withRetry(() => c.env.DB.batch(deleteBatch));
+			const sectionsDeleted = batchResults[0]?.meta?.changes ?? 0;
+			const relationsDeleted = batchResults[1]?.meta?.changes ?? 0;
+			const speechDeleted = batchResults[2]?.meta?.changes ?? 0;
+			let speakersDeleted = 0;
+			for (let i = 3; i < batchResults.length; i++) {
+				speakersDeleted += batchResults[i]?.meta?.changes ?? 0;
+			}
 
-				const sectionsDeleted = batchResults[0]?.meta?.changes ?? 0;
-				const relationsDeleted = batchResults[1]?.meta?.changes ?? 0;
-				const speechDeleted = batchResults[2]?.meta?.changes ?? 0;
-				let speakersDeleted = 0;
-				for (let i = 3; i < batchResults.length; i++) {
-					speakersDeleted += batchResults[i]?.meta?.changes ?? 0;
-				}
-
-				if (sectionsDeleted === 0 && relationsDeleted === 0 && speechDeleted === 0) {
-					return c.json(
-						{
-							success: false,
-							message: `No records found for filename: ${filename}`,
-							deleted: { sections: 0, relations: 0, speakers: 0, speech: 0 }
-						},
-						404,
-						corsHeadersWithMethods
-					);
-				}
-
-				const [cachePurge, searchSync] = await Promise.all([
-					Promise.all([
-						invalidateSpeechCaches(c, filename, preexistingSectionIds),
-						invalidateSpeakerCaches(c, speakerRoutePathnames),
-						invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
-					]).then((parts) => parts.every(Boolean)),
-					syncSearchArtifactsAfterDelete(c, filename),
-				]);
-				// Only after search artifacts are fresh: evict /search/ and /api/search.json front cache.
-				const searchFrontPurge = searchSync ? await purgeSearchFrontCache() : false;
-				const searchFresh = searchSync && searchFrontPurge;
-				if (!cachePurge || !searchFresh) {
-					console.error('[upload_markdown] DELETE post-commit invalidation incomplete', {
-						filename,
-						cachePurge,
-						searchSync,
-						searchFrontPurge
-					});
-				}
-
+			if (sectionsDeleted === 0 && relationsDeleted === 0 && speechDeleted === 0) {
 				return c.json(
 					{
-						success: true,
-						cachePurge,
-						searchSync: searchFresh,
-						message: `Successfully deleted ${filename}`,
-						deleted: {
-							sections: sectionsDeleted,
-							relations: relationsDeleted,
-							speakers: speakersDeleted,
-							speech: speechDeleted
-						}
+						success: false,
+						message: `No records found for filename: ${filename}`,
+						deleted: { sections: 0, relations: 0, speakers: 0, speech: 0 },
 					},
-					cachePurge && searchFresh ? 200 : 503,
-					corsHeadersWithMethods
+					404,
+					corsHeadersWithMethods,
 				);
+			}
+
+			const [cachePurge, searchSync] = await Promise.all([
+				Promise.all([
+					invalidateSpeechCaches(c, filename, preexistingSectionIds),
+					invalidateSpeakerCaches(c, speakerRoutePathnames),
+					invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
+				]).then((parts) => parts.every(Boolean)),
+				syncSearchArtifactsAfterDelete(c, filename),
+			]);
+			// Only after search artifacts are fresh: evict /search/ and /api/search.json front cache.
+			const searchFrontPurge = searchSync ? await purgeSearchFrontCache() : false;
+			const searchFresh = searchSync && searchFrontPurge;
+			if (!cachePurge || !searchFresh) {
+				console.error('[upload_markdown] DELETE post-commit invalidation incomplete', {
+					filename,
+					cachePurge,
+					searchSync,
+					searchFrontPurge,
+				});
+			}
+
+			return c.json(
+				{
+					success: true,
+					cachePurge,
+					searchSync: searchFresh,
+					message: `Successfully deleted ${filename}`,
+					deleted: {
+						sections: sectionsDeleted,
+						relations: relationsDeleted,
+						speakers: speakersDeleted,
+						speech: speechDeleted,
+					},
+				},
+				cachePurge && searchFresh ? 200 : 503,
+				corsHeadersWithMethods,
+			);
 		} else if (method === 'POST') {
 			// POST：新增一筆演講。寫入 speech_index、speakers、speech_speakers、speech_content（段落）
 			let body: { filename?: string; markdown?: string; alternate_filename?: string };
@@ -861,11 +553,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const incomingTitle = firstLine.replace(/^#\s*/, '');
 
 			// 冪等：若 speech_index 已有此 filename 則先刪除舊資料再重新寫入
-			let existing = await withRetry(() => c.env.DB.prepare(
-				'SELECT filename, display_name FROM speech_index WHERE filename = ?'
-			)
-				.bind(filename)
-				.first<{ filename: string; display_name: string }>());
+			let existing = await withRetry(() =>
+				c.env.DB.prepare('SELECT filename, display_name FROM speech_index WHERE filename = ?')
+					.bind(filename)
+					.first<{ filename: string; display_name: string }>(),
+			);
 
 			if (!existing) {
 				// 若 filename 已被合併到 canonical，改 POST 到 canonical，避免重新生出重複列
@@ -873,11 +565,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				if (canonicalFilename) {
 					console.log('[upload_markdown] POST redirect:', { from: filename, to: canonicalFilename });
 					filename = canonicalFilename;
-					existing = await withRetry(() => c.env.DB.prepare(
-						'SELECT filename, display_name FROM speech_index WHERE filename = ?'
-					)
-						.bind(filename)
-						.first<{ filename: string; display_name: string }>());
+					existing = await withRetry(() =>
+						c.env.DB.prepare('SELECT filename, display_name FROM speech_index WHERE filename = ?')
+							.bind(filename)
+							.first<{ filename: string; display_name: string }>(),
+					);
 				}
 			}
 
@@ -888,33 +580,35 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				const resistantKey = collisionResistantKey(raw_filename.trim());
 				if (resistantKey !== filename) {
 					console.warn(
-						`[upload_markdown] POST key collision on "${filename}" (existing "${existing.display_name}" != incoming "${incomingTitle}"); using "${resistantKey}"`
+						`[upload_markdown] POST key collision on "${filename}" (existing "${existing.display_name}" != incoming "${incomingTitle}"); using "${resistantKey}"`,
 					);
 					filename = resistantKey;
-					existing = await withRetry(() => c.env.DB.prepare(
-						'SELECT filename, display_name FROM speech_index WHERE filename = ?'
-					)
-						.bind(filename)
-						.first<{ filename: string; display_name: string }>());
+					existing = await withRetry(() =>
+						c.env.DB.prepare('SELECT filename, display_name FROM speech_index WHERE filename = ?')
+							.bind(filename)
+							.first<{ filename: string; display_name: string }>(),
+					);
 				}
 			}
 
 			let priorSpeakerRoutePathnames: string[] = [];
 			if (existing) {
 				console.log('[upload_markdown] POST speech_index 已存在，先刪除舊資料:', filename);
-				const priorSpeakerRows = await withRetry(() => c.env.DB.prepare(
-					'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
-				)
-					.bind(filename)
-					.all<{ speaker_route_pathname: string }>());
-				priorSpeakerRoutePathnames = Array.from(
-					new Set((priorSpeakerRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
+				const priorSpeakerRows = await withRetry(() =>
+					c.env.DB.prepare('SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?')
+						.bind(filename)
+						.all<{ speaker_route_pathname: string }>(),
 				);
-				await withRetry(() => c.env.DB.batch([
-					c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ?').bind(filename),
-					c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
-					c.env.DB.prepare('DELETE FROM speech_index WHERE filename = ?').bind(filename),
-				]));
+				priorSpeakerRoutePathnames = Array.from(
+					new Set((priorSpeakerRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean)),
+				);
+				await withRetry(() =>
+					c.env.DB.batch([
+						c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ?').bind(filename),
+						c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename),
+						c.env.DB.prepare('DELETE FROM speech_index WHERE filename = ?').bind(filename),
+					]),
+				);
 			}
 
 			const display_name = incomingTitle || filename;
@@ -935,7 +629,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					previous_section_id,
 					next_section_id,
 					section_speaker: section.speaker,
-					section_content: section.section_content
+					section_content: section.section_content,
 				};
 			});
 
@@ -944,56 +638,51 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			metaBatch.push(
 				c.env.DB.prepare(
-					'INSERT INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES (?, ?, 0, ?, ?)'
-				).bind(filename, display_name, '', '')
+					'INSERT INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES (?, ?, 0, ?, ?)',
+				).bind(filename, display_name, '', ''),
 			);
 
 			// Relations and speaker rows come only from speakers assigned to final sections.
 			// Marker-only names without a section must not appear on /speakers.
 			const usedSpeakerRoutePathnames = Array.from(
-				new Set(
-					normalized
-						.map((section) => section.section_speaker)
-						.filter((value): value is string => Boolean(value && value.trim()))
-				)
+				new Set(normalized.map((section) => section.section_speaker).filter((value): value is string => Boolean(value && value.trim()))),
 			);
 			for (const routePathname of usedSpeakerRoutePathnames) {
 				const speakerName = decodeURIComponent(routePathname);
 				metaBatch.push(
 					c.env.DB.prepare(
-						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
-					).bind(routePathname, speakerName)
+						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING',
+					).bind(routePathname, speakerName),
 				);
 				metaBatch.push(
-					c.env.DB.prepare(
-						'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
-					).bind(filename, routePathname)
+					c.env.DB.prepare('INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)').bind(
+						filename,
+						routePathname,
+					),
 				);
 			}
 			// Drop orphan speaker rows after replace/reassign (prior + marker-only, not used on sections).
-			const orphanCandidates = Array.from(
-				new Set([...priorSpeakerRoutePathnames, ...speakerRoutePathnames])
-			).filter((routePathname) => !usedSpeakerRoutePathnames.includes(routePathname));
+			const orphanCandidates = Array.from(new Set([...priorSpeakerRoutePathnames, ...speakerRoutePathnames])).filter(
+				(routePathname) => !usedSpeakerRoutePathnames.includes(routePathname),
+			);
 			for (const routePathname of orphanCandidates) {
 				metaBatch.push(
 					c.env.DB.prepare(
-						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
-					).bind(routePathname, routePathname)
+						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)',
+					).bind(routePathname, routePathname),
 				);
 			}
 
 			await withRetry(() => c.env.DB.batch(metaBatch));
 
 			// 1b. 雙向語言連結：若指定 alternate_filename，兩邊互指
-			const altFilename = body.alternate_filename
-				? transformFilename(body.alternate_filename.trim())
-				: null;
+			const altFilename = body.alternate_filename ? transformFilename(body.alternate_filename.trim()) : null;
 			if (altFilename) {
 				await withRetry(() =>
 					c.env.DB.batch([
 						c.env.DB.prepare('UPDATE speech_index SET alternate_filename = ? WHERE filename = ?').bind(altFilename, filename),
 						c.env.DB.prepare('UPDATE speech_index SET alternate_filename = ? WHERE filename = ?').bind(filename, altFilename),
-					])
+					]),
 				);
 			}
 
@@ -1001,7 +690,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const ROWS_PER_INSERT = 10;
 			const INSERTS_PER_BATCH = 5; // 5 statements × 10 rows = 50 rows per batch
 			const ROWS_PER_BATCH = ROWS_PER_INSERT * INSERTS_PER_BATCH;
-			const cols = 'filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content';
+			const cols =
+				'filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content';
 
 			for (let batchStart = 0; batchStart < normalized.length; batchStart += ROWS_PER_BATCH) {
 				const batchSlice = normalized.slice(batchStart, batchStart + ROWS_PER_BATCH);
@@ -1021,7 +711,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							section.previous_section_id,
 							section.next_section_id,
 							section.section_speaker,
-							section.section_content
+							section.section_content,
 						);
 					}
 					sectionBatch.push(c.env.DB.prepare(sql).bind(...binds));
@@ -1046,7 +736,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					filename,
 					cachePurge,
 					searchSync,
-					searchFrontPurge
+					searchFrontPurge,
 				});
 			}
 
@@ -1057,10 +747,10 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					searchSync: searchFresh,
 					filename,
 					sectionsCount: normalized.length,
-					...(altFilename ? { alternate_filename: altFilename } : {})
+					...(altFilename ? { alternate_filename: altFilename } : {}),
 				},
 				cachePurge && searchFresh ? 200 : 503,
-				corsHeadersWithMethods
+				corsHeadersWithMethods,
 			);
 		} else if (method === 'PATCH') {
 			// PATCH：更新既有演講。以 LCS 對齊舊/新段落，更新/插入/刪除 speech_content，重建講者關聯
@@ -1084,22 +774,22 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const markdown = body.markdown;
 			const patchFirstLine = markdown.split('\n')[0]?.trim() ?? '';
 			const incomingTitle = patchFirstLine.replace(/^#\s*/, '');
-			let existingSpeech = await withRetry(() => c.env.DB.prepare(
-				'SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?'
-			)
-				.bind(filename)
-				.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>());
+			let existingSpeech = await withRetry(() =>
+				c.env.DB.prepare('SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?')
+					.bind(filename)
+					.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>(),
+			);
 			if (!existingSpeech) {
 				// 若 filename 已被合併到 canonical，改 PATCH 到 canonical，避免重新生出重複列
 				const canonicalFilename = await lookupRedirectTarget(c, filename);
 				if (canonicalFilename) {
 					console.log('[upload_markdown] PATCH redirect:', { from: filename, to: canonicalFilename });
 					filename = canonicalFilename;
-					existingSpeech = await withRetry(() => c.env.DB.prepare(
-						'SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?'
-					)
-						.bind(filename)
-						.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>());
+					existingSpeech = await withRetry(() =>
+						c.env.DB.prepare('SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?')
+							.bind(filename)
+							.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>(),
+					);
 				}
 			}
 			// CLOBBER GUARD (mirrors POST): if this (possibly truncated) key holds a
@@ -1110,21 +800,25 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				const resistantKey = collisionResistantKey(rawFilename.trim());
 				if (resistantKey !== filename) {
 					console.warn(
-						`[upload_markdown] PATCH key collision on "${filename}" (existing "${existingSpeech.display_name}" != incoming "${incomingTitle}"); using "${resistantKey}"`
+						`[upload_markdown] PATCH key collision on "${filename}" (existing "${existingSpeech.display_name}" != incoming "${incomingTitle}"); using "${resistantKey}"`,
 					);
 					filename = resistantKey;
-					existingSpeech = await withRetry(() => c.env.DB.prepare(
-						'SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?'
-					)
-						.bind(filename)
-						.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>());
+					existingSpeech = await withRetry(() =>
+						c.env.DB.prepare('SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?')
+							.bind(filename)
+							.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>(),
+					);
 				}
 			}
 			if (!existingSpeech) {
 				// Upsert: auto-create speech_index entry so PATCH proceeds as an insert
-				await withRetry(() => c.env.DB.prepare(
-					'INSERT INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES (?, ?, 0, ?, ?)'
-				).bind(filename, filename, '', '').run());
+				await withRetry(() =>
+					c.env.DB.prepare(
+						'INSERT INTO speech_index (filename, display_name, isNested, nest_filenames, nest_display_names) VALUES (?, ?, 0, ?, ?)',
+					)
+						.bind(filename, filename, '', '')
+						.run(),
+				);
 			}
 			const hasAlternateFilename = Object.prototype.hasOwnProperty.call(body, 'alternate_filename');
 			let nextAlternateFilename: string | null | undefined = undefined;
@@ -1146,34 +840,35 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				typeof existingSpeech?.alternate_filename === 'string' && existingSpeech.alternate_filename.trim()
 					? transformFilename(existingSpeech.alternate_filename.trim())
 					: null;
-			const desiredAlternateFilename =
-				nextAlternateFilename === undefined ? currentAlternateFilename : nextAlternateFilename;
+			const desiredAlternateFilename = nextAlternateFilename === undefined ? currentAlternateFilename : nextAlternateFilename;
 
 			const displayName = incomingTitle || filename;
-			const oldSectionsRaw = await withRetry(() => c.env.DB.prepare(
-				`SELECT section_id, previous_section_id, next_section_id, section_speaker, section_content
+			const oldSectionsRaw = await withRetry(() =>
+				c.env.DB.prepare(
+					`SELECT section_id, previous_section_id, next_section_id, section_speaker, section_content
 				 FROM speech_content
 				 WHERE filename = ?
-				 ORDER BY section_id ASC`
-			)
-				.bind(filename)
-				.all<ExistingSection>());
+				 ORDER BY section_id ASC`,
+				)
+					.bind(filename)
+					.all<ExistingSection>(),
+			);
 			const oldSections = orderSectionsByLinks(
 				(oldSectionsRaw.results ?? []).map((row) => ({
 					section_id: Number(row.section_id),
 					previous_section_id: row.previous_section_id != null ? Number(row.previous_section_id) : null,
 					next_section_id: row.next_section_id != null ? Number(row.next_section_id) : null,
 					section_speaker: row.section_speaker ?? null,
-					section_content: row.section_content ?? ''
-				}))
+					section_content: row.section_content ?? '',
+				})),
 			);
-			const oldSpeakerRows = await withRetry(() => c.env.DB.prepare(
-				'SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?'
-			)
-				.bind(filename)
-				.all<{ speaker_route_pathname: string }>());
+			const oldSpeakerRows = await withRetry(() =>
+				c.env.DB.prepare('SELECT speaker_route_pathname FROM speech_speakers WHERE speech_filename = ?')
+					.bind(filename)
+					.all<{ speaker_route_pathname: string }>(),
+			);
 			const oldSpeakerRoutePathnames = Array.from(
-				new Set((oldSpeakerRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean))
+				new Set((oldSpeakerRows.results ?? []).map((row) => row.speaker_route_pathname).filter(Boolean)),
 			);
 
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
@@ -1202,20 +897,23 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 
 			// 1. 更新 display_name
 			batchStatements.push(
-				c.env.DB.prepare('UPDATE speech_index SET display_name = ?, alternate_filename = ? WHERE filename = ?')
-					.bind(displayName, desiredAlternateFilename, filename)
+				c.env.DB.prepare('UPDATE speech_index SET display_name = ?, alternate_filename = ? WHERE filename = ?').bind(
+					displayName,
+					desiredAlternateFilename,
+					filename,
+				),
 			);
 			if (hasAlternateFilename && currentAlternateFilename && currentAlternateFilename !== desiredAlternateFilename) {
 				batchStatements.push(
-					c.env.DB.prepare(
-						'UPDATE speech_index SET alternate_filename = NULL WHERE filename = ? AND alternate_filename = ?'
-					).bind(currentAlternateFilename, filename)
+					c.env.DB.prepare('UPDATE speech_index SET alternate_filename = NULL WHERE filename = ? AND alternate_filename = ?').bind(
+						currentAlternateFilename,
+						filename,
+					),
 				);
 			}
 			if (hasAlternateFilename && desiredAlternateFilename) {
 				batchStatements.push(
-					c.env.DB.prepare('UPDATE speech_index SET alternate_filename = ? WHERE filename = ?')
-						.bind(filename, desiredAlternateFilename)
+					c.env.DB.prepare('UPDATE speech_index SET alternate_filename = ? WHERE filename = ?').bind(filename, desiredAlternateFilename),
 				);
 			}
 
@@ -1233,21 +931,21 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 								 next_section_id = ?,
 								 section_speaker = ?,
 								 section_content = ?
-							 WHERE filename = ? AND section_id = ?`
+							 WHERE filename = ? AND section_id = ?`,
 						).bind(
 							section.previous_section_id,
 							section.next_section_id,
 							section.section_speaker,
 							section.section_content,
 							filename,
-							section.section_id
-						)
+							section.section_id,
+						),
 					);
 				} else {
 					// 此 section_id 為新分配 → INSERT
 					batchStatements.push(
 						c.env.DB.prepare(
-							'INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+							'INSERT INTO speech_content (filename, nest_filename, nest_display_name, section_id, previous_section_id, next_section_id, section_speaker, section_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 						).bind(
 							filename,
 							null,
@@ -1256,8 +954,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							section.previous_section_id,
 							section.next_section_id,
 							section.section_speaker,
-							section.section_content
-						)
+							section.section_content,
+						),
 					);
 				}
 			}
@@ -1266,49 +964,43 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			for (const oldSection of oldSections) {
 				if (!finalSectionIds.has(oldSection.section_id)) {
 					batchStatements.push(
-						c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ? AND section_id = ?')
-							.bind(filename, oldSection.section_id)
+						c.env.DB.prepare('DELETE FROM speech_content WHERE filename = ? AND section_id = ?').bind(filename, oldSection.section_id),
 					);
 				}
 			}
 
 			// 5. 重建演講-講者關聯：只用「段落上實際出現的講者」，單一 batch 完成（無第二階段對帳）
 			const usedSpeakerRoutePathnames = Array.from(
-				new Set(
-					normalized
-						.map((section) => section.section_speaker)
-						.filter((value): value is string => Boolean(value && value.trim()))
-				)
+				new Set(normalized.map((section) => section.section_speaker).filter((value): value is string => Boolean(value && value.trim()))),
 			);
 			// Upsert speakers that appear on final sections only
 			for (const routePathname of usedSpeakerRoutePathnames) {
 				const speakerName = decodeURIComponent(routePathname);
 				batchStatements.push(
 					c.env.DB.prepare(
-						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING'
-					).bind(routePathname, speakerName)
+						'INSERT INTO speakers (route_pathname, name, photoURL) VALUES (?, ?, NULL) ON CONFLICT(route_pathname) DO NOTHING',
+					).bind(routePathname, speakerName),
 				);
 			}
-			batchStatements.push(
-				c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename)
-			);
+			batchStatements.push(c.env.DB.prepare('DELETE FROM speech_speakers WHERE speech_filename = ?').bind(filename));
 			for (const routePathname of usedSpeakerRoutePathnames) {
 				batchStatements.push(
-					c.env.DB.prepare(
-						'INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)'
-					).bind(filename, routePathname)
+					c.env.DB.prepare('INSERT OR IGNORE INTO speech_speakers (speech_filename, speaker_route_pathname) VALUES (?, ?)').bind(
+						filename,
+						routePathname,
+					),
 				);
 			}
 
 			// 6. 清理孤兒講者（同一 batch：INSERT 後 NOT EXISTS 在 SQLite batch 內按序可見）
 			const finalImpactedSpeakers = Array.from(
-				new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames, ...usedSpeakerRoutePathnames])
+				new Set([...oldSpeakerRoutePathnames, ...newSpeakerRoutePathnames, ...usedSpeakerRoutePathnames]),
 			);
 			for (const routePathname of finalImpactedSpeakers) {
 				batchStatements.push(
 					c.env.DB.prepare(
-						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)'
-					).bind(routePathname, routePathname)
+						'DELETE FROM speakers WHERE route_pathname = ? AND NOT EXISTS (SELECT 1 FROM speech_speakers WHERE speaker_route_pathname = ?)',
+					).bind(routePathname, routePathname),
 				);
 			}
 
@@ -1321,10 +1013,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					invalidateSpeechCaches(c, filename, preexistingSectionIds),
 					...Array.from(
 						new Set(
-							[currentAlternateFilename, desiredAlternateFilename].filter(
-								(value): value is string => Boolean(value && value !== filename)
-							)
-						)
+							[currentAlternateFilename, desiredAlternateFilename].filter((value): value is string => Boolean(value && value !== filename)),
+						),
 					).map((alternateFilename) => invalidateSpeechCaches(c, alternateFilename)),
 					invalidateSpeakerCaches(c, finalImpactedSpeakers),
 					invalidateListPageCaches(c, { home: true, speeches: true, speakers: true }),
@@ -1338,7 +1028,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					filename,
 					cachePurge,
 					searchSync,
-					searchFrontPurge
+					searchFrontPurge,
 				});
 			}
 
@@ -1352,11 +1042,11 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					updatedCount: normalized.filter((section) => oldSectionIds.has(section.section_id)).length,
 					deletedCount: oldSections.filter((section) => !finalSectionIds.has(section.section_id)).length,
 					cachePurge,
-					searchSync: searchFresh
+					searchSync: searchFresh,
 				},
 				// 503 when D1 wrote but cache and/or search artifacts incomplete
 				cachePurge && searchFresh ? 200 : 503,
-				corsHeadersWithMethods
+				corsHeadersWithMethods,
 			);
 		} else {
 			console.error('[upload_markdown] method not supported', method);
@@ -1365,10 +1055,6 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		console.error('[upload_markdown] error', error);
-		return c.json(
-			{ error: 'Service temporarily unavailable', detail: message },
-			503,
-			{ ...corsHeadersWithMethods, 'Retry-After': '2' }
-		);
+		return c.json({ error: 'Service temporarily unavailable', detail: message }, 503, { ...corsHeadersWithMethods, 'Retry-After': '2' });
 	}
 }

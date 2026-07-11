@@ -3,20 +3,6 @@ import { getCorsHeaders } from './cors';
 import type { ApiEnv } from './types';
 import { normalizeSections } from '../utils/sectionUtils';
 
-type Section = {
-	filename: string;
-	nest_filename: string | null;
-	nest_display_name: string | null;
-	section_id: number;
-	previous_section_id: number | null;
-	next_section_id: number | null;
-	section_speaker: string | null;
-	section_content: string;
-	display_name: string;
-	photoURL: string | null;
-	name: string | null;
-};
-
 export async function speechContent(c: Context<ApiEnv>) {
 	const origin = c.req.header('Origin') ?? null;
 	const corsHeaders = getCorsHeaders(origin);
@@ -57,7 +43,9 @@ ORDER BY sc.section_id ASC`;
 
 		const bindings: Array<string> = nestFilename ? [filename, nestFilename] : [filename];
 
-		const result = await c.env.DB.prepare(baseQuery).bind(...bindings).all();
+		const result = await c.env.DB.prepare(baseQuery)
+			.bind(...bindings)
+			.all();
 
 		if (!result.success) {
 			return c.json({ error: 'Database query failed' }, 500, corsHeaders);
@@ -76,7 +64,7 @@ ORDER BY sc.section_id ASC`;
 				display_name: row.display_name,
 				photoURL: row.photoURL,
 				name: row.name,
-			}))
+			})),
 		);
 
 		if (speechRows.length === 0) {
@@ -89,4 +77,3 @@ ORDER BY sc.section_id ASC`;
 		return c.json({ error: 'Internal server error' }, 500, corsHeaders);
 	}
 }
-

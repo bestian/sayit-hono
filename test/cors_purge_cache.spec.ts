@@ -25,16 +25,16 @@ function createSimpleEnv() {
 					httpEtag: null,
 					httpMetadata: {
 						cacheControl: entry.cacheControl,
-						contentType: entry.contentType
+						contentType: entry.contentType,
 					},
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
 				r2Store.set(key, {
 					body,
 					cacheControl: options?.httpMetadata?.cacheControl,
-					contentType: options?.httpMetadata?.contentType
+					contentType: options?.httpMetadata?.contentType,
 				});
 			},
 			delete: async (keys: string | string[]) => {
@@ -51,17 +51,17 @@ function createSimpleEnv() {
 				return {
 					objects: slice.map((key) => ({ key })),
 					truncated: nextCursor < matchingKeys.length,
-					cursor: `${nextCursor}`
+					cursor: `${nextCursor}`,
 				};
-			}
+			},
 		},
 		DB: {
 			prepare: () => ({
 				bind: () => ({ first: async () => null, all: async () => ({ success: true, results: [] }) }),
 				first: async () => null,
-				all: async () => ({ success: true, results: [] })
-			})
-		}
+				all: async () => ({ success: true, results: [] }),
+			}),
+		},
 	};
 }
 
@@ -77,7 +77,7 @@ describe('CORS preflight on /api/*', () => {
 		const env = createSimpleEnv();
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'OPTIONS',
-			headers: { Origin: 'https://archive.tw' }
+			headers: { Origin: 'https://archive.tw' },
 		});
 		expect(res.status).toBe(200);
 		expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://archive.tw');
@@ -90,7 +90,7 @@ describe('CORS preflight on /api/*', () => {
 		const env = createSimpleEnv();
 		const { res } = await request('/api/speech_index.json', env, {
 			method: 'OPTIONS',
-			headers: { Origin: 'http://localhost:5173' }
+			headers: { Origin: 'http://localhost:5173' },
 		});
 		expect(res.status).toBe(200);
 		expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
@@ -100,7 +100,7 @@ describe('CORS preflight on /api/*', () => {
 		const env = createSimpleEnv();
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'OPTIONS',
-			headers: { Origin: 'https://evil.example' }
+			headers: { Origin: 'https://evil.example' },
 		});
 		expect(res.status).toBe(403);
 	});
@@ -121,7 +121,7 @@ describe('POST /api/purge_cache', () => {
 
 		const { res } = await request('/api/purge_cache', env, {
 			method: 'POST',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 
 		expect(res.status).toBe(200);
@@ -137,7 +137,7 @@ describe('POST /api/purge_cache', () => {
 
 		const { res } = await request('/api/purge_cache', env, {
 			method: 'POST',
-			headers: { Authorization: 'Bearer token-bestian' }
+			headers: { Authorization: 'Bearer token-bestian' },
 		});
 		expect(res.status).toBe(200);
 	});
@@ -153,7 +153,7 @@ describe('POST /api/purge_cache', () => {
 		env.__r2Store.set('keep-me', { body: 'x' });
 		const { res } = await request('/api/purge_cache?front_only=1', env, {
 			method: 'POST',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as { frontOnly: boolean; purged: boolean };
@@ -169,7 +169,7 @@ describe('POST /api/purge_cache', () => {
 		const env = createSimpleEnv();
 		const { res } = await request('/api/purge_cache?front_only=1', env, {
 			method: 'POST',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 		expect(res.status).toBe(503);
 		const body = (await res.json()) as { frontOnly: boolean; purged: boolean };
@@ -185,7 +185,7 @@ describe('Read route cache behavior', () => {
 		env.__r2Store.set(cacheKey, {
 			body: '<!doctype html><title>SEEDED</title><body>cached response</body>',
 			cacheControl: 'public, max-age=3600',
-			contentType: 'text/html; charset=utf-8'
+			contentType: 'text/html; charset=utf-8',
 		});
 
 		const { res } = await request('/cached-speech', env);
@@ -201,7 +201,7 @@ describe('Read route cache behavior', () => {
 		env.__r2Store.set(cacheKey, {
 			body: '<!doctype html><title>SPEECHES-SEEDED</title><body>speeches cache</body>',
 			cacheControl: 'public, max-age=3600',
-			contentType: 'text/html; charset=utf-8'
+			contentType: 'text/html; charset=utf-8',
 		});
 
 		const { res } = await request('/speeches/', env);
@@ -210,7 +210,7 @@ describe('Read route cache behavior', () => {
 		expect(html).not.toContain('SPEECHES-SEEDED');
 		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
-			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`),
 		);
 		expect(speechCacheKeys).toHaveLength(1);
 	});

@@ -145,11 +145,7 @@ function backgroundLayers(): SatoriElement[] {
 	];
 }
 
-export function buildLanyangSpeechElement(
-	title: string,
-	date: string | null,
-	speakers: string[]
-): SatoriElement {
+export function buildLanyangSpeechElement(title: string, date: string | null, speakers: string[]): SatoriElement {
 	const speakerText = speakers.length > 0 ? speakers.join(' · ') : '';
 	const fontSize = title.length > 20 ? (title.length > 35 ? 48 : 56) : 72;
 
@@ -240,11 +236,7 @@ export function buildLanyangSpeechElement(
 	};
 }
 
-export async function renderLanyangSpeechPng(
-	filename: string,
-	displayName: string,
-	speakers: string[]
-): Promise<Uint8Array> {
+export async function renderLanyangSpeechPng(filename: string, displayName: string, speakers: string[]): Promise<Uint8Array> {
 	const date = extractDateFromFilename(filename);
 	const title = titleFromDisplayName(displayName, date);
 	const element = buildLanyangSpeechElement(title, date, speakers);

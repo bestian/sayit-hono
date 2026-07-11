@@ -8,29 +8,31 @@ import { handleOgSpeechImage, type OgLoader } from '../src/api/og_routes';
 import type { Context } from 'hono';
 import type { ApiEnv } from '../src/api/types';
 
-function makeCtx(overrides: Partial<{
-	method: string;
-	url: string;
-	path: string;
-	param: string | undefined;
-	origin: string | null;
-	resolver: (sql: string, args: unknown[]) => { success?: boolean; results: any[] };
-	sectionRow: any;
-}> = {}) {
+function makeCtx(
+	overrides: Partial<{
+		method: string;
+		url: string;
+		path: string;
+		param: string | undefined;
+		origin: string | null;
+		resolver: (sql: string, args: unknown[]) => { success?: boolean; results: any[] };
+		sectionRow: any;
+	}> = {},
+) {
 	const resolver = overrides.resolver ?? (() => ({ success: true, results: [] }));
 	return {
 		req: {
 			method: overrides.method ?? 'GET',
 			url: overrides.url ?? 'https://example.com/api/an/demo.an',
 			path: overrides.path ?? '/api/an/demo.an',
-			header: (k: string) => (k === 'Origin' ? overrides.origin ?? null : null),
-			param: (_: string) => overrides.param
+			header: (k: string) => (k === 'Origin' ? (overrides.origin ?? null) : null),
+			param: (_: string) => overrides.param,
 		},
 		env: {
 			SPEECH_CACHE: {
 				get: async () => null,
 				put: async () => {},
-				delete: async () => true
+				delete: async () => true,
 			},
 			ASSETS: { fetch: () => new Response('nf', { status: 404 }) } as any,
 			DB: {
@@ -40,20 +42,19 @@ function makeCtx(overrides: Partial<{
 						all: async () => {
 							const r = resolver(sql, args);
 							return { success: r.success ?? true, results: r.results };
-						}
+						},
 					});
 					return {
 						bind: (...args: unknown[]) => run(args),
 						first: async () => run([]).first(),
-						all: async () => run([]).all()
+						all: async () => run([]).all(),
 					};
-				}
-			}
+				},
+			},
 		},
-		text: (body: string, status = 200, headers: Record<string, string> = {}) =>
-			new Response(body, { status, headers }),
+		text: (body: string, status = 200, headers: Record<string, string> = {}) => new Response(body, { status, headers }),
 		json: (body: any, status = 200, headers: Record<string, string> = {}) =>
-			new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } })
+			new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }),
 	} as unknown as Context<ApiEnv>;
 }
 
@@ -66,18 +67,20 @@ describe('an.ts parseContent branches via JSON-encoded string content', () => {
 					if (sql.includes('FROM sections WHERE section_id = ?')) {
 						return {
 							success: true,
-							results: [{
-								section_speaker: 'a',
-								section_content: '"hello world"',
-								display_name: 'Demo',
-								name: 'A'
-							}]
+							results: [
+								{
+									section_speaker: 'a',
+									section_content: '"hello world"',
+									display_name: 'Demo',
+									name: 'A',
+								},
+							],
 						};
 					}
 					return { success: true, results: [] };
-				}
+				},
 			}),
-			'42.an'
+			'42.an',
 		);
 		expect(out).toContain('hello world');
 		expect(out).not.toContain('"hello world"');
@@ -90,18 +93,20 @@ describe('an.ts parseContent branches via JSON-encoded string content', () => {
 					if (sql.includes('FROM sections WHERE section_id = ?')) {
 						return {
 							success: true,
-							results: [{
-								section_speaker: null,
-								section_content: null,
-								display_name: null,
-								name: null
-							}]
+							results: [
+								{
+									section_speaker: null,
+									section_content: null,
+									display_name: null,
+									name: null,
+								},
+							],
 						};
 					}
 					return { success: true, results: [] };
-				}
+				},
 			}),
-			'42.an'
+			'42.an',
 		);
 		expect(out).toContain('<p></p>');
 	});
@@ -136,47 +141,56 @@ describe('speechAn getSpeechObjectKey branches', () => {
 	});
 
 	it('decodes a valid URI-encoded path param when the route provides it', async () => {
-		const res = await speechAn(makeCtx({
-			param: '2026-demo.an',
-			path: '/api/an/2026-demo.an',
-			resolver: () => ({ success: true, results: [] })
-		}));
+		const res = await speechAn(
+			makeCtx({
+				param: '2026-demo.an',
+				path: '/api/an/2026-demo.an',
+				resolver: () => ({ success: true, results: [] }),
+			}),
+		);
 		expect(res.status).toBe(404);
 	});
 
 	it('resolves via path fallback when pathParam is missing and path is valid', async () => {
-		const res = await speechAn(makeCtx({
-			param: undefined,
-			path: '/api/an/2026-demo.an',
-			resolver: () => ({ success: true, results: [] })
-		}));
+		const res = await speechAn(
+			makeCtx({
+				param: undefined,
+				path: '/api/an/2026-demo.an',
+				resolver: () => ({ success: true, results: [] }),
+			}),
+		);
 		expect(res.status).toBe(404);
 	});
 
 	it('returns 404 when path fallback contains a malformed URI escape', async () => {
-		const res = await speechAn(makeCtx({
-			param: undefined,
-			path: '/api/an/%E0%A4%A.an',
-			resolver: () => ({ success: true, results: [] })
-		}));
+		const res = await speechAn(
+			makeCtx({
+				param: undefined,
+				path: '/api/an/%E0%A4%A.an',
+				resolver: () => ({ success: true, results: [] }),
+			}),
+		);
 		expect(res.status).toBe(404);
 	});
 });
 
 describe('serveAnByKey numeric head path Content-Length', () => {
 	it('sets Content-Length on HEAD for numeric section', async () => {
-		const res = await serveAnByKey(makeCtx({
-			method: 'HEAD',
-			resolver: (sql, args) => {
-				if (sql.includes('FROM sections WHERE section_id = ?') && args[0] === 42) {
-					return {
-						success: true,
-						results: [{ section_speaker: 'a', section_content: 'Plain', display_name: 'Demo', name: 'A' }]
-					};
-				}
-				return { success: true, results: [] };
-			}
-		}), '42.an');
+		const res = await serveAnByKey(
+			makeCtx({
+				method: 'HEAD',
+				resolver: (sql, args) => {
+					if (sql.includes('FROM sections WHERE section_id = ?') && args[0] === 42) {
+						return {
+							success: true,
+							results: [{ section_speaker: 'a', section_content: 'Plain', display_name: 'Demo', name: 'A' }],
+						};
+					}
+					return { success: true, results: [] };
+				},
+			}),
+			'42.an',
+		);
 		expect(res.status).toBe(200);
 		expect(res.headers.get('Content-Length')).not.toBeNull();
 	});
@@ -190,15 +204,15 @@ describe('speaker_detail direct invocation', () => {
 				path: '/api/speaker_detail/',
 				header: () => null,
 				param: () => '',
-				query: () => null
+				query: () => null,
 			},
 			env: {
 				DB: {
-					prepare: () => ({ bind: () => ({ first: async () => null }), first: async () => null })
-				}
+					prepare: () => ({ bind: () => ({ first: async () => null }), first: async () => null }),
+				},
 			},
 			json: (body: any, status = 200, headers: Record<string, string> = {}) =>
-				new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } })
+				new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }),
 		} as unknown as Context<ApiEnv>);
 		expect(res.status).toBe(400);
 	});
@@ -211,13 +225,11 @@ describe('speechIndex direct invocation with null/array nest inputs', () => {
 				if (sql.includes('FROM speech_index ORDER BY id ASC')) {
 					return {
 						success: true,
-						results: [
-							{ filename: 'a', display_name: 'A', isNested: 0, nest_filenames: null, nest_display_names: undefined }
-						]
+						results: [{ filename: 'a', display_name: 'A', isNested: 0, nest_filenames: null, nest_display_names: undefined }],
 					};
 				}
 				return { success: true, results: [] };
-			}
+			},
 		});
 		const res = await speechIndex(ctx);
 		expect(res.status).toBe(200);
@@ -231,13 +243,11 @@ describe('speechIndex direct invocation with null/array nest inputs', () => {
 				if (sql.includes('FROM speech_index ORDER BY id ASC')) {
 					return {
 						success: true,
-						results: [
-							{ filename: 'b', display_name: 'B', isNested: 1, nest_filenames: ['n1', 'n2'], nest_display_names: ['D1', 'D2'] }
-						]
+						results: [{ filename: 'b', display_name: 'B', isNested: 1, nest_filenames: ['n1', 'n2'], nest_display_names: ['D1', 'D2'] }],
 					};
 				}
 				return { success: true, results: [] };
-			}
+			},
 		});
 		const res = await speechIndex(ctx);
 		expect(res.status).toBe(200);
@@ -260,7 +270,7 @@ describe('reorderSections prev-in-set skip branch', () => {
 	const mk = (id: number, prev: number | null, next: number | null): SectionLike => ({
 		section_id: id,
 		previous_section_id: prev,
-		next_section_id: next
+		next_section_id: next,
 	});
 
 	it('skips head search when a later section has prev already in set', () => {
@@ -282,7 +292,7 @@ describe('og_routes parseContent JSON-string branch', () => {
 				expect(quote).toBe('direct quote');
 				return generator();
 			},
-			generateOgImage: generator
+			generateOgImage: generator,
 		});
 		const ctx = makeCtx({
 			url: 'https://example.com/og/speech/42.png',
@@ -291,18 +301,20 @@ describe('og_routes parseContent JSON-string branch', () => {
 				if (sql.includes('FROM speech_content a') && args[0] === 42) {
 					return {
 						success: true,
-						results: [{
-							filename: '2026-demo',
-							section_speaker: 'a',
-							section_content: '"direct quote"',
-							display_name: 'Demo',
-							photoURL: null,
-							name: 'A'
-						}]
+						results: [
+							{
+								filename: '2026-demo',
+								section_speaker: 'a',
+								section_content: '"direct quote"',
+								display_name: 'Demo',
+								photoURL: null,
+								name: 'A',
+							},
+						],
 					};
 				}
 				return { success: true, results: [] };
-			}
+			},
 		});
 		const res = await handleOgSpeechImage(ctx, loader);
 		expect(res.status).toBe(200);

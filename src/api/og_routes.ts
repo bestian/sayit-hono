@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { ApiEnv } from './types';
+import { parseContent } from '../utils/textUtils';
 import { CACHE_KEY_VERSION } from '../cacheKeyVersion';
 
 export type OgGenerators = {
@@ -7,27 +8,12 @@ export type OgGenerators = {
 		quoteHtml: string,
 		speakerName: string | null,
 		speechTitle: string,
-		avatarDataUri: string | null
+		avatarDataUri: string | null,
 	) => Promise<Uint8Array>;
-	generateOgImage: (
-		env: { ASSETS: Fetcher },
-		filename: string,
-		displayName: string,
-		speakers: string[]
-	) => Promise<Uint8Array>;
+	generateOgImage: (env: { ASSETS: Fetcher }, filename: string, displayName: string, speakers: string[]) => Promise<Uint8Array>;
 };
 
 export type OgLoader = () => Promise<OgGenerators>;
-
-function parseContent(raw?: string | null): string {
-	if (!raw) return '';
-	try {
-		const parsed = JSON.parse(raw);
-		return typeof parsed === 'string' ? parsed : raw;
-	} catch {
-		return raw;
-	}
-}
 
 interface OgSectionResult {
 	filename: string;
@@ -50,15 +36,19 @@ async function loadSection(c: Context<ApiEnv>, sectionId: number): Promise<OgSec
 		FROM speech_content a
 		LEFT JOIN speech_index si ON a.filename = si.filename
 		LEFT JOIN speakers sp ON a.section_speaker = sp.route_pathname
-		WHERE a.section_id = ?`
-	).bind(sectionId).first() as Promise<OgSectionResult | null>;
+		WHERE a.section_id = ?`,
+	)
+		.bind(sectionId)
+		.first() as Promise<OgSectionResult | null>;
 }
 
 async function loadSpeechMeta(c: Context<ApiEnv>, filename: string) {
 	return c.env.DB.prepare(
 		`SELECT filename, display_name, isNested
-		 FROM speech_index WHERE filename = ?`
-	).bind(filename).first() as Promise<{ filename: string; display_name: string; isNested: number | boolean } | null>;
+		 FROM speech_index WHERE filename = ?`,
+	)
+		.bind(filename)
+		.first() as Promise<{ filename: string; display_name: string; isNested: number | boolean } | null>;
 }
 
 async function encodeAvatar(c: Context<ApiEnv>, photoURL: string): Promise<string | null> {
@@ -96,7 +86,7 @@ export async function handleOgSpeechImage(c: Context<ApiEnv>, loader: OgLoader) 
 		}
 		const headers: Record<string, string> = {
 			'Content-Type': 'image/png',
-			'Cache-Control': 'public, max-age=86400, s-maxage=86400'
+			'Cache-Control': 'public, max-age=86400, s-maxage=86400',
 		};
 		if (filename) {
 			headers['Cache-Tag'] = `speech:${encodeURIComponent(filename)}`;
@@ -128,7 +118,7 @@ export async function handleOgSpeechImage(c: Context<ApiEnv>, loader: OgLoader) 
 			headers: {
 				'Content-Type': 'image/png',
 				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-				'Cache-Tag': `speech:${encodeURIComponent(section.filename)}`
+				'Cache-Tag': `speech:${encodeURIComponent(section.filename)}`,
 			},
 		});
 	} catch (err) {
@@ -151,7 +141,7 @@ export async function handleOgImage(c: Context<ApiEnv>, loader: OgLoader) {
 			headers: {
 				'Content-Type': 'image/png',
 				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-				'Cache-Tag': `speech:${encodeURIComponent(filename)}`
+				'Cache-Tag': `speech:${encodeURIComponent(filename)}`,
 			},
 		});
 	}
@@ -168,8 +158,10 @@ export async function handleOgImage(c: Context<ApiEnv>, loader: OgLoader) {
 			 WHERE sc.filename = ? AND sp.name IS NOT NULL
 			 GROUP BY sp.name
 			 ORDER BY first_appearance
-			 LIMIT 5`
-		).bind(filename).all();
+			 LIMIT 5`,
+		)
+			.bind(filename)
+			.all();
 		speakers = (result.results as Array<{ name: string | null }>).map((r) => r.name).filter(Boolean) as string[];
 	} catch (err) {
 		console.error('[og] speakers query error', err);
@@ -185,7 +177,7 @@ export async function handleOgImage(c: Context<ApiEnv>, loader: OgLoader) {
 			headers: {
 				'Content-Type': 'image/png',
 				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-				'Cache-Tag': `speech:${encodeURIComponent(filename)}`
+				'Cache-Tag': `speech:${encodeURIComponent(filename)}`,
 			},
 		});
 	} catch (err) {

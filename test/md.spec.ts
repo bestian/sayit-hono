@@ -47,3 +47,44 @@ describe('md conversion', () => {
 		expect(md).toContain('> 連結略');
 	});
 });
+
+describe('an2md paragraph extraction branches', () => {
+	it('captures meaningful text that appears BEFORE a <p> block', () => {
+		const an = `<akomaNtoso>
+			<heading>Heading</heading>
+			<TLCPerson id="p" showAs="Audrey"/>
+			<speech by="#p">
+				Leading text without a p
+				<p>Inside paragraph</p>
+			</speech>
+		</akomaNtoso>`;
+		const md = __test__.an2md(an);
+		expect(md).toContain('Leading text without a p');
+		expect(md).toContain('Inside paragraph');
+	});
+
+	it('keeps whole block when speech has no <p> tags at all', () => {
+		const an = `<akomaNtoso>
+			<heading>Heading</heading>
+			<TLCPerson id="p" showAs="Audrey"/>
+			<speech by="#p">Plain speech body with no p</speech>
+		</akomaNtoso>`;
+		const md = __test__.an2md(an);
+		expect(md).toContain('Plain speech body with no p');
+	});
+
+	it('drops leading blocks that contain only whitespace/comments', () => {
+		const an = `<akomaNtoso>
+			<heading>H</heading>
+			<TLCPerson id="p" showAs="A"/>
+			<speech by="#p">
+				<!-- comment -->
+				<p>Body</p>
+			</speech>
+		</akomaNtoso>`;
+		const md = __test__.an2md(an);
+		// Comment-only before should not appear as a separate paragraph
+		expect(md).not.toContain('comment');
+		expect(md).toContain('Body');
+	});
+});

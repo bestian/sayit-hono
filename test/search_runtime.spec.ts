@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import {
-	markSpeechDeletedInSearch,
-	readSearchOverlayManifest,
-	syncSearchStats,
-	writeSearchOverlayForSpeech
-} from '../src/search/runtime';
+import { markSpeechDeletedInSearch, readSearchOverlayManifest, syncSearchStats, writeSearchOverlayForSpeech } from '../src/search/runtime';
 import {
 	SEARCH_INDEX_MANIFEST_KEY,
 	SEARCH_INDEX_MANIFEST_VERSION,
 	SEARCH_STATS_KEY,
-	buildSearchOverlayKey
+	buildSearchOverlayKey,
 } from '../src/search/indexFormat';
 
 type StoreEntry = { body: string };
@@ -28,7 +23,7 @@ function createBucket(initial: Record<string, string> = {}) {
 		},
 		delete: async (keys: string | string[]) => {
 			for (const k of Array.isArray(keys) ? keys : [keys]) store.delete(k);
-		}
+		},
 	} as any;
 	return { bucket, store };
 }
@@ -55,16 +50,16 @@ function createContext(bucket: any, countRows: { speeches?: number; speakers?: n
 									section_id: 1,
 									section_content: '<p>hi</p>',
 									display_name: 'Demo',
-									name: 'Audrey'
-								}
-							]
+									name: 'Audrey',
+								},
+							],
 						}),
-						first: async () => firstFor(sql)
+						first: async () => firstFor(sql),
 					}),
-					first: async () => firstFor(sql)
-				})
-			}
-		}
+					first: async () => firstFor(sql),
+				}),
+			},
+		},
 	} as any;
 }
 
@@ -78,7 +73,7 @@ describe('search/runtime.readSearchOverlayManifest', () => {
 
 	it('returns an empty manifest when stored version mismatches', async () => {
 		const { bucket } = createBucket({
-			[SEARCH_INDEX_MANIFEST_KEY]: JSON.stringify({ v: 999, baselineVersion: 'v9', updatedAt: 'x', overlays: { a: { updatedAt: 'x' } } })
+			[SEARCH_INDEX_MANIFEST_KEY]: JSON.stringify({ v: 999, baselineVersion: 'v9', updatedAt: 'x', overlays: { a: { updatedAt: 'x' } } }),
 		});
 		const manifest = await readSearchOverlayManifest(bucket);
 		expect(manifest.baselineVersion).toBe('');
@@ -87,7 +82,7 @@ describe('search/runtime.readSearchOverlayManifest', () => {
 
 	it('normalizes a valid manifest with missing fields', async () => {
 		const { bucket } = createBucket({
-			[SEARCH_INDEX_MANIFEST_KEY]: JSON.stringify({ v: SEARCH_INDEX_MANIFEST_VERSION })
+			[SEARCH_INDEX_MANIFEST_KEY]: JSON.stringify({ v: SEARCH_INDEX_MANIFEST_VERSION }),
 		});
 		const manifest = await readSearchOverlayManifest(bucket);
 		expect(manifest.baselineVersion).toBe('');
@@ -101,8 +96,8 @@ describe('search/runtime.readSearchOverlayManifest', () => {
 				v: SEARCH_INDEX_MANIFEST_VERSION,
 				baselineVersion: 'v1',
 				updatedAt: '2026-04-01T00:00:00Z',
-				overlays: { demo: { updatedAt: 'now' } }
-			})
+				overlays: { demo: { updatedAt: 'now' } },
+			}),
 		});
 		const manifest = await readSearchOverlayManifest(bucket);
 		expect(manifest.overlays).toEqual({ demo: { updatedAt: 'now' } });
@@ -134,11 +129,11 @@ describe('search/runtime.writeSearchOverlayForSpeech', () => {
 					prepare: () => ({
 						bind: () => ({
 							all: async () => ({ success: true, results: [] }),
-							first: async () => null
-						})
-					})
-				}
-			}
+							first: async () => null,
+						}),
+					}),
+				},
+			},
 		} as any;
 
 		await writeSearchOverlayForSpeech(emptyC, 'no-sections');
@@ -150,7 +145,7 @@ describe('search/runtime.writeSearchOverlayForSpeech', () => {
 describe('search/runtime.markSpeechDeletedInSearch', () => {
 	it('marks the overlay as deleted and removes the per-speech object', async () => {
 		const { bucket, store } = createBucket({
-			[buildSearchOverlayKey('gone')]: JSON.stringify({ v: 2, pages: [], speakers: [], docs: [], generatedAt: 'x' })
+			[buildSearchOverlayKey('gone')]: JSON.stringify({ v: 2, pages: [], speakers: [], docs: [], generatedAt: 'x' }),
 		});
 		await markSpeechDeletedInSearch(bucket, 'gone', '2026-04-02T00:00:00Z');
 
@@ -178,10 +173,10 @@ describe('search/runtime.syncSearchStats', () => {
 					prepare: () => ({
 						bind: () => ({ first: async () => null, all: async () => ({ success: true, results: [] }) }),
 						first: async () => null,
-						all: async () => ({ success: true, results: [] })
-					})
-				}
-			}
+						all: async () => ({ success: true, results: [] }),
+					}),
+				},
+			},
 		} as any;
 		await syncSearchStats(c);
 		const stats = JSON.parse(store.get(SEARCH_STATS_KEY)!.body);

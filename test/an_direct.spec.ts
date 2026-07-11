@@ -3,15 +3,17 @@ import { getAnContentAsString, isNumericAnKey, serveAnByKey, speechAn } from '..
 import type { Context } from 'hono';
 import type { ApiEnv } from '../src/api/types';
 
-function createC(overrides: Partial<{
-	method: string;
-	url: string;
-	param: string | undefined;
-	path: string;
-	origin: string | null;
-	sectionRow: any;
-	sections: any[];
-}> = {}) {
+function createC(
+	overrides: Partial<{
+		method: string;
+		url: string;
+		param: string | undefined;
+		path: string;
+		origin: string | null;
+		sectionRow: any;
+		sections: any[];
+	}> = {},
+) {
 	const sectionRow = 'sectionRow' in overrides ? overrides.sectionRow : null;
 	const sections = overrides.sections ?? [];
 
@@ -19,11 +21,11 @@ function createC(overrides: Partial<{
 		prepare: () => ({
 			bind: () => ({
 				first: async () => sectionRow,
-				all: async () => ({ success: true, results: sections })
+				all: async () => ({ success: true, results: sections }),
 			}),
 			first: async () => sectionRow,
-			all: async () => ({ success: true, results: sections })
-		})
+			all: async () => ({ success: true, results: sections }),
+		}),
 	};
 
 	return {
@@ -31,18 +33,18 @@ function createC(overrides: Partial<{
 			method: overrides.method ?? 'GET',
 			url: overrides.url ?? 'https://example.com/api/an/demo.an',
 			path: overrides.path ?? '/api/an/demo.an',
-			header: (k: string) => (k === 'Origin' ? overrides.origin ?? null : null),
-			param: (_: string) => overrides.param
+			header: (k: string) => (k === 'Origin' ? (overrides.origin ?? null) : null),
+			param: (_: string) => overrides.param,
 		},
 		env: {
 			SPEECH_CACHE: {
 				get: async () => null,
 				put: async () => {},
-				delete: async () => true
+				delete: async () => true,
 			},
-			DB: db
+			DB: db,
 		},
-		text: (body: string, status: number = 200, headers: Record<string, string> = {}) => new Response(body, { status, headers })
+		text: (body: string, status: number = 200, headers: Record<string, string> = {}) => new Response(body, { status, headers }),
 	} as unknown as Context<ApiEnv>;
 }
 
@@ -95,10 +97,10 @@ describe('getAnContentAsString guards', () => {
 					section_speaker: 'a',
 					section_content: '<p>Hi</p>',
 					display_name: 'Demo',
-					name: 'Audrey'
-				}
+					name: 'Audrey',
+				},
 			}),
-			'42.an'
+			'42.an',
 		);
 		expect(out).toContain('<heading>Demo</heading>');
 	});
@@ -106,9 +108,9 @@ describe('getAnContentAsString guards', () => {
 	it('returns generated .an for a full speech', async () => {
 		const out = await getAnContentAsString(
 			createC({
-				sections: [{ section_speaker: 'a', section_content: '<p>Hi</p>', display_name: 'Demo', name: 'Audrey' }]
+				sections: [{ section_speaker: 'a', section_content: '<p>Hi</p>', display_name: 'Demo', name: 'Audrey' }],
 			}),
-			'demo.an'
+			'demo.an',
 		);
 		expect(out).toContain('<heading>Demo</heading>');
 	});
@@ -121,19 +123,23 @@ describe('speechAn fallback', () => {
 	});
 
 	it('decodes a valid URI-encoded path param', async () => {
-		const res = await speechAn(createC({
-			param: '%E5%94%90%E9%B3%B3.an',
-			sections: []
-		}));
+		const res = await speechAn(
+			createC({
+				param: '%E5%94%90%E9%B3%B3.an',
+				sections: [],
+			}),
+		);
 		// No sections → 404
 		expect(res.status).toBe(404);
 	});
 
 	it('tolerates a malformed URI-encoded path param by keeping it as-is', async () => {
-		const res = await speechAn(createC({
-			param: '%E0%A4%A.an',
-			sections: []
-		}));
+		const res = await speechAn(
+			createC({
+				param: '%E0%A4%A.an',
+				sections: [],
+			}),
+		);
 		expect(res.status).toBe(404);
 	});
 });

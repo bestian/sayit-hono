@@ -14,7 +14,7 @@ export async function speakersIndex(c: Context<ApiEnv>) {
 					WHERE s2.name = speakers.name AND s2.photoURL IS NOT NULL
 					ORDER BY s2.id ASC LIMIT 1
 				)) AS photoURL
-			FROM speakers ORDER BY id ASC`
+			FROM speakers ORDER BY id ASC`,
 		).all();
 
 		if (!result.success) {
@@ -34,4 +34,3 @@ export async function speakersIndex(c: Context<ApiEnv>) {
 		return c.json({ error: 'Internal server error' }, 500, corsHeaders);
 	}
 }
-

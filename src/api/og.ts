@@ -12,13 +12,12 @@ const OG_HEIGHT = 630;
 
 async function ensureWasm() {
 	if (!wasmInitPromise) {
-		wasmInitPromise = Promise.all([
-			initSatori(yogaWasm),
-			initResvg(resvgWasm),
-		]).then(() => undefined).catch((error) => {
-			wasmInitPromise = null;
-			throw error;
-		});
+		wasmInitPromise = Promise.all([initSatori(yogaWasm), initResvg(resvgWasm)])
+			.then(() => undefined)
+			.catch((error) => {
+				wasmInitPromise = null;
+				throw error;
+			});
 	}
 	await wasmInitPromise;
 }
@@ -41,7 +40,6 @@ function truncate(text: string, maxLen: number): string {
 	if (text.length <= maxLen) return text;
 	return text.slice(0, maxLen).replace(/\s+\S*$/, '') + '…';
 }
-
 
 function avatarElement(dataUri: string, size: number) {
 	const ring = size + 6;
@@ -220,9 +218,7 @@ function buildSpeechElement(title: string, date: string | null, speakers: string
 					props: {
 						style: { display: 'flex', flexDirection: 'column', gap: '6px' },
 						children: [
-							date
-								? { type: 'span', props: { style: { fontSize: 22, color: '#d4a44a', fontWeight: 400 }, children: date } }
-								: null,
+							date ? { type: 'span', props: { style: { fontSize: 22, color: '#d4a44a', fontWeight: 400 }, children: date } } : null,
 							speakerText
 								? {
 										type: 'span',
@@ -240,12 +236,7 @@ function buildSpeechElement(title: string, date: string | null, speakers: string
 	};
 }
 
-function buildQuoteElement(
-	quoteText: string,
-	speakerName: string | null,
-	speechTitle: string,
-	avatarDataUri: string | null
-) {
+function buildQuoteElement(quoteText: string, speakerName: string | null, speechTitle: string, avatarDataUri: string | null) {
 	const maxLen = 300;
 	const displayQuote = truncate(quoteText, maxLen);
 	const len = displayQuote.length;
@@ -276,7 +267,13 @@ function buildQuoteElement(
 						children: {
 							type: 'span',
 							props: {
-								style: { fontSize, fontWeight: 500, lineHeight: 1.55, color: '#f5f0e8', ...(fontSize <= 36 ? { letterSpacing: '0.03em' } : {}) },
+								style: {
+									fontSize,
+									fontWeight: 500,
+									lineHeight: 1.55,
+									color: '#f5f0e8',
+									...(fontSize <= 36 ? { letterSpacing: '0.03em' } : {}),
+								},
 								children: displayQuote,
 							},
 						},
@@ -325,7 +322,7 @@ async function renderElement(
 	element: any,
 	allText: string,
 	fontWeights: number[] = [400, 700],
-	fontFamily = 'Noto Sans TC'
+	fontFamily = 'Noto Sans TC',
 ): Promise<Uint8Array> {
 	await ensureWasm();
 
@@ -352,13 +349,12 @@ export async function generateOgImage(
 	_env: { ASSETS: Fetcher },
 	filename: string,
 	displayName: string,
-	speakers: string[]
+	speakers: string[],
 ): Promise<Uint8Array> {
 	const date = extractDate(filename);
 	let title = displayName || filename;
 	// Strip date prefix from title if it's shown separately
 	if (date) title = title.replace(new RegExp(`^${date}[-\\s]*`), '');
-	const speakerText = speakers.join(' \u00b7 ');
 	const allText = ['ARCHIVE.TW', title, date ?? '', '\u00b7', ...speakers].join('');
 	const element = buildSpeechElement(title, date, speakers);
 	return renderElement(element, allText, [400, 900], 'Noto Serif TC');
@@ -368,9 +364,12 @@ export async function generateQuoteOgImage(
 	quoteHtml: string,
 	speakerName: string | null,
 	speechTitle: string,
-	avatarDataUri: string | null = null
+	avatarDataUri: string | null = null,
 ): Promise<Uint8Array> {
-	const plainText = quoteHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+	const plainText = quoteHtml
+		.replace(/<[^>]+>/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
 	const displayQuote = truncate(plainText, 300);
 	const allText = ['ARCHIVE.TW', displayQuote, speakerName ?? '', speechTitle, '\u2014'].join('');
 	const element = buildQuoteElement(plainText, speakerName, speechTitle, avatarDataUri);

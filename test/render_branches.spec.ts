@@ -3,7 +3,7 @@ import { defineComponent, h } from 'vue';
 import { renderHtml } from '../src/ssr/render';
 
 const Empty = defineComponent({
-	render: () => h('div', 'x')
+	render: () => h('div', 'x'),
 });
 
 describe('renderHtml branches', () => {
@@ -24,13 +24,13 @@ describe('renderHtml branches', () => {
 				meta: [
 					{ property: 'og:title', content: 'Property Meta' },
 					{ name: 'twitter:card', content: 'summary' },
-					{ content: 'ignored' } as any
+					{ content: 'ignored' } as any,
 				],
 				links: [
 					{ rel: 'alternate', href: 'https://archive.tw/en', hreflang: 'en' },
-					{ rel: 'alternate', href: 'https://archive.tw/zh' }
-				]
-			}
+					{ rel: 'alternate', href: 'https://archive.tw/zh' },
+				],
+			},
 		});
 		expect(html).toContain('<meta property="og:title" content="Property Meta">');
 		expect(html).toContain('<meta name="twitter:card" content="summary">');
