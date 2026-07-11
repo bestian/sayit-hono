@@ -1087,15 +1087,26 @@ type RenderOptions = {
 	scripts?: string;
 };
 
+// TODO(techdebt-phase3): duplicated from src/index.ts's escapeHtml; will be
+// consolidated into a shared src/utils/textUtils.ts in the decomposition pass.
+function escapeHtml(value: string): string {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
 function renderMeta(head?: HeadSpec) {
 	const entries = head?.meta ?? [];
 	return entries
 		.map((meta) => {
 			if (meta.property) {
-				return `<meta property="${meta.property}" content="${meta.content}">`;
+				return `<meta property="${escapeHtml(meta.property)}" content="${escapeHtml(meta.content)}">`;
 			}
 			if (meta.name) {
-				return `<meta name="${meta.name}" content="${meta.content}">`;
+				return `<meta name="${escapeHtml(meta.name)}" content="${escapeHtml(meta.content)}">`;
 			}
 			return '';
 		})
@@ -1107,8 +1118,8 @@ function renderLinks(head?: HeadSpec) {
 	const entries = head?.links ?? [];
 	return entries
 		.map((link) => {
-			const attrs = [`rel="${link.rel}"`, `href="${link.href}"`];
-			if (link.hreflang) attrs.push(`hreflang="${link.hreflang}"`);
+			const attrs = [`rel="${escapeHtml(link.rel)}"`, `href="${escapeHtml(link.href)}"`];
+			if (link.hreflang) attrs.push(`hreflang="${escapeHtml(link.hreflang)}"`);
 			return `<link ${attrs.join(' ')}>`;
 		})
 		.filter(Boolean)
@@ -1116,7 +1127,7 @@ function renderLinks(head?: HeadSpec) {
 }
 
 function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptions) {
-	const headTitle = head?.title ?? (title ? `${title} :: SayIt` : 'SayIt');
+	const headTitle = escapeHtml(head?.title ?? (title ? `${title} :: SayIt` : 'SayIt'));
 	const inlineStyles = styles?.trim() ? `<style>${styles}</style>` : '';
 	const metaTags = renderMeta(head);
 	const linkTags = renderLinks(head);

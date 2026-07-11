@@ -193,3 +193,4 @@ dist
 .claude/
 og-preview*.png
 .og-bake-tmp/
+local-og-compare/
