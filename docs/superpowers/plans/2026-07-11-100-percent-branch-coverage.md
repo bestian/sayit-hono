@@ -4,13 +4,14 @@
 
 **Goal:** Reach actual 100% statements, branches, functions, and lines coverage across all 18 files in the codebase, and enforce it with `thresholds.branches = 100` and `perFile = true` in Vitest configuration.
 
-**Architecture:** We will systematically address each file. For reachable branch arms (Type 1), we will write targeted test assertions in their respective module specs. For unreachable or redundant branches (Type 2), we will safely remove/simplify them from the production code. For instrumentation anomalies (Type 3), we will adjust the parameter and code layout to ensure the Istanbul coverage engine can correctly track them.
+**Architecture:** We will systematically address each file. For reachable branch arms (Type 1), we will write targeted test assertions in their respective behavior-owning specs. For unreachable or redundant branches (Type 2), we will treat them as hypotheses and verify them against actual types/callers/schema before simplification. If they cannot be proven unreachable, we will write a reachable boundary/error test instead. Instrumentation anomalies (Type 3) will be resolved via minor structural changes. No new tests will be added to the coverage-theater files (`final_gaps.spec.ts`, `final_gap_close.spec.ts`, `index_branches.spec.ts`, `search_branches.spec.ts`, `heads_branches.spec.ts`).
 
 **Tech Stack:** Vitest 4.1.10, Hono 4.12.15, TypeScript, D1, R2
 
 ## Global Constraints
 - Do not use any `/* istanbul ignore ... */` annotations, ignores, or dynamic denominator exclusions.
 - Do not weaken the existing behavior contract or change the build pipeline.
+- Remap every new test to the nearest behavior-owning spec. No catch-all coverage files are allowed.
 - Run tests in worker environment using `vp test run --coverage`.
 
 ---
@@ -19,16 +20,16 @@
 
 **Files:**
 - Modify: `src/ssr/pages/speech.ts`
-- Test: `test/ssr_routes.spec.ts`
+- Test: `test/ssr_routes.spec.ts` (Behavior-owning spec for SSR page routing)
 
 **Interfaces:**
 - Consumes: `renderSpeechPage`, `renderSectionPage`, `renderNestedSpeechPage`
 - Produces: 100% branch coverage on speech rendering page handlers
 
 - [ ] **Step 1: Write the failing tests for reachable branch arms**
-Add the following tests to `test/ssr_routes.spec.ts` to cover lines 92, 96, 98, 127, 144, 150, 236, 237, 258, 259, 264, 278, 384, 388, 402, 417, 429, 471, 494, 502:
+Add the following tests to `test/ssr_routes.spec.ts` under the existing `describe('SSR /:filename', ...)` blocks to cover lines 92, 96, 98, 127, 144, 150, 236, 237, 258, 259, 264, 278, 384, 388, 402, 417, 429, 471, 494, 502:
 ```typescript
-describe('speech page branch coverages', () => {
+describe('speech page branch coverages (remap to ssr_routes)', () => {
 	it('handles alternate info with missing display name', async () => {
 		const env = createMockEnv((sql, args) => {
 			if (sql.includes('FROM speech_index si') && sql.includes('alternate_filename')) {
@@ -148,11 +149,10 @@ describe('speech page branch coverages', () => {
 Run: `vp test run test/ssr_routes.spec.ts`
 Expected: FAIL or missing coverage on these branches
 
-- [ ] **Step 3: Simplify and remove impossible branches from src/ssr/pages/speech.ts**
-Open `src/ssr/pages/speech.ts` and simplify impossible branches:
-- Remove parameter default fallbacks where Honos router matches protect parameter presence (lines 107, 167, 168, 309).
-- Remove fallback `response.ok && response.status < 400` inside R2 cache operations that return exact standard responses (lines 299, 439, 514).
-- Clean up nullish coalescing on display name inputs that are guaranteed by DB structure (line 386).
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Lines 107, 167, 168, 309)*: The Honos router regex matches guarantee parameter presence. Let's verify by auditing Hono routes. Since they match, these parameter default fallbacks can be safely deleted.
+- *Hypothesis 2 (Lines 299, 439, 514)*: The controllers catch DB errors and return 500 directly, meaning `response.ok` check is redundant. Let's verify. If Hono's `c.html` response can never fail dynamically, simplify to `if (response)`.
+- Apply updates to `src/ssr/pages/speech.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
 Run: `vp test run test/ssr_routes.spec.ts --coverage`
@@ -219,11 +219,10 @@ hi' })
 Run: `vp test run test/upload_markdown_unit.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches from src/api/upload_markdown.ts**
-- Remove impossible marked output checks `typeof html === 'string'` (line 252).
-- Remove fallback checks for batch meta changes (lines 474-479) since D1 batch driver always populates it on success.
-- Clean up first-line null checks that are covered by prior loops (lines 552, 775).
-- Structure loop final step to satisfy Istanbul (line 174).
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 252)*: `marked.parse` returns a string for standard inputs. Simplify `typeof html === 'string'` check to direct string input type.
+- *Hypothesis 2 (Lines 474-479)*: D1 batch results metadata change counts. Verify if D1 driver always populates it on success. If so, clean up nullish coalescing to avoid redundant fallbacks.
+- Apply updates to `src/api/upload_markdown.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
 Run: `vp test run test/upload_markdown_unit.spec.ts --coverage`
@@ -241,16 +240,16 @@ git commit -m "test: cover and simplify branches in upload_markdown"
 
 **Files:**
 - Modify: `src/api/an.ts`
-- Test: `test/an_direct.spec.ts`
+- Test: `test/an.spec.ts` (Remapped from final_gap_close / an_direct)
 
 **Interfaces:**
 - Consumes: `speechAn`, `serveAnByKey`, `getAnContentAsString`
 - Produces: 100% branch coverage on `.an` API handlers
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/an_direct.spec.ts` to cover lines 31, 34, 35, 36, 47, 48, 192, 217, 261, 262, 276, 339, 340:
+Add the following tests to `test/an.spec.ts` to cover lines 31, 34, 35, 36, 47, 48, 192, 217, 261, 262, 276, 339, 340:
 ```typescript
-describe('an branch coverage extra scenarios', () => {
+describe('an branch coverage extra scenarios (remapped to an.spec.ts)', () => {
 	it('generates an with null display name and missing speaker name', async () => {
 		const env = createMockEnv((sql, args) => {
 			if (sql.includes('FROM speech_content sc')) {
@@ -288,19 +287,20 @@ describe('an branch coverage extra scenarios', () => {
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
-Run: `vp test run test/an_direct.spec.ts`
+Run: `vp test run test/an.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/api/an.ts`, simplify branch line 36 arm 2 (`s.section_speaker ?? 'Unknown'`) as it is protected by line 34.
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 36 arm 2)*: `s.section_speaker ?? 'Unknown'` is protected by line 34. Let's verify by auditing schema rules. Safe to simplify.
+- Apply updates to `src/api/an.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
-Run: `vp test run test/an_direct.spec.ts --coverage`
+Run: `vp test run test/an.spec.ts --coverage`
 Expected: PASS and 100% branch coverage on `src/api/an.ts`.
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/api/an.ts test/an_direct.spec.ts
+git add src/api/an.ts test/an.spec.ts
 git commit -m "test: cover and simplify branches in api/an"
 ```
 
@@ -310,16 +310,16 @@ git commit -m "test: cover and simplify branches in api/an"
 
 **Files:**
 - Modify: `src/ssr/pages/speaker.ts`
-- Test: `test/final_gaps.spec.ts`
+- Test: `test/ssr_routes.spec.ts` (Remapped from final_gaps)
 
 **Interfaces:**
 - Consumes: `renderSpeakerPage`
 - Produces: 100% branch coverage on speaker rendering pages
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/final_gaps.spec.ts` to cover lines 73, 117, 118, 119, 121, 123, 132, 149, 161:
+Add the following tests to `test/ssr_routes.spec.ts` under speaker blocks to cover lines 73, 117, 118, 119, 121, 123, 132, 149, 161:
 ```typescript
-describe('speaker SSR page extra branches', () => {
+describe('speaker SSR page extra branches (remapped to ssr_routes)', () => {
 	it('handles speaker details with negative/invalid page numbers and missing content', async () => {
 		const env = createMockEnv((sql, args) => {
 			if (sql.includes('FROM speakers_view')) {
@@ -350,21 +350,21 @@ describe('speaker SSR page extra branches', () => {
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
-Run: `vp test run test/final_gaps.spec.ts`
+Run: `vp test run test/ssr_routes.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/ssr/pages/speaker.ts`:
-- Remove route param fallback check (line 38).
-- Remove try/catch response verification block (line 161).
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 38)*: Route param fallback is structurally dead because Honos router ensures parameter match. Verify and simplify.
+- *Hypothesis 2 (Line 161)*: The try/catch response verification block can be simplified if DB errors are fully caught. Verify.
+- Apply updates to `src/ssr/pages/speaker.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
-Run: `vp test run test/final_gaps.spec.ts --coverage`
+Run: `vp test run test/ssr_routes.spec.ts --coverage`
 Expected: PASS and 100% branch coverage on `src/ssr/pages/speaker.ts`.
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/ssr/pages/speaker.ts test/final_gaps.spec.ts
+git add src/ssr/pages/speaker.ts test/ssr_routes.spec.ts
 git commit -m "test: cover and simplify branches in pages/speaker"
 ```
 
@@ -374,17 +374,16 @@ git commit -m "test: cover and simplify branches in pages/speaker"
 
 **Files:**
 - Modify: `src/index.ts`
-- Test: `test/index_branches.spec.ts`
-- Test: `test/index.spec.ts`
+- Test: `test/index.spec.ts` (Remapped from index_branches)
 
 **Interfaces:**
 - Consumes: app routing entrypoint
 - Produces: 100% branch coverage on app router and index middleware
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/index_branches.spec.ts` to cover lines 53, 54, 55, 160, 319, 323, 326, 349, 353:
+Add the following tests to `test/index.spec.ts` to cover lines 53, 54, 55, 160, 319, 323, 326, 349, 353:
 ```typescript
-describe('index edge routing branches', () => {
+describe('index edge routing branches (remapped to index.spec.ts)', () => {
 	it('handles non-canonical redirect matching files with dots', async () => {
 		const env = createMockEnv(() => ({ success: true, results: [] }));
 		const { res } = await dispatch('/speech/text.xml', env);
@@ -412,21 +411,21 @@ describe('index edge routing branches', () => {
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
-Run: `vp test run test/index_branches.spec.ts`
+Run: `vp test run test/index.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/index.ts`:
-- Remove optional size branch check (line 147).
-- Remove fallback `row.display_name ?? ''` since column is NOT NULL (line 272).
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 147)*: R2 object size is always numeric. Verify and remove optional size check fallback.
+- *Hypothesis 2 (Line 272)*: `row.display_name` is non-null. Verify D1 schema and remove redundant coalescing.
+- Apply updates to `src/index.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
-Run: `vp test run test/index_branches.spec.ts --coverage`
+Run: `vp test run test/index.spec.ts --coverage`
 Expected: PASS and 100% branch coverage on `src/index.ts`.
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/index.ts test/index_branches.spec.ts test/index.spec.ts
+git add src/index.ts test/index.spec.ts
 git commit -m "test: cover and simplify branches in index.ts"
 ```
 
@@ -436,16 +435,16 @@ git commit -m "test: cover and simplify branches in index.ts"
 
 **Files:**
 - Modify: `src/ssr/pages/search.ts`
-- Test: `test/search_branches.spec.ts`
+- Test: `test/ssr_routes.spec.ts` (Remapped from search_branches)
 
 **Interfaces:**
 - Consumes: `renderSearchPage`
 - Produces: 100% branch coverage on search render pages
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/search_branches.spec.ts` to cover lines 98, 110, 129, 130:
+Add the following tests to `test/ssr_routes.spec.ts` to cover lines 98, 110, 129, 130:
 ```typescript
-describe('search page rendering branch edge cases', () => {
+describe('search page rendering branch edge cases (remapped to ssr_routes)', () => {
 	it('handles extreme query pagination fallbacks', async () => {
 		const env = createMockEnv(() => ({ success: true, results: [] }));
 		const { res } = await dispatch('/search/?q=needle&page=0&limit=0', env);
@@ -476,21 +475,21 @@ describe('search page rendering branch edge cases', () => {
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
-Run: `vp test run test/search_branches.spec.ts`
+Run: `vp test run test/ssr_routes.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/ssr/pages/search.ts`:
-- Remove speaker name fallback (line 142) and section content fallback (line 263).
-- Restructure default arguments (lines 118, 119) to standard declarations inside the function body so they do not skip instrumentation.
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 142)*: Speaker name constraint in DB. Verify schema definition. Delete fallback if redundant.
+- *Hypothesis 2 (Line 263)*: `section_content` is NOT NULL. Verify schema and simplify.
+- Restructure default arguments in search.ts (lines 118, 119) to standard declarations.
 
 - [ ] **Step 4: Run test to verify it passes**
-Run: `vp test run test/search_branches.spec.ts --coverage`
+Run: `vp test run test/ssr_routes.spec.ts --coverage`
 Expected: PASS and 100% branch coverage on `src/ssr/pages/search.ts`.
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/ssr/pages/search.ts test/search_branches.spec.ts
+git add src/ssr/pages/search.ts test/ssr_routes.spec.ts
 git commit -m "test: cover and simplify branches in pages/search"
 ```
 
@@ -500,16 +499,16 @@ git commit -m "test: cover and simplify branches in pages/search"
 
 **Files:**
 - Modify: `src/api/speaker_detail.ts`
-- Test: `test/final_gap_close.spec.ts`
+- Test: `test/read_api_routes.spec.ts` (Remapped from final_gap_close)
 
 **Interfaces:**
 - Consumes: `speakerDetail`
 - Produces: 100% branch coverage on speaker details API
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/final_gap_close.spec.ts` to cover lines 46, 53, 94, 95, 98, 102, 111:
+Add the following tests to `test/read_api_routes.spec.ts` to cover lines 46, 53, 94, 95, 98, 102, 111:
 ```typescript
-describe('speakerDetail branch coverage extra cases', () => {
+describe('speakerDetail branch coverage extra cases (remapped to read_api_routes)', () => {
 	it('handles speaker details with missing counts and fallback length calculation', async () => {
 		const env = createMockEnv((sql, args) => {
 			if (sql.includes('FROM speakers_view')) {
@@ -546,19 +545,20 @@ describe('speakerDetail branch coverage extra cases', () => {
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
-Run: `vp test run test/final_gap_close.spec.ts`
+Run: `vp test run test/read_api_routes.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/api/speaker_detail.ts`, remove route parameter fallback check (line 12).
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 12)*: Parameter presence check is redundant. Audit and remove.
+- Apply updates to `src/api/speaker_detail.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
-Run: `vp test run test/final_gap_close.spec.ts --coverage`
+Run: `vp test run test/read_api_routes.spec.ts --coverage`
 Expected: PASS and 100% branch coverage on `src/api/speaker_detail.ts`.
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/api/speaker_detail.ts test/final_gap_close.spec.ts
+git add src/api/speaker_detail.ts test/read_api_routes.spec.ts
 git commit -m "test: cover and simplify branches in api/speaker_detail"
 ```
 
@@ -569,14 +569,13 @@ git commit -m "test: cover and simplify branches in api/speaker_detail"
 **Files:**
 - Modify: `src/api/md.ts`
 - Test: `test/md.spec.ts`
-- Test: `test/md_routes.spec.ts`
 
 **Interfaces:**
 - Consumes: `serveMdByKey`
 - Produces: 100% branch coverage on markdown generation API
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/md.spec.ts` and `test/md_routes.spec.ts` to cover lines 49, 151, 181, 196, 252, 279:
+Add the following tests to `test/md.spec.ts` to cover lines 49, 151, 181, 196, 252, 279:
 ```typescript
 describe('md branch coverage extra assertions', () => {
 	it('handles empty content and malformed TLCPerson tags', () => {
@@ -614,9 +613,7 @@ describe('md branch coverage extra assertions', () => {
     <debateBody>
       <debateSection>
         <speech by="#Unknown">
-          <p>line1
-
-line2</p>
+          <p>line1\n\nline2</p>
         </speech>
       </debateSection>
     </debateBody>
@@ -632,8 +629,9 @@ line2</p>
 Run: `vp test run test/md.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/api/md.ts`, remove `closeMatch.index !== undefined` check as JS regex matching guarantees it (line 75).
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 75)*: Close match regex guarantees index. Audit regex matching logic. Delete index undefined verification.
+- Apply updates to `src/api/md.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
 Run: `vp test run test/md.spec.ts --coverage`
@@ -641,7 +639,7 @@ Expected: PASS and 100% branch coverage on `src/api/md.ts`.
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/api/md.ts test/md.spec.ts test/md_routes.spec.ts
+git add src/api/md.ts test/md.spec.ts
 git commit -m "test: cover and simplify branches in api/md"
 ```
 
@@ -677,10 +675,10 @@ describe('cache utility branch coverages', () => {
 Run: `vp test run test/cache_unit.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/api/cache.ts`:
-- Restructure default arguments to avoid function default parameter skips (line 61).
-- Remove `typeof object.size === 'number'` fallback (line 94).
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 94)*: Size check is always numeric on active R2 objects. Verify R2 typings. Simplify.
+- Restructure default arguments (line 61).
+- Apply updates to `src/api/cache.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
 Run: `vp test run test/cache_unit.spec.ts --coverage`
@@ -737,9 +735,10 @@ describe('search runtime buildSearchDocsForSpeech branches', () => {
 Run: `vp test run test/search_runtime.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 133)*: `section_content` database constraint is NOT NULL. Verify schema and simplify.
 - Remove D1 results wrapper fallback (line 127).
-- Remove fallback check `row.section_content ?? ''` since the column is NOT NULL (line 133).
+- Apply updates to `src/search/runtime.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
 Run: `vp test run test/search_runtime.spec.ts --coverage`
@@ -799,8 +798,9 @@ describe('og routes branch coverages', () => {
 Run: `vp test run test/og_routes.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/api/og_routes.ts`, remove route parameter fallback (line 72).
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 72)*: Router regex guarantees presence of parameter. Simplify fallback.
+- Apply updates to `src/api/og_routes.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
 Run: `vp test run test/og_routes.spec.ts --coverage`
@@ -818,27 +818,40 @@ git commit -m "test: cover and simplify branches in api/og_routes"
 
 **Files:**
 - Modify: `src/ssr/pages/home.ts`
-- Test: `test/ssr_routes.spec.ts`
+- Test: `test/ssr_routes.spec.ts` (Remapped from home_branches)
 
 **Interfaces:**
 - Consumes: home pages SSR renderers
 - Produces: 100% branch coverage on home pages rendering handlers
 
-- [ ] **Step 1: Write the failing tests**
-Verify that home rendering covers standard flows. Since the uncovered branch is impossible code path:
-- Line 99: `response.ok && response.status < 400`
-- Line 129: `response.ok && response.status < 400`
-Both are unreachable because `readR2Cache` catches R2 errors internally and returns standard successful Responses or null.
+- [ ] **Step 1: Write a behavioral test before simplifying the source**
+Add a test in `test/ssr_routes.spec.ts` that asserts the standard caching behavior (verifying that a successful render writes to R2):
+```typescript
+describe('home page render caching behavior before simplification', () => {
+	it('writes the rendered home layout response to R2 cache when successful', async () => {
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/speeches/', env);
+		expect(res.status).toBe(200);
+		// Verify R2 was written
+		const keys = Array.from(env.__r2Store.keys());
+		expect(keys.some(k => k.includes('speeches/data-'))).toBe(true);
+	});
+});
+```
 
-- [ ] **Step 2: Simplify and remove impossible branches**
-Open `src/ssr/pages/home.ts` and simplify lines 99 and 129:
-Change `if (response.ok && response.status < 400)` to `if (response)`.
+- [ ] **Step 2: Run test to verify standard cache write behavior**
+Run: `vp test run test/ssr_routes.spec.ts`
+Expected: PASS
 
-- [ ] **Step 3: Run tests to verify they pass**
+- [ ] **Step 3: Verify simplification hypothesis**
+- *Hypothesis 1 (Lines 99, 129)*: `response.ok && response.status < 400` is redundant because `readR2Cache` handles R2 reads and Hono `c.html()` always yields 200 response. If we want to guard against writeR2Cache being called for errors, we should keep the check but write a test that mocks `c.html` to return a 500 status (skipping cache write). If `c.html` is proven structurally infallible in standard Hono SSR, simplify the check to `if (response)`.
+- Open `src/ssr/pages/home.ts` and simplify lines 99 and 129 to `if (response)` or add the fallback tests.
+
+- [ ] **Step 4: Run test to verify cache write behavior after simplification**
 Run: `vp test run test/ssr_routes.spec.ts --coverage`
 Expected: PASS and 100% branch coverage on `src/ssr/pages/home.ts`.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 ```bash
 git add src/ssr/pages/home.ts test/ssr_routes.spec.ts
 git commit -m "test: cover and simplify branches in pages/home"
@@ -878,8 +891,9 @@ describe('docBuilder extra branches', () => {
 Run: `vp test run test/docBuilder.spec.ts`
 Expected: FAIL or missing coverage
 
-- [ ] **Step 3: Simplify and remove impossible branches**
-In `src/search/docBuilder.ts`, remove first-line fallback (line 19) since it is validated prior.
+- [ ] **Step 3: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 19)*: Title extraction fallback is covered prior. Simplify line 19 fallback.
+- Apply updates to `src/search/docBuilder.ts`.
 
 - [ ] **Step 4: Run test to verify it passes**
 Run: `vp test run test/docBuilder.spec.ts --coverage`
@@ -951,17 +965,18 @@ git commit -m "test: cover and simplify branches in api/rss"
 
 **Files:**
 - Modify: `src/api/speech.ts`
-- Test: `test/read_api_routes.spec.ts`
+- Test: `test/read_api_routes.spec.ts` (Remapped from speech_branches)
 
 **Interfaces:**
 - Consumes: `speechContent`
 - Produces: 100% branch coverage on speech content retrieval API
 
-- [ ] **Step 1: Write the failing tests**
-Verify standard paths are fully covered.
+- [ ] **Step 1: Verify standard paths are covered**
+Verify by running existing routes tests.
 
-- [ ] **Step 2: Simplify and remove impossible branches**
-In `src/api/speech.ts`, remove line 14 fallback `parts[0] ?? ''` since Hono route regex matches guarantee it.
+- [ ] **Step 2: Verify and resolve source simplification hypotheses**
+- *Hypothesis 1 (Line 14)*: Route regex checks guarantee parameter presence. Audit and delete parameter check.
+- Apply updates to `src/api/speech.ts`.
 
 - [ ] **Step 3: Run tests to verify they pass**
 Run: `vp test run test/read_api_routes.spec.ts --coverage`
@@ -979,16 +994,16 @@ git commit -m "test: simplify branches in api/speech"
 
 **Files:**
 - Modify: `src/api/speech_index.ts`
-- Test: `test/final_gap_close.spec.ts`
+- Test: `test/read_api_routes.spec.ts` (Remapped from final_gap_close)
 
 **Interfaces:**
 - Consumes: `speechIndex`
 - Produces: 100% branch coverage on speech index retrieval API
 
 - [ ] **Step 1: Write the failing tests**
-Add the following tests to `test/final_gap_close.spec.ts` to cover line 17:
+Add the following tests to `test/read_api_routes.spec.ts` to cover line 17:
 ```typescript
-describe('speechIndex branch coverage extra cases', () => {
+describe('speechIndex branch coverage extra cases (remapped to read_api_routes)', () => {
 	it('handles non-array json parse fallbacks', async () => {
 		const env = createMockEnv((sql, args) => {
 			if (sql.includes('FROM speech_index')) {
@@ -1012,16 +1027,16 @@ describe('speechIndex branch coverage extra cases', () => {
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
-Run: `vp test run test/final_gap_close.spec.ts`
+Run: `vp test run test/read_api_routes.spec.ts`
 Expected: FAIL or missing coverage
 
 - [ ] **Step 3: Run test to verify it passes**
-Run: `vp test run test/final_gap_close.spec.ts --coverage`
+Run: `vp test run test/read_api_routes.spec.ts --coverage`
 Expected: PASS and 100% branch coverage on `src/api/speech_index.ts`.
 
 - [ ] **Step 4: Commit**
 ```bash
-git add src/api/speech_index.ts test/final_gap_close.spec.ts
+git add src/api/speech_index.ts test/read_api_routes.spec.ts
 git commit -m "test: cover and simplify branches in api/speech_index"
 ```
 
@@ -1031,7 +1046,7 @@ git commit -m "test: cover and simplify branches in api/speech_index"
 
 **Files:**
 - Modify: `src/utils/sectionPatch.ts`
-- Test: `test/upload_markdown_unit.spec.ts`
+- Test: `test/upload_markdown_unit.spec.ts` (LCS logic spec)
 
 **Interfaces:**
 - Consumes: `sectionMatchKey`
@@ -1042,10 +1057,10 @@ Add the following tests to `test/upload_markdown_unit.spec.ts` to cover line 134
 ```typescript
 import { sectionMatchKey } from '../src/utils/sectionPatch';
 
-describe('sectionMatchKey extra branches', () => {
+describe('sectionMatchKey extra branches (remapped to upload_markdown_unit)', () => {
 	it('matches SVG keys without speaker details', () => {
 		const key = sectionMatchKey({ speaker: null, markdown: '<svg></svg>' });
-		expect(key).toBe(' __embedded_svg__');
+		expect(key).toBe('\u0000__embedded_svg__');
 	});
 });
 ```
@@ -1070,7 +1085,7 @@ git commit -m "test: cover and simplify branches in utils/sectionPatch"
 
 **Files:**
 - Modify: `src/utils/textUtils.ts`
-- Test: `test/md.spec.ts`
+- Test: `test/md.spec.ts` (Text/markup extraction spec)
 
 **Interfaces:**
 - Consumes: `decodeHtmlEntities`
@@ -1081,7 +1096,7 @@ Add the following tests to `test/md.spec.ts` to cover line 48:
 ```typescript
 import { decodeHtmlEntities } from '../src/utils/textUtils';
 
-describe('decodeHtmlEntities extra branches', () => {
+describe('decodeHtmlEntities extra branches (remapped to md.spec.ts)', () => {
 	it('ignores unknown named entities', () => {
 		const decoded = decodeHtmlEntities('Hello &foo;');
 		expect(decoded).toBe('Hello &foo;');
