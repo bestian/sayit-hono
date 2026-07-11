@@ -18,6 +18,27 @@ describe('SSR layout', () => {
 		expect(html).toContain('navigator.share');
 	});
 
+	it('escapes title/meta/link values in the document head (XSS regression, see B5)', async () => {
+		const html = await renderHtml(HomeView, {
+			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer },
+			head: {
+				title: `"><script>alert(1)</script>`,
+				meta: [
+					{ property: 'og:title', content: `Quote " and <tag> & amp` },
+					{ name: 'description', content: `'single' "double"` }
+				],
+				links: [{ rel: 'canonical', href: `https://example.com/?a=1&b="2`, hreflang: 'zh-Hant' }]
+			}
+		});
+
+		expect(html).not.toContain('<script>alert(1)</script>');
+		expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+		expect(html).toContain('Quote &quot; and &lt;tag&gt; &amp; amp');
+		expect(html).toContain('&#39;single&#39; &quot;double&quot;');
+		expect(html).toContain('href="https://example.com/?a=1&amp;b=&quot;2"');
+	});
+
 	it('navbar share control has no legacy margin-top in SSR CSS', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),

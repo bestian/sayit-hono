@@ -26,14 +26,18 @@
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
+		"@cloudflare/vite-plugin": "^1.44.0",
 		"@cloudflare/vitest-pool-workers": "^0.15",
 		"@types/node": "^25",
 		"@typescript/native-preview": "^7.0.0-dev.20260429.1",
+		"@vitejs/plugin-vue": "^6.0.7",
 		"@vitest/coverage-istanbul": "^4",
 		"@vue/compiler-sfc": "^3.5.33",
 		"fuse.js": "^7.3.0",
+		"lemmascript": "0.5.14",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
+		"vite": "^8.1.4",
 		"vitest": "^4",
 		"wrangler": "^4.107.0"
 	},
