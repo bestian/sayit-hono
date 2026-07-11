@@ -189,9 +189,6 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 		headers.set('Content-Type', 'text/plain; charset=utf-8');
 		headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 		headers.set('Cache-Tag', `speech:${encodeURIComponent(section.filename)}`);
-		if (headers.has('Access-Control-Allow-Origin')) {
-			headers.set('Vary', 'Origin');
-		}
 
 		if (c.req.method === 'HEAD') {
 			headers.set('Content-Length', new TextEncoder().encode(singleAn).length.toString());
@@ -214,9 +211,6 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 			headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 			headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-			if (headers.has('Access-Control-Allow-Origin')) {
-				headers.set('Vary', 'Origin');
-			}
 			if (c.req.method === 'HEAD') {
 				return new Response(null, { status: 200, headers });
 			}
@@ -273,9 +267,6 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 	headers.set('Content-Type', 'text/plain; charset=utf-8');
 	headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 	headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
-	if (headers.has('Access-Control-Allow-Origin')) {
-		headers.set('Vary', 'Origin');
-	}
 
 	if (c.req.method === 'HEAD') {
 		headers.set('Content-Length', new TextEncoder().encode(generatedAn).length.toString());

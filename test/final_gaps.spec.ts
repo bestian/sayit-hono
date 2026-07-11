@@ -46,7 +46,6 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 			body: '<!doctype html><title>cached</title><body>SPEECHES-FROM-R2</body>',
 			cacheControl: 'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400',
 			contentType: 'text/html; charset=utf-8',
-			etag: null,
 		});
 
 		const second = await dispatch('/speeches/', env);
@@ -71,7 +70,6 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 			body: '<!doctype html><title>OLD</title><body>OLD-CACHED</body>',
 			cacheControl: 'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400',
 			contentType: 'text/html; charset=utf-8',
-			etag: null,
 		});
 
 		rows = [{ filename: '2026-b-demo', display_name: 'B Demo' }];

@@ -679,7 +679,7 @@ describe('speech_redirects 301 fallback', () => {
 	});
 
 	it('treats redirect query throw as a miss (404)', async () => {
-		const env = createMockEnv((sql, args) => {
+		const env = createMockEnv((sql, _args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
 			if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) throw new Error('boom');
 			return { success: true, results: [] };

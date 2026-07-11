@@ -259,7 +259,7 @@ describe('handleOgSpeechImage', () => {
 			},
 		});
 
-		const generator = vi.fn(async () => new Uint8Array([0x89]));
+		const generator = vi.fn<OgGenerators['generateQuoteOgImage']>(async () => new Uint8Array([0x89]));
 		await handleOgSpeechImage(ctx, createFakeGenerators({ generateQuoteOgImage: generator }));
 		const avatarArg = generator.mock.calls[0]![3];
 		expect(avatarArg).toMatch(/^data:image\/jpeg;base64,/);
@@ -277,7 +277,7 @@ describe('handleOgSpeechImage', () => {
 			},
 			assetsFetch: () => new Response('nope', { status: 404 }),
 		});
-		const generator = vi.fn(async () => new Uint8Array([0x89]));
+		const generator = vi.fn<OgGenerators['generateQuoteOgImage']>(async () => new Uint8Array([0x89]));
 		await handleOgSpeechImage(ctx, createFakeGenerators({ generateQuoteOgImage: generator }));
 		expect(generator.mock.calls[0]![3]).toBeNull();
 	});
@@ -296,7 +296,7 @@ describe('handleOgSpeechImage', () => {
 				throw new Error('asset fetch exploded');
 			},
 		});
-		const generator = vi.fn(async () => new Uint8Array([0x89]));
+		const generator = vi.fn<OgGenerators['generateQuoteOgImage']>(async () => new Uint8Array([0x89]));
 		await handleOgSpeechImage(ctx, createFakeGenerators({ generateQuoteOgImage: generator }));
 		expect(generator.mock.calls[0]![3]).toBeNull();
 	});

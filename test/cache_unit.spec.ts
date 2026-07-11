@@ -15,6 +15,7 @@ import {
 	writeR2Cache,
 	type PurgeOptions,
 } from '../src/api/cache';
+import { purgeMock } from './setup-cache-isolation';
 
 function createBucket() {
 	const store = new Map<
@@ -194,37 +195,18 @@ describe('speech/speaker request paths', () => {
 
 describe('purgeWorkersCache reliability', () => {
 	it('returns true when purge succeeds or returns no explicit failure', async () => {
-		const mod = await import('cloudflare:workers');
-		const original = mod.cache.purge;
-		mod.cache.purge = (async () => ({ success: true })) as typeof mod.cache.purge;
-		try {
-			await expect(purgeWorkersCache({ tags: ['list:home'] })).resolves.toBe(true);
-		} finally {
-			mod.cache.purge = original;
-		}
+		purgeMock.mockResolvedValueOnce({ success: true, errors: [] });
+		await expect(purgeWorkersCache({ tags: ['list:home'] })).resolves.toBe(true);
 	});
 
 	it('returns false after repeated explicit purge failures', async () => {
-		const mod = await import('cloudflare:workers');
-		const original = mod.cache.purge;
-		mod.cache.purge = (async () => ({ success: false })) as typeof mod.cache.purge;
-		try {
-			await expect(purgeWorkersCache({ tags: ['list:home'] })).resolves.toBe(false);
-		} finally {
-			mod.cache.purge = original;
-		}
+		// Persists (not `Once`) so every retry attempt inside purgeWorkersCache sees the failure.
+		purgeMock.mockResolvedValue({ success: false, errors: [] });
+		await expect(purgeWorkersCache({ tags: ['list:home'] })).resolves.toBe(false);
 	});
 
 	it('returns false after repeated thrown purge errors', async () => {
-		const mod = await import('cloudflare:workers');
-		const original = mod.cache.purge;
-		mod.cache.purge = (async () => {
-			throw new Error('purge transport failed');
-		}) as typeof mod.cache.purge;
-		try {
-			await expect(purgeWorkersCache({ tags: ['list:home'] })).resolves.toBe(false);
-		} finally {
-			mod.cache.purge = original;
-		}
+		purgeMock.mockRejectedValue(new Error('purge transport failed'));
+		await expect(purgeWorkersCache({ tags: ['list:home'] })).resolves.toBe(false);
 	});
 });

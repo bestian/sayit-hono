@@ -99,7 +99,18 @@ export async function syncSearchStats(c: Context<ApiEnv>): Promise<void> {
 	await writeJsonObject(c.env.SPEECH_CACHE, SEARCH_STATS_KEY, stats, SEARCH_STATS_CACHE_CONTROL);
 }
 
-export async function buildSearchDocsForSpeech(c: Context<ApiEnv>, filename: string): Promise<SearchDocRecord[]> {
+/** Minimal shape `buildSearchDocsForSpeech` actually uses off `c` — real `Context<ApiEnv>` satisfies this structurally, no cast needed at real call sites. */
+interface SearchDocsDbContext {
+	env: {
+		DB: {
+			prepare(sql: string): {
+				bind(...args: unknown[]): { all<T = Record<string, unknown>>(): Promise<{ success: boolean; results: T[] }> };
+			};
+		};
+	};
+}
+
+export async function buildSearchDocsForSpeech(c: SearchDocsDbContext, filename: string): Promise<SearchDocRecord[]> {
 	const rows = await c.env.DB.prepare(
 		`SELECT
 			sc.filename,
@@ -124,7 +135,7 @@ export async function buildSearchDocsForSpeech(c: Context<ApiEnv>, filename: str
 	// sort would scramble the excerpt; normalizeSections returns rows untouched when
 	// already in chain order, otherwise re-stitches them by the link chain.
 	const sections = normalizeSections(
-		(rows.results ?? []).map((row) => ({
+		rows.results.map((row) => ({
 			filename: row.filename,
 			nest_filename: row.nest_filename ?? null,
 			section_id: Number(row.section_id),

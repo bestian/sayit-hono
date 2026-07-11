@@ -7,11 +7,10 @@
  * per-test SQL-matching resolver logic stays inline.
  */
 import { describe, expect, it } from 'vite-plus/test';
-// vi.mock in setup-cache-isolation.ts hoists this; static import is fine.
-import { cache as workersCache } from 'cloudflare:workers';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import { createMockEnv, dispatch } from './helpers/mockEnv';
 import type { MockWorkerEnv, PreparedStatement, QueryResolver } from './helpers/mockEnv';
+import { purgeMock } from './setup-cache-isolation';
 
 // ---------------------------------------------------------------------------
 // Safe filter helper: __batchedStatements contains both bound statements
@@ -824,8 +823,7 @@ describe('filename truncation clobber guard', () => {
 
 describe('upload_markdown cachePurge failures', () => {
 	it('returns 503 when cache purge fails after PATCH', async () => {
-		const purge = workersCache.purge as unknown as { mockResolvedValue: (v: unknown) => void };
-		purge.mockResolvedValue({ success: false });
+		purgeMock.mockResolvedValue({ success: false, errors: [] });
 		const env = createMockEnv(demoSpeechResolver());
 		const { res } = await dispatch('/api/upload_markdown', env, {
 			method: 'PATCH',
@@ -839,8 +837,7 @@ describe('upload_markdown cachePurge failures', () => {
 	});
 
 	it('returns 503 when cache purge fails after DELETE', async () => {
-		const purge = workersCache.purge as unknown as { mockResolvedValue: (v: unknown) => void };
-		purge.mockResolvedValue({ success: false });
+		purgeMock.mockResolvedValue({ success: false, errors: [] });
 		const env = createMockEnv(deleteResolver({ speakerRoutes: [] }));
 		const { res } = await dispatch('/api/upload_markdown?filename=demo-speech', env, {
 			method: 'DELETE',
@@ -854,8 +851,7 @@ describe('upload_markdown cachePurge failures', () => {
 	});
 
 	it('returns 503 when cache purge fails after POST', async () => {
-		const purge = workersCache.purge as unknown as { mockResolvedValue: (v: unknown) => void };
-		purge.mockResolvedValue({ success: false });
+		purgeMock.mockResolvedValue({ success: false, errors: [] });
 		const env = createMockEnv(demoSpeechResolver());
 		const { res } = await dispatch('/api/upload_markdown', env, {
 			method: 'POST',

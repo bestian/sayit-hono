@@ -91,19 +91,12 @@
 				var params = new URLSearchParams(window.location.search);
 				var override = params.get('ask_base');
 				if (override) return override.replace(/\/$/, '');
-			} catch (_e) { /* ignore */ }
+			} catch { /* ignore */ }
 			return 'http://127.0.0.1:8787';
 		}
 		return 'https://ask.archive.tw';
 	}
 	var ASK_BASE_URL = resolveAskBaseUrl();
-
-	function shouldWarmupOnFocus() {
-		var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-		if (!connection) return true;
-		if (connection.saveData) return false;
-		return !/^(slow-2g|2g|3g)$/i.test(connection.effectiveType || '');
-	}
 
 	function ensureWorker(shouldWarmup) {
 		if (worker) return;
@@ -155,7 +148,7 @@
 		try {
 			var url = new URL(value);
 			return url.protocol === 'http:' || url.protocol === 'https:';
-		} catch (e) {
+		} catch {
 			return false;
 		}
 	}
@@ -221,7 +214,7 @@
 			if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
 				return navigator.clipboard.writeText(text).then(function () { return true; }).catch(function () { return false; });
 			}
-		} catch (e) {}
+		} catch { /* clipboard write unsupported or denied; fall through to the execCommand fallback below */ }
 		try {
 			var textarea = document.createElement('textarea');
 			textarea.value = text;
@@ -235,7 +228,7 @@
 			var ok = document.execCommand('copy');
 			textarea.remove();
 			return Promise.resolve(!!ok);
-		} catch (err) {
+		} catch {
 			return Promise.resolve(false);
 		}
 	}
@@ -248,7 +241,7 @@
 			if (!btn || btn.disabled) return;
 			var text = lastAskMarkdown || '';
 			if (!text.trim()) return;
-			copyMarkdownText(text).then(function (ok) {
+			void copyMarkdownText(text).then(function (ok) {
 				btn.textContent = ok ? askT.copiedMarkdown : askT.copyFailed;
 				if (askCopyResetTimer) clearTimeout(askCopyResetTimer);
 				askCopyResetTimer = setTimeout(function () {
@@ -276,7 +269,7 @@
 		var extracted = extractAskInlineHtmlAnchors(text || '');
 		var html = escapeHtml(extracted.text);
 		html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-		html = html.replace(/(^|[^*])\*([^\*\n]+)\*/g, '$1<em>$2</em>');
+		html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
 		html = html.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, function (_m, label, href) {
 			if (!isSafeHttpUrl(href)) return escapeHtml(label);
 			return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(label) + '</a>';
@@ -289,6 +282,7 @@
 			});
 		}
 		// Restore extracted HTML anchors as sanitized links (or plain text if unsafe).
+		// oxlint-disable-next-line no-control-regex -- intentional NUL sentinel placeholder, mirrors extractAskInlineHtmlAnchors' marker format
 		html = html.replace(/\u0000ASKA(\d+)\u0000/g, function (_m, id) {
 			var item = extracted.anchors[Number(id)];
 			if (!item) return '';
@@ -694,7 +688,7 @@
 
 		ensureWorker(true);
 
-		searchViaWorker(query, 100).then(function (msg) {
+		void searchViaWorker(query, 100).then(function (msg) {
 			if (query !== currentQuery) return;
 
 			if (msg.type === 'error') {
@@ -829,7 +823,7 @@
 		var onSearchResults = window.location.pathname === '/search/';
 
 		if (askAnswer && askAvailable && q.length <= 100 && !askLoading && askCooldownRemaining <= 0) {
-			runAiFirstSearch(q, onSearchResults);
+			void runAiFirstSearch(q, onSearchResults);
 			return;
 		}
 
@@ -903,7 +897,7 @@
 		if (shortcutBadge && !input.value) shortcutBadge.style.opacity = '1';
 	});
 
-	initAsk().finally(function () {
+	void initAsk().finally(function () {
 		if (!results || window.location.pathname !== '/search/') return;
 		var initialQuery = new URLSearchParams(window.location.search).get('q') || '';
 		if (!initialQuery.trim()) return;

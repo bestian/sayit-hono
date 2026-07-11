@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
-import { createMockEnv, dispatch, type QueryResolver } from './helpers/mockEnv';
+import { createMockEnv, dispatch } from './helpers/mockEnv';
 
 describe('/rss.xml', () => {
 	it('serves feed with front-cache headers from R2 or DB', async () => {

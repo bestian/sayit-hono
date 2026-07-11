@@ -11,7 +11,7 @@ export async function speechContent(c: Context<ApiEnv>) {
 		const pathname = new URL(c.req.url).pathname;
 		const encodedPath = pathname.slice('/api/speech/'.length);
 		const parts = encodedPath.split('/');
-		const encodedFilename = parts[0] ?? '';
+		const encodedFilename = parts[0];
 		const encodedNestFilename = parts.slice(1).join('/') || '';
 
 		if (!encodedFilename) {

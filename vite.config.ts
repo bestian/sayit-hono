@@ -36,6 +36,16 @@ export default defineConfig({
 		env: {
 			builtin: true,
 		},
+		// Third-party vendored static JS (unbundled, served as-is to the browser) —
+		// never a TS/type-checked module. First-party public/static/speeches/js/*
+		// glue (pagefind-search.js, select2-override.js, speeches.js,
+		// fuse-search.worker.js) stays in scope and must lint clean.
+		ignorePatterns: [
+			'public/static/speeches/js/jquery.js',
+			'public/static/speeches/js/fuse.min.js',
+			'public/static/speeches/js/masonry.pkgd.min.js',
+			'public/static/speeches/js/foundation/**',
+		],
 		options: {
 			typeAware: true,
 			typeCheck: true,

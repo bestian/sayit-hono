@@ -45,6 +45,7 @@ function renderAskInlineMarkdown(text: string): string {
 		if (!isSafeHttpUrl(href)) return escapeHtml(label);
 		return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
 	});
+	// oxlint-disable-next-line no-control-regex -- intentional NUL sentinel placeholder, mirrors extractAskInlineHtmlAnchors' real marker format
 	html = html.replace(/\u0000ASKA(\d+)\u0000/g, (_m, id: string) => {
 		const item = extracted.anchors[Number(id)];
 		if (!item) return '';

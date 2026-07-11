@@ -244,13 +244,13 @@ export async function runSearchQuery(
 
 	return {
 		query: normalizedQuery,
-		speakers: ((speakerResult.results ?? []) as SearchSpeakerRow[]).map((row: SearchSpeakerRow) => ({
+		speakers: (speakerResult.results as SearchSpeakerRow[]).map((row: SearchSpeakerRow) => ({
 			route_pathname: row.route_pathname,
 			name: row.name,
 			photoURL: row.photoURL ?? null,
 			snippet: highlightSearchText(row.name ?? '', normalizedQuery),
 		})),
-		sections: ((sectionResult.results ?? []) as Array<SearchResultRow & { section_speaker?: string | null; photoURL?: string | null }>).map(
+		sections: (sectionResult.results as Array<SearchResultRow & { section_speaker?: string | null; photoURL?: string | null }>).map(
 			(row) => ({
 				section_id: Number(row.section_id),
 				filename: row.filename,

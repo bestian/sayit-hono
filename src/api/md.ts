@@ -249,9 +249,6 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 				headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
 				headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
 				Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-				if (headers.has('Access-Control-Allow-Origin')) {
-					headers.set('Vary', 'Origin');
-				}
 				const body = await cached.text();
 				return new Response(body, { status: 200, headers });
 			}
@@ -276,9 +273,6 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	if (!isNumericAnKey(anKey)) {
 		const cacheKey = r2MdKey(baseKey);
-		if (headers.has('Access-Control-Allow-Origin')) {
-			headers.set('Vary', 'Origin');
-		}
 		const response = new Response(mdContent, { status: 200, headers });
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response, 'text/markdown; charset=utf-8');
 		return response;

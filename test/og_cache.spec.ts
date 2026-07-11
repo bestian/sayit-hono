@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
-import { createMockEnv, dispatch, type QueryResolver } from './helpers/mockEnv';
+import { createMockEnv, dispatch } from './helpers/mockEnv';
 
 describe('/og/speech/:id.png', () => {
 	it('serves a cached PNG from SPEECH_CACHE when present', async () => {
@@ -40,7 +40,7 @@ describe('/og/*', () => {
 	});
 
 	it('returns 404 for unknown speech meta', async () => {
-		const env = createMockEnv((sql, args) => {
+		const env = createMockEnv((sql, _args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
 			return { success: true, results: [] };
 		});
