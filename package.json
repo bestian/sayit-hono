@@ -5,9 +5,9 @@
 	"private": true,
 	"packageManager": "bun@1.3.14",
 	"scripts": {
-		"deploy": "echo 'BLOCKED on techdebt/vp-lemmascript-migration: prod deploy disabled during migration. Use: bun run deploy:staging' && exit 1",
-		"deploy:assets": "echo 'BLOCKED on techdebt/vp-lemmascript-migration: prod deploy disabled during migration. Use: bun run deploy:staging:assets' && exit 1",
-		"deploy:search": "echo 'BLOCKED on techdebt/vp-lemmascript-migration: prod deploy disabled during migration. Use: bun run deploy:staging' && exit 1",
+		"deploy": "bun run deploy:search",
+		"deploy:assets": "bun run preflight:deploy && bun run build:cache-version && vite build && npx wrangler deploy && bun run verify:deploy",
+		"deploy:search": "bun run preflight:deploy && bun run build:cache-version && vite build && ALLOW_PROD_R2=1 bun run build:search && npx wrangler deploy && bun run verify:deploy",
 		"deploy:staging": "bun run build:cache-version && CLOUDFLARE_ENV=staging vite build && SEARCH_R2_BUCKETS=sayit-speech-cache-staging bun run build:search && npx wrangler deploy --env staging && VERIFY_URL=https://sayit-hono-staging.audreyt.workers.dev/version DEPLOY_RETRY_HINT='CLOUDFLARE_ENV=staging vite build && npx wrangler deploy --env staging' bun run verify:deploy",
 		"deploy:staging:assets": "bun run build:cache-version && CLOUDFLARE_ENV=staging vite build && npx wrangler deploy --env staging && VERIFY_URL=https://sayit-hono-staging.audreyt.workers.dev/version bun run verify:deploy",
 		"dev": "vite dev",

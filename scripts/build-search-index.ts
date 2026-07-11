@@ -412,6 +412,13 @@ async function buildSearchIndex() {
 		if (uploadedToR2) {
 			await Promise.all([outputPath, outputBrPath, runtimeManifestPath, statsPath].map(removeIfExists));
 			console.log('[build-search] Removed R2-served generated files from www/ before Wrangler asset upload');
+		} else {
+			// A caller chaining this with `&&` (deploy:search, deploy:staging) must
+			// not proceed to `wrangler deploy` on a half-uploaded index — that
+			// would flip the worker to code expecting R2 keys that were never
+			// written. Fail the whole script instead of warning and continuing.
+			process.exitCode = 1;
+			throw new Error('[build-search] Aborting: one or more R2 uploads failed (see errors above).');
 		}
 	}
 }
