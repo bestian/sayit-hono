@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { assertNotProd } from './lib/assert-not-prod';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { brotliCompressSync } from 'node:zlib';
@@ -14,10 +15,16 @@ import {
 	packSearchDocs,
 	unpackSearchDocs,
 	type SearchDocRecord,
-	type SearchIndexPayload
+	type SearchIndexPayload,
 } from '../src/search/indexFormat';
 
-const R2_BUCKETS = ['sayit-speech-cache', 'sayit-speech-cache-preview'] as const;
+// Comma-separated override so non-prod runs (e.g. staging deploys) never
+// write to the production bucket by accident — default preserves exact
+// prior behavior for the real prod deploy path.
+const R2_BUCKETS = (process.env.SEARCH_R2_BUCKETS ?? 'sayit-speech-cache,sayit-speech-cache-preview')
+	.split(',')
+	.map((b) => b.trim())
+	.filter(Boolean);
 const SEARCH_BUILD_FORMAT_VERSION = 2;
 const SEARCH_BUILD_FORMAT_VERSION_KEY = '__search_build_format_version';
 
@@ -65,12 +72,7 @@ async function fetchSpeechSections(apiBase: string, filename: string): Promise<A
 }
 
 /** Fetch sections for multiple speeches concurrently, updating dump in place */
-async function fetchSections(
-	apiBase: string,
-	filenames: string[],
-	dump: SectionsDump,
-	concurrency = 20
-): Promise<void> {
+async function fetchSections(apiBase: string, filenames: string[], dump: SectionsDump, concurrency = 20): Promise<void> {
 	if (filenames.length === 0) return;
 	let done = 0;
 	const queue = [...filenames];
@@ -92,6 +94,7 @@ async function fetchSections(
 }
 
 function uploadFileToR2Buckets(key: string, filePath: string, contentType: string) {
+	for (const bucket of R2_BUCKETS) assertNotProd(bucket);
 	const MAX_RETRIES = 3;
 	for (const bucket of R2_BUCKETS) {
 		const cmd = `npx wrangler r2 object put ${bucket}/${key} --file "${filePath}" --content-type "${contentType}" --remote`;
@@ -166,16 +169,14 @@ async function buildSearchIndex() {
 	try {
 		const statsResp = await fetch(statsApiUrl);
 		if (statsResp.ok) {
-			statsFromApi = await statsResp.json() as SearchStats;
+			statsFromApi = (await statsResp.json()) as SearchStats;
 		}
 	} catch (err) {
 		console.warn('[build-search] Failed to fetch stats.json', err);
 	}
 
 	const stripMixedHyphens = (value: string) =>
-		value
-			.replace(/([a-z0-9])-(?=[^\x00-\x7f])/g, '$1')
-			.replace(/(?<=[^\x00-\x7f])-([a-z0-9])/g, '$1');
+		value.replace(/([a-z0-9])-(?=[^\x20-\x7f])/g, '$1').replace(/(?<=[^\x20-\x7f])-([a-z0-9])/g, '$1');
 	const normalize = (value: string) => stripMixedHyphens(value).replace(/[、，。；：！？]/g, '');
 	const canonicalByTransformed = new Map<string, string>();
 	const canonicalByNormalized = new Map<string, string>();
@@ -186,9 +187,7 @@ async function buildSearchIndex() {
 
 	function resolveCanonical(mdFile: string): string {
 		const derived = transformFilename(mdFile);
-		return canonicalByTransformed.get(derived)
-			|| canonicalByNormalized.get(normalize(derived))
-			|| derived;
+		return canonicalByTransformed.get(derived) || canonicalByNormalized.get(normalize(derived)) || derived;
 	}
 
 	let dump: SectionsDump = {};
@@ -248,14 +247,12 @@ async function buildSearchIndex() {
 	}
 	newManifest[SEARCH_BUILD_FORMAT_VERSION_KEY] = SEARCH_BUILD_FORMAT_VERSION;
 
-	const deletedFiles = Object.keys(oldManifest).filter((file) =>
-		!file.startsWith('__') && !currentFiles.has(file)
-	);
-	const isIncremental = existingDocs.length > 0 && (changedFiles.length + deletedFiles.length) < mdFiles.length;
+	const deletedFiles = Object.keys(oldManifest).filter((file) => !file.startsWith('__') && !currentFiles.has(file));
+	const isIncremental = existingDocs.length > 0 && changedFiles.length + deletedFiles.length < mdFiles.length;
 
 	if (isIncremental) {
 		console.log(
-			`[build-search] Incremental: ${changedFiles.length} changed, ${deletedFiles.length} deleted, ${mdFiles.length - changedFiles.length} unchanged`
+			`[build-search] Incremental: ${changedFiles.length} changed, ${deletedFiles.length} deleted, ${mdFiles.length - changedFiles.length} unchanged`,
 		);
 	} else {
 		console.log('[build-search] Full rebuild');
@@ -281,9 +278,7 @@ async function buildSearchIndex() {
 	}
 
 	if (skipFetch && canonicalsToFetch.size > 0) {
-		console.log(
-			`[build-search] SKIP_FETCH=1, skipping ${canonicalsToFetch.size} API fetches (markdown fallback where needed)`
-		);
+		console.log(`[build-search] SKIP_FETCH=1, skipping ${canonicalsToFetch.size} API fetches (markdown fallback where needed)`);
 	} else if (canonicalsToFetch.size > 0) {
 		const fetchList = Array.from(canonicalsToFetch);
 		console.log(`[build-search] Fetching sections for ${fetchList.length} speeches from API...`);
@@ -304,9 +299,7 @@ async function buildSearchIndex() {
 	const allSpeakers = new Set<string>();
 
 	if (isIncremental) {
-		const changedFilenames = new Set(
-			[...changedFiles, ...deletedFiles].map(resolveCanonical)
-		);
+		const changedFilenames = new Set([...changedFiles, ...deletedFiles].map(resolveCanonical));
 		for (const doc of existingDocs) {
 			if (!changedFilenames.has(doc.filename)) {
 				allDocs.push(doc);
@@ -363,14 +356,9 @@ async function buildSearchIndex() {
 	}
 
 	allDocs.sort((a, b) => extractDate(b.title).localeCompare(extractDate(a.title)));
-	const sectionsCount = Number(
-		statsFromApi?.sections
-		?? Object.values(dump).reduce((total, sections) => total + sections.length, 0)
-	);
+	const sectionsCount = Number(statsFromApi?.sections ?? Object.values(dump).reduce((total, sections) => total + sections.length, 0));
 
-	console.log(
-		`[build-search] Processed: ${indexed} speeches (${fromDump} from dump, ${fromMarkdown} from markdown), Skipped: ${skipped}`
-	);
+	console.log(`[build-search] Processed: ${indexed} speeches (${fromDump} from dump, ${fromMarkdown} from markdown), Skipped: ${skipped}`);
 	console.log(`[build-search] Total: ${allDocs.length} page docs from ${sectionsCount} sections`);
 
 	await mkdir(path.dirname(outputPath), { recursive: true });
@@ -385,7 +373,7 @@ async function buildSearchIndex() {
 	const stats = {
 		speeches: Number(statsFromApi?.speeches ?? dbEntries.length),
 		speakers: Number(statsFromApi?.speakers ?? speakersCount ?? allSpeakers.size),
-		sections: sectionsCount
+		sections: sectionsCount,
 	};
 
 	await writeFile(outputPath, jsonData);

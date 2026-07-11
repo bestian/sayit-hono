@@ -4,7 +4,7 @@ import {
 	planSpeechInvalidation,
 	planSpeakerInvalidation,
 	planListInvalidation,
-	type CacheInvalidationInput
+	type CacheInvalidationInput,
 } from '../src/utils/cachePlan';
 import { CACHE_KEY_VERSION, r2AnKey, r2MdKey, r2OgSpeechKey, r2OgSectionKey, tags } from '../src/api/cache';
 
@@ -20,14 +20,9 @@ describe('planSpeechInvalidation', () => {
 			r2MdKey(filename),
 			`${CACHE_KEY_VERSION}/${HOST}/${filename}`,
 			`${CACHE_KEY_VERSION}/${HOST}/${encodeURIComponent(filename)}`,
-			r2OgSpeechKey(filename)
+			r2OgSpeechKey(filename),
 		]);
-		expect(out.tags).toEqual([
-			tags.speech(filename),
-			tags.listHome,
-			tags.listSpeeches,
-			tags.listRss
-		]);
+		expect(out.tags).toEqual([tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss]);
 	});
 
 	it('appends 2 R2 keys (HTML + OG PNG) per section ID', () => {
@@ -84,10 +79,7 @@ describe('planSpeakerInvalidation', () => {
 		// ASCII pathnames: raw === encoded, so each pathname contributes 1 unique key.
 		const out = planSpeakerInvalidation(HOST, ['alice']);
 
-		expect(out.r2Keys).toEqual([
-			`${CACHE_KEY_VERSION}/${HOST}/speakers`,
-			`${CACHE_KEY_VERSION}/${HOST}/speaker/alice`
-		]);
+		expect(out.r2Keys).toEqual([`${CACHE_KEY_VERSION}/${HOST}/speakers`, `${CACHE_KEY_VERSION}/${HOST}/speaker/alice`]);
 	});
 
 	it('preserves duplicate tags (matching original — tags are NOT deduplicated)', () => {
@@ -117,10 +109,7 @@ describe('planListInvalidation', () => {
 	it('home=true adds / and /index.html keys + listHome tag', () => {
 		const out = planListInvalidation(HOST, true, false, false);
 
-		expect(out.r2Keys).toEqual([
-			`${CACHE_KEY_VERSION}/${HOST}/`,
-			`${CACHE_KEY_VERSION}/${HOST}/index.html`
-		]);
+		expect(out.r2Keys).toEqual([`${CACHE_KEY_VERSION}/${HOST}/`, `${CACHE_KEY_VERSION}/${HOST}/index.html`]);
 		expect(out.tags).toEqual([tags.listHome]);
 	});
 
@@ -131,7 +120,7 @@ describe('planListInvalidation', () => {
 			`${CACHE_KEY_VERSION}/${HOST}/speeches`,
 			`${CACHE_KEY_VERSION}/${HOST}/speeches/`,
 			`${CACHE_KEY_VERSION}/${HOST}/rss.xml`,
-			`${CACHE_KEY_VERSION}/${HOST}/feed.xml`
+			`${CACHE_KEY_VERSION}/${HOST}/feed.xml`,
 		]);
 		expect(out.tags).toEqual([tags.listSpeeches, tags.listRss]);
 	});
@@ -139,10 +128,7 @@ describe('planListInvalidation', () => {
 	it('speakers=true adds /speakers and /speakers/ keys + listSpeakers tag', () => {
 		const out = planListInvalidation(HOST, false, false, true);
 
-		expect(out.r2Keys).toEqual([
-			`${CACHE_KEY_VERSION}/${HOST}/speakers`,
-			`${CACHE_KEY_VERSION}/${HOST}/speakers/`
-		]);
+		expect(out.r2Keys).toEqual([`${CACHE_KEY_VERSION}/${HOST}/speakers`, `${CACHE_KEY_VERSION}/${HOST}/speakers/`]);
 		expect(out.tags).toEqual([tags.listSpeakers]);
 	});
 
@@ -157,14 +143,9 @@ describe('planListInvalidation', () => {
 			`${CACHE_KEY_VERSION}/${HOST}/rss.xml`,
 			`${CACHE_KEY_VERSION}/${HOST}/feed.xml`,
 			`${CACHE_KEY_VERSION}/${HOST}/speakers`,
-			`${CACHE_KEY_VERSION}/${HOST}/speakers/`
+			`${CACHE_KEY_VERSION}/${HOST}/speakers/`,
 		]);
-		expect(out.tags).toEqual([
-			tags.listHome,
-			tags.listSpeeches,
-			tags.listRss,
-			tags.listSpeakers
-		]);
+		expect(out.tags).toEqual([tags.listHome, tags.listSpeeches, tags.listRss, tags.listSpeakers]);
 	});
 });
 
@@ -174,7 +155,7 @@ describe('planCacheInvalidation (dispatcher)', () => {
 			kind: 'speech',
 			host: HOST,
 			filename: 'talk',
-			sectionIds: [1]
+			sectionIds: [1],
 		};
 		expect(planCacheInvalidation(input)).toEqual(planSpeechInvalidation(HOST, 'talk', [1]));
 	});
@@ -183,7 +164,7 @@ describe('planCacheInvalidation (dispatcher)', () => {
 		const input: CacheInvalidationInput = {
 			kind: 'speaker',
 			host: HOST,
-			routePathnames: ['alice']
+			routePathnames: ['alice'],
 		};
 		expect(planCacheInvalidation(input)).toEqual(planSpeakerInvalidation(HOST, ['alice']));
 	});
@@ -194,7 +175,7 @@ describe('planCacheInvalidation (dispatcher)', () => {
 			host: HOST,
 			home: true,
 			speeches: false,
-			speakers: false
+			speakers: false,
 		};
 		expect(planCacheInvalidation(input)).toEqual(planListInvalidation(HOST, true, false, false));
 	});

@@ -17,7 +17,7 @@ const LEGACY_PALETTE = [
 	'#c512b2',
 	'#d47733',
 	'#b17656',
-	'#4d89d2'
+	'#4d89d2',
 ];
 
 function hashString(value: string): number {
@@ -37,4 +37,3 @@ export function getSpeakerColor(key?: string | null): string {
 }
 
 export const speakerColorPalette = LEGACY_PALETTE;
-

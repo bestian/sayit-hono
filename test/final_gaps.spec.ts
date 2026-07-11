@@ -14,7 +14,7 @@ function makeEnv(resolver: Resolver, preSeedR2: Record<string, { body: string; e
 			body: v.body,
 			cacheControl: 'public, max-age=3600',
 			contentType: v.contentType ?? 'text/html; charset=utf-8',
-			etag: v.etag ?? null
+			etag: v.etag ?? null,
 		});
 	}
 	return {
@@ -31,16 +31,21 @@ function makeEnv(resolver: Resolver, preSeedR2: Record<string, { body: string; e
 					size: entry.body.length,
 					httpEtag: entry.etag,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
-				r2Store.set(key, { body, cacheControl: options?.httpMetadata?.cacheControl, contentType: options?.httpMetadata?.contentType, etag: null });
+				r2Store.set(key, {
+					body,
+					cacheControl: options?.httpMetadata?.cacheControl,
+					contentType: options?.httpMetadata?.contentType,
+					etag: null,
+				});
 			},
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -49,15 +54,15 @@ function makeEnv(resolver: Resolver, preSeedR2: Record<string, { body: string; e
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -76,8 +81,8 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 					success: true,
 					results: [
 						{ filename: '2026-a-demo', display_name: 'A Demo' },
-						{ filename: '2026-b-demo', display_name: 'B Demo' }
-					]
+						{ filename: '2026-b-demo', display_name: 'B Demo' },
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -87,7 +92,7 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 		expect(await res.text()).toContain('A Demo');
 		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
-			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`),
 		);
 		expect(speechCacheKeys).toHaveLength(1);
 	});
@@ -104,9 +109,7 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 		// 第一次呼叫填入 R2，cache key 由 dataToken 決定
 		const first = await request('/speeches/', env);
 		expect(first.res.status).toBe(200);
-		const [cacheKey] = Array.from(env.__r2Store.keys()).filter((key) =>
-			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
-		);
+		const [cacheKey] = Array.from(env.__r2Store.keys()).filter((key) => key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`));
 		expect(cacheKey).toBeDefined();
 
 		// 把同一把 key 改成 sentinel，第二次呼叫應該命中 R2 直接回傳
@@ -114,7 +117,7 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 			body: '<!doctype html><title>cached</title><body>SPEECHES-FROM-R2</body>',
 			cacheControl: 'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400',
 			contentType: 'text/html; charset=utf-8',
-			etag: null
+			etag: null,
 		});
 
 		const second = await request('/speeches/', env);
@@ -133,15 +136,13 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 
 		const first = await request('/speeches/', env);
 		expect(await first.res.text()).toContain('A Demo');
-		const [oldKey] = Array.from(env.__r2Store.keys()).filter((key) =>
-			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
-		);
+		const [oldKey] = Array.from(env.__r2Store.keys()).filter((key) => key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`));
 		expect(oldKey).toBeDefined();
 		env.__r2Store.set(oldKey!, {
 			body: '<!doctype html><title>OLD</title><body>OLD-CACHED</body>',
 			cacheControl: 'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400',
 			contentType: 'text/html; charset=utf-8',
-			etag: null
+			etag: null,
 		});
 
 		rows = [{ filename: '2026-b-demo', display_name: 'B Demo' }];
@@ -150,7 +151,7 @@ describe('/speeches/ render (happy path without R2 preseed)', () => {
 		expect(html).toContain('B Demo');
 		expect(html).not.toContain('OLD-CACHED');
 		const speechCacheKeys = Array.from(env.__r2Store.keys()).filter((key) =>
-			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`)
+			key.startsWith(`${CACHE_KEY_VERSION}/example.com/speeches/data-`),
 		);
 		expect(speechCacheKeys).toHaveLength(2);
 	});
@@ -160,7 +161,7 @@ describe('/speakers/ R2 cache hit', () => {
 	it('returns the preseeded body without calling DB', async () => {
 		const cacheKey = `${CACHE_KEY_VERSION}/example.com/speakers/`;
 		const env = makeEnv(() => ({ success: false, results: [] }), {
-			[cacheKey]: { body: '<!doctype html><title>SEED</title>SPEAKERS-SEED' }
+			[cacheKey]: { body: '<!doctype html><title>SEED</title>SPEAKERS-SEED' },
 		});
 		const { res } = await request('/speakers/', env);
 		expect(res.status).toBe(200);
@@ -171,7 +172,7 @@ describe('/speakers/ R2 cache hit', () => {
 describe('serveBucketJson surfaces ETag', () => {
 	it('exposes the ETag header when R2 has one', async () => {
 		const env = makeEnv(() => ({ success: true, results: [] }), {
-			'stats.json': { body: '{"n":1}', etag: '"abc"', contentType: 'application/json; charset=utf-8' }
+			'stats.json': { body: '{"n":1}', etag: '"abc"', contentType: 'application/json; charset=utf-8' },
 		});
 		const { res } = await request('/stats.json', env);
 		expect(res.status).toBe(200);

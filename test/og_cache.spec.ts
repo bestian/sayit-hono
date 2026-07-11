@@ -26,7 +26,7 @@ function createEnv(resolver: Resolver, preSeed: Record<string, { body: string; c
 					httpEtag: null,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
 					text: async () => entry.body,
-					arrayBuffer: async () => new TextEncoder().encode(entry.body).buffer
+					arrayBuffer: async () => new TextEncoder().encode(entry.body).buffer,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
@@ -35,7 +35,7 @@ function createEnv(resolver: Resolver, preSeed: Record<string, { body: string; c
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -59,15 +59,15 @@ function createEnv(resolver: Resolver, preSeed: Record<string, { body: string; c
 					all: async () => {
 						const r = await callResolver(args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -81,7 +81,7 @@ async function request(path: string, env: ReturnType<typeof createEnv>, init?: R
 describe('/og/speech/:id.png', () => {
 	it('serves a cached PNG from SPEECH_CACHE when present', async () => {
 		const env = createEnv(() => ({ success: true, results: [] }), {
-			[`${CACHE_KEY_VERSION}/og/speech/42.png`]: { body: 'PNG-bytes', contentType: 'image/png' }
+			[`${CACHE_KEY_VERSION}/og/speech/42.png`]: { body: 'PNG-bytes', contentType: 'image/png' },
 		});
 		const { res } = await request('/og/speech/42.png', env);
 		expect(res.status).toBe(200);
@@ -108,7 +108,7 @@ describe('/og/speech/:id.png', () => {
 describe('/og/*', () => {
 	it('serves a cached PNG from SPEECH_CACHE for /og/<filename>.png', async () => {
 		const env = createEnv(() => ({ success: true, results: [] }), {
-			[`${CACHE_KEY_VERSION}/og/2026-demo.png`]: { body: 'PNG-bytes', contentType: 'image/png' }
+			[`${CACHE_KEY_VERSION}/og/2026-demo.png`]: { body: 'PNG-bytes', contentType: 'image/png' },
 		});
 		const { res } = await request('/og/2026-demo.png', env);
 		expect(res.status).toBe(200);

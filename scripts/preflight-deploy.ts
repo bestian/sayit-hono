@@ -11,7 +11,9 @@ import { execSync } from 'node:child_process';
 const url = process.env.PREFLIGHT_URL ?? process.env.VERIFY_URL ?? 'https://archive.tw/version';
 
 function git(cmd: string): string {
-	return execSync(`git ${cmd}`, { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
+	return execSync(`git ${cmd}`, { stdio: ['ignore', 'pipe', 'pipe'] })
+		.toString()
+		.trim();
 }
 
 function gitOk(cmd: string): boolean {
@@ -28,7 +30,7 @@ async function fetchLiveSha(): Promise<string | null> {
 	try {
 		const res = await fetch(`${url}?_=${Date.now()}`, {
 			cache: 'no-store',
-			headers: { 'Cache-Control': 'no-cache' }
+			headers: { 'Cache-Control': 'no-cache' },
 		});
 		if (!res.ok) {
 			console.warn(`[preflight] /version returned HTTP ${res.status}; skipping ancestor check`);

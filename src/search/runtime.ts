@@ -8,7 +8,7 @@ import {
 	createEmptySearchOverlayManifest,
 	packSearchDocs,
 	type SearchDocRecord,
-	type SearchOverlayManifest
+	type SearchOverlayManifest,
 } from './indexFormat';
 import { docsFromSections, type ApiSection } from './docBuilder';
 import { normalizeSections } from '../utils/sectionUtils';
@@ -30,7 +30,7 @@ function normalizeManifest(raw: SearchOverlayManifest | null): SearchOverlayMani
 		v: SEARCH_INDEX_MANIFEST_VERSION,
 		baselineVersion: raw.baselineVersion || '',
 		updatedAt: raw.updatedAt || new Date().toISOString(),
-		overlays: raw.overlays && typeof raw.overlays === 'object' ? raw.overlays : {}
+		overlays: raw.overlays && typeof raw.overlays === 'object' ? raw.overlays : {},
 	};
 }
 
@@ -40,17 +40,12 @@ async function readJsonObject<T>(bucket: R2Bucket, key: string): Promise<T | nul
 	return JSON.parse(await object.text()) as T;
 }
 
-async function writeJsonObject(
-	bucket: R2Bucket,
-	key: string,
-	value: unknown,
-	cacheControl: string
-): Promise<void> {
+async function writeJsonObject(bucket: R2Bucket, key: string, value: unknown, cacheControl: string): Promise<void> {
 	await bucket.put(key, JSON.stringify(value), {
 		httpMetadata: {
 			cacheControl,
-			contentType: JSON_CONTENT_TYPE
-		}
+			contentType: JSON_CONTENT_TYPE,
+		},
 	});
 }
 
@@ -66,7 +61,7 @@ async function writeSearchOverlayManifest(bucket: R2Bucket, manifest: SearchOver
 export async function writeSearchOverlayForSpeech(
 	c: Context<ApiEnv>,
 	filename: string,
-	updatedAt = new Date().toISOString()
+	updatedAt = new Date().toISOString(),
 ): Promise<void> {
 	const docs = await buildSearchDocsForSpeech(c, filename);
 	const payload = packSearchDocs(docs, updatedAt);
@@ -76,45 +71,35 @@ export async function writeSearchOverlayForSpeech(
 
 	await Promise.all([
 		writeJsonObject(c.env.SPEECH_CACHE, buildSearchOverlayKey(filename), payload, SEARCH_UPDATE_CACHE_CONTROL),
-		writeSearchOverlayManifest(c.env.SPEECH_CACHE, manifest)
+		writeSearchOverlayManifest(c.env.SPEECH_CACHE, manifest),
 	]);
 }
 
-export async function markSpeechDeletedInSearch(
-	bucket: R2Bucket,
-	filename: string,
-	updatedAt = new Date().toISOString()
-): Promise<void> {
+export async function markSpeechDeletedInSearch(bucket: R2Bucket, filename: string, updatedAt = new Date().toISOString()): Promise<void> {
 	const manifest = await readSearchOverlayManifest(bucket);
 	manifest.updatedAt = updatedAt;
 	manifest.overlays[filename] = { deleted: true, updatedAt };
 
-	await Promise.all([
-		bucket.delete(buildSearchOverlayKey(filename)),
-		writeSearchOverlayManifest(bucket, manifest)
-	]);
+	await Promise.all([bucket.delete(buildSearchOverlayKey(filename)), writeSearchOverlayManifest(bucket, manifest)]);
 }
 
 export async function syncSearchStats(c: Context<ApiEnv>): Promise<void> {
 	const [sectionsRow, speakersRow, speechesRow] = await Promise.all([
 		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speech_index').first<CountRow>(),
 		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speakers').first<CountRow>(),
-		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speech_content').first<CountRow>()
+		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speech_content').first<CountRow>(),
 	]);
 
 	const stats = {
 		speeches: Number(speechesRow?.count ?? 0),
 		speakers: Number(speakersRow?.count ?? 0),
-		sections: Number(sectionsRow?.count ?? 0)
+		sections: Number(sectionsRow?.count ?? 0),
 	};
 
 	await writeJsonObject(c.env.SPEECH_CACHE, SEARCH_STATS_KEY, stats, SEARCH_STATS_CACHE_CONTROL);
 }
 
-export async function buildSearchDocsForSpeech(
-	c: Context<ApiEnv>,
-	filename: string
-): Promise<SearchDocRecord[]> {
+export async function buildSearchDocsForSpeech(c: Context<ApiEnv>, filename: string): Promise<SearchDocRecord[]> {
 	const rows = await c.env.DB.prepare(
 		`SELECT
 			sc.filename,
@@ -129,8 +114,10 @@ export async function buildSearchDocsForSpeech(
 		LEFT JOIN speech_index si ON sc.filename = si.filename
 		LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
 		WHERE sc.filename = ?
-		ORDER BY sc.section_id ASC`
-	).bind(filename).all<ApiSection & { previous_section_id: number | null; next_section_id: number | null }>();
+		ORDER BY sc.section_id ASC`,
+	)
+		.bind(filename)
+		.all<ApiSection & { previous_section_id: number | null; next_section_id: number | null }>();
 
 	// Order by the previous/next link chain (true display order), NOT raw section_id.
 	// Inserted sections get fresh ids far above their neighbours, so a section_id ASC
@@ -145,8 +132,8 @@ export async function buildSearchDocsForSpeech(
 			next_section_id: row.next_section_id != null ? Number(row.next_section_id) : null,
 			section_content: row.section_content ?? '',
 			display_name: row.display_name ?? filename,
-			name: row.name ?? null
-		}))
+			name: row.name ?? null,
+		})),
 	);
 
 	if (sections.length === 0) return [];

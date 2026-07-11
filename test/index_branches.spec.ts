@@ -26,7 +26,7 @@ function makeEnv(resolver: Resolver, preSeedR2: Record<string, { body: string; c
 					size: entry.body.length,
 					httpEtag: '"etag"',
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
@@ -35,7 +35,7 @@ function makeEnv(resolver: Resolver, preSeedR2: Record<string, { body: string; c
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -44,15 +44,15 @@ function makeEnv(resolver: Resolver, preSeedR2: Record<string, { body: string; c
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -68,21 +68,21 @@ describe('buildSearchSnippet middle-of-text match', () => {
 		const prefix = 'BEFORE '.repeat(50); // 350 chars pre-match
 		const body = `<p>${prefix}needle and a lot more text after</p>`;
 		const env = makeEnv((sql) => {
-			if (sql.includes('FROM speech_content sc')
-				&& sql.includes('LEFT JOIN speech_index si')
-				&& sql.includes('ORDER BY')) {
+			if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si') && sql.includes('ORDER BY')) {
 				return {
 					success: true,
-					results: [{
-						filename: 'mid-match',
-						nest_filename: null,
-						display_name: 'Mid Match',
-						section_id: 1,
-						section_speaker: null,
-						section_content: body,
-						speaker_name: null,
-						photoURL: null
-					}]
+					results: [
+						{
+							filename: 'mid-match',
+							nest_filename: null,
+							display_name: 'Mid Match',
+							section_id: 1,
+							section_speaker: null,
+							section_content: body,
+							speaker_name: null,
+							photoURL: null,
+						},
+					],
 				};
 			}
 			if (sql.includes('SELECT COUNT(*) AS count') && sql.includes('FROM speech_content sc')) {
@@ -97,21 +97,21 @@ describe('buildSearchSnippet middle-of-text match', () => {
 
 	it('returns an empty snippet when the section text trims down to nothing', async () => {
 		const env = makeEnv((sql) => {
-			if (sql.includes('FROM speech_content sc')
-				&& sql.includes('LEFT JOIN speech_index si')
-				&& sql.includes('ORDER BY')) {
+			if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si') && sql.includes('ORDER BY')) {
 				return {
 					success: true,
-					results: [{
-						filename: 'blank-snippet',
-						nest_filename: null,
-						display_name: 'Blank Snippet',
-						section_id: 2,
-						section_speaker: null,
-						section_content: '   ',
-						speaker_name: null,
-						photoURL: null
-					}]
+					results: [
+						{
+							filename: 'blank-snippet',
+							nest_filename: null,
+							display_name: 'Blank Snippet',
+							section_id: 2,
+							section_speaker: null,
+							section_content: '   ',
+							speaker_name: null,
+							photoURL: null,
+						},
+					],
 				};
 			}
 			if (sql.includes('SELECT COUNT(*) AS count') && sql.includes('FROM speech_content sc')) {
@@ -127,21 +127,21 @@ describe('buildSearchSnippet middle-of-text match', () => {
 	it('appends ... when the match is near the start but the snippet is truncated on the right', async () => {
 		const body = `<p>needle ${'after '.repeat(80)}</p>`;
 		const env = makeEnv((sql) => {
-			if (sql.includes('FROM speech_content sc')
-				&& sql.includes('LEFT JOIN speech_index si')
-				&& sql.includes('ORDER BY')) {
+			if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si') && sql.includes('ORDER BY')) {
 				return {
 					success: true,
-					results: [{
-						filename: 'right-truncated',
-						nest_filename: null,
-						display_name: 'Right Truncated',
-						section_id: 3,
-						section_speaker: null,
-						section_content: body,
-						speaker_name: null,
-						photoURL: null
-					}]
+					results: [
+						{
+							filename: 'right-truncated',
+							nest_filename: null,
+							display_name: 'Right Truncated',
+							section_id: 3,
+							section_speaker: null,
+							section_content: body,
+							speaker_name: null,
+							photoURL: null,
+						},
+					],
 				};
 			}
 			if (sql.includes('SELECT COUNT(*) AS count') && sql.includes('FROM speech_content sc')) {
@@ -159,7 +159,7 @@ describe('buildSearchSnippet middle-of-text match', () => {
 describe('serveBucketJson header branches', () => {
 	it('returns ETag and Content-Length when the R2 object exposes them', async () => {
 		const env = makeEnv(() => ({ success: true, results: [] }), {
-			'sections-dump.json': { body: '[1]', contentType: 'application/json; charset=utf-8' }
+			'sections-dump.json': { body: '[1]', contentType: 'application/json; charset=utf-8' },
 		});
 		const { res } = await request('/sections-dump.json', env);
 		expect(res.status).toBe(200);

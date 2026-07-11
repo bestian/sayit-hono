@@ -1,5 +1,6 @@
-# Generated Vue SSR artifacts
-src/.generated/
+# LemmaScript-generated Dafny artifacts (regenerable via `npx lsc gen`)
+*.dfy
+*.dfy.gen
 
 # Pagefind search index (built from transcript .md files)
 www/pagefind/

@@ -52,7 +52,7 @@ function createDeleteEnv(options: { speakerRoutes?: string[]; redirects?: Record
 			put: async (key: string, body: string) => {
 				putObjects.set(key, body);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -63,12 +63,12 @@ function createDeleteEnv(options: { speakerRoutes?: string[]; redirects?: Record
 						const result = query(sql, args);
 						return result.results[0] ?? null;
 					},
-					all: async () => query(sql, args)
+					all: async () => query(sql, args),
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
 			},
 			batch: async (statements: PreparedStatement[]) => {
@@ -76,19 +76,15 @@ function createDeleteEnv(options: { speakerRoutes?: string[]; redirects?: Record
 					operations.push(stmt);
 				}
 				return statements.map(() => ({ meta: { changes: 1 } }));
-			}
+			},
 		},
 		__operations: operations,
 		__deletedKeys: deletedKeys,
-		__putObjects: putObjects
+		__putObjects: putObjects,
 	};
 }
 
-async function request(
-	path: string,
-	env: ReturnType<typeof createDeleteEnv>,
-	init?: RequestInit<IncomingRequestCfProperties>
-) {
+async function request(path: string, env: ReturnType<typeof createDeleteEnv>, init?: RequestInit<IncomingRequestCfProperties>) {
 	const req = new IncomingRequest(`https://example.com${path}`, init);
 	const ctx = createExecutionContext();
 	const res = await worker.fetch(req, env as any, ctx);
@@ -101,7 +97,7 @@ describe('DELETE /api/upload_markdown', () => {
 
 		const { res } = await request('/api/upload_markdown?filename=demo-speech', env, {
 			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 
 		expect(res.status).toBe(200);
@@ -116,7 +112,7 @@ describe('DELETE /api/upload_markdown', () => {
 		expect(batchSqls[2]).toContain('DELETE FROM speech_index');
 		expect(env.__operations.slice(3).map((s) => s.sql)).toEqual([
 			expect.stringContaining('DELETE FROM speakers'),
-			expect.stringContaining('DELETE FROM speakers')
+			expect.stringContaining('DELETE FROM speakers'),
 		]);
 		expect(env.__operations.slice(3).map((s) => s.args[0])).toEqual(['audrey-tang', 'bestian']);
 	});
@@ -126,17 +122,19 @@ describe('DELETE /api/upload_markdown', () => {
 
 		await request('/api/upload_markdown?filename=demo-speech', env, {
 			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 
-		expect(env.__deletedKeys).toEqual(expect.arrayContaining([
-			`${CACHE_KEY_VERSION}/example.com/demo-speech`,
-			`${CACHE_KEY_VERSION}/example.com/speaker/audrey-tang`,
-			`${CACHE_KEY_VERSION}/example.com/speeches`,
-			`${CACHE_KEY_VERSION}/example.com/speakers`,
-			`${CACHE_KEY_VERSION}/example.com/rss.xml`,
-			`${CACHE_KEY_VERSION}/example.com/`
-		]));
+		expect(env.__deletedKeys).toEqual(
+			expect.arrayContaining([
+				`${CACHE_KEY_VERSION}/example.com/demo-speech`,
+				`${CACHE_KEY_VERSION}/example.com/speaker/audrey-tang`,
+				`${CACHE_KEY_VERSION}/example.com/speeches`,
+				`${CACHE_KEY_VERSION}/example.com/speakers`,
+				`${CACHE_KEY_VERSION}/example.com/rss.xml`,
+				`${CACHE_KEY_VERSION}/example.com/`,
+			]),
+		);
 	});
 
 	it('returns 404 when no rows match', async () => {
@@ -149,7 +147,7 @@ describe('DELETE /api/upload_markdown', () => {
 
 		const { res } = await request('/api/upload_markdown?filename=ghost', env, {
 			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 
 		expect(res.status).toBe(404);
@@ -158,12 +156,12 @@ describe('DELETE /api/upload_markdown', () => {
 	it('rewrites filename via speech_redirects to the canonical target before deleting', async () => {
 		const env = createDeleteEnv({
 			speakerRoutes: ['audrey-tang'],
-			redirects: { 'deprecated-name': 'canonical-name' }
+			redirects: { 'deprecated-name': 'canonical-name' },
 		});
 
 		const { res } = await request('/api/upload_markdown?filename=deprecated-name', env, {
 			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 
 		expect(res.status).toBe(200);
@@ -178,7 +176,7 @@ describe('DELETE /api/upload_markdown', () => {
 		const env = createDeleteEnv();
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 		expect(res.status).toBe(400);
 	});
@@ -188,16 +186,14 @@ describe('DELETE /api/upload_markdown', () => {
 
 		await request('/api/upload_markdown?filename=demo-speech', env, {
 			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 
 		// markSpeechDeletedInSearch writes the manifest marker and deletes the per-speech overlay.
 		const manifestWrite = env.__putObjects.get('search-index-manifest.json');
 		expect(manifestWrite).toBeDefined();
 		expect(manifestWrite).toContain('"deleted":true');
-		expect(env.__deletedKeys).toEqual(expect.arrayContaining([
-			expect.stringMatching(/^search-updates\/demo-speech\.json$/)
-		]));
+		expect(env.__deletedKeys).toEqual(expect.arrayContaining([expect.stringMatching(/^search-updates\/demo-speech\.json$/)]));
 		// syncSearchStats writes a stats snapshot.
 		expect(env.__putObjects.get('stats.json')).toContain('"sections"');
 	});

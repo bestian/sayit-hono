@@ -46,8 +46,7 @@ function buildElement(title: string, date: string | null, speakers: string[]) {
 							width: '800px',
 							height: '800px',
 							borderRadius: '50%',
-							background:
-								'radial-gradient(circle, rgba(219,165,75,0.04) 0%, transparent 65%)',
+							background: 'radial-gradient(circle, rgba(219,165,75,0.04) 0%, transparent 65%)',
 						},
 					},
 				},
@@ -63,8 +62,7 @@ function buildElement(title: string, date: string | null, speakers: string[]) {
 							width: '700px',
 							height: '700px',
 							borderRadius: '50%',
-							background:
-								'radial-gradient(circle, rgba(210,105,72,0.045) 0%, transparent 65%)',
+							background: 'radial-gradient(circle, rgba(210,105,72,0.045) 0%, transparent 65%)',
 						},
 					},
 				},
@@ -293,12 +291,90 @@ function buildQuoteElement(quoteText: string, speakerName: string | null, speech
 // Shared background layers
 function bgLayers() {
 	return [
-		{ type: 'div', props: { style: { position: 'absolute', top: '-250px', left: '-100px', width: '800px', height: '800px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(219,165,75,0.04) 0%, transparent 65%)' } } },
-		{ type: 'div', props: { style: { position: 'absolute', bottom: '-200px', right: '-150px', width: '700px', height: '700px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(210,105,72,0.045) 0%, transparent 65%)' } } },
-		{ type: 'div', props: { style: { position: 'absolute', bottom: '-570px', left: '-10px', width: '1220px', height: '980px', borderRadius: '50%', border: '50px solid rgba(219,159,66,0.02)' } } },
-		{ type: 'div', props: { style: { position: 'absolute', bottom: '-520px', left: '50px', width: '1100px', height: '900px', borderRadius: '50%', border: '1.5px solid rgba(212,164,74,0.32)' } } },
-		{ type: 'div', props: { style: { position: 'absolute', bottom: '-680px', left: '-80px', width: '1360px', height: '1100px', borderRadius: '50%', border: '1px solid rgba(212,164,74,0.1)' } } },
-		{ type: 'div', props: { style: { position: 'absolute', bottom: '-840px', left: '-210px', width: '1620px', height: '1300px', borderRadius: '50%', border: '1px solid rgba(212,164,74,0.05)' } } },
+		{
+			type: 'div',
+			props: {
+				style: {
+					position: 'absolute',
+					top: '-250px',
+					left: '-100px',
+					width: '800px',
+					height: '800px',
+					borderRadius: '50%',
+					background: 'radial-gradient(circle, rgba(219,165,75,0.04) 0%, transparent 65%)',
+				},
+			},
+		},
+		{
+			type: 'div',
+			props: {
+				style: {
+					position: 'absolute',
+					bottom: '-200px',
+					right: '-150px',
+					width: '700px',
+					height: '700px',
+					borderRadius: '50%',
+					background: 'radial-gradient(circle, rgba(210,105,72,0.045) 0%, transparent 65%)',
+				},
+			},
+		},
+		{
+			type: 'div',
+			props: {
+				style: {
+					position: 'absolute',
+					bottom: '-570px',
+					left: '-10px',
+					width: '1220px',
+					height: '980px',
+					borderRadius: '50%',
+					border: '50px solid rgba(219,159,66,0.02)',
+				},
+			},
+		},
+		{
+			type: 'div',
+			props: {
+				style: {
+					position: 'absolute',
+					bottom: '-520px',
+					left: '50px',
+					width: '1100px',
+					height: '900px',
+					borderRadius: '50%',
+					border: '1.5px solid rgba(212,164,74,0.32)',
+				},
+			},
+		},
+		{
+			type: 'div',
+			props: {
+				style: {
+					position: 'absolute',
+					bottom: '-680px',
+					left: '-80px',
+					width: '1360px',
+					height: '1100px',
+					borderRadius: '50%',
+					border: '1px solid rgba(212,164,74,0.1)',
+				},
+			},
+		},
+		{
+			type: 'div',
+			props: {
+				style: {
+					position: 'absolute',
+					bottom: '-840px',
+					left: '-210px',
+					width: '1620px',
+					height: '1300px',
+					borderRadius: '50%',
+					border: '1px solid rgba(212,164,74,0.05)',
+				},
+			},
+		},
 	];
 }
 
@@ -315,11 +391,13 @@ async function renderToFile(element: any, allText: string, filename: string) {
 		],
 	});
 
-	const wasmPath = join(__dirname, '..', 'node_modules', '@resvg', 'resvg-wasm', 'index_bg.wasm');
-	try { await initWasm(readFileSync(wasmPath)); } catch {}
+	const wasmPath = join(import.meta.dirname, '..', 'node_modules', '@resvg', 'resvg-wasm', 'index_bg.wasm');
+	try {
+		await initWasm(readFileSync(wasmPath));
+	} catch {}
 
 	const pngData = new Resvg(svg, { fitTo: { mode: 'width' as const, value: OG_WIDTH } }).render().asPng();
-	const outPath = join(__dirname, '..', filename);
+	const outPath = join(import.meta.dirname, '..', filename);
 	writeFileSync(outPath, pngData);
 	console.log(`Written ${outPath} (${pngData.length} bytes)`);
 }
@@ -334,14 +412,11 @@ async function main() {
 	await renderToFile(buildElement(title, date, speakers), allText1, 'og-preview.png');
 
 	// Quote-level OG
-	const quoteText = '像 GDP 這種抽象指標，極容易被人為灌高。你可以先毀掉某樣東西，再花錢讓人重建。如果摧毀者和重建者都是 AI 系統，那麼你完全可以先製造痛苦，再去治療它——GDP 因而可以被無限墊高。但如果你只是把孩子們聚在一起，圍成一圈講故事，那裡沒有 GDP，因為沒有交易。';
+	const quoteText =
+		'像 GDP 這種抽象指標，極容易被人為灌高。你可以先毀掉某樣東西，再花錢讓人重建。如果摧毀者和重建者都是 AI 系統，那麼你完全可以先製造痛苦，再去治療它——GDP 因而可以被無限墊高。但如果你只是把孩子們聚在一起，圍成一圈講故事，那裡沒有 GDP，因為沒有交易。';
 	const allText2 = ['SAYIT ARCHIVE', quoteText.slice(0, 130), '\u2014', '唐鳳', '2026-03-13 仁工智慧對話', '\u2026'].join('');
 	console.log('--- Quote OG ---');
-	await renderToFile(
-		buildQuoteElement(quoteText, '唐鳳', '2026-03-13 仁工智慧對話'),
-		allText2,
-		'og-preview-quote.png'
-	);
+	await renderToFile(buildQuoteElement(quoteText, '唐鳳', '2026-03-13 仁工智慧對話'), allText2, 'og-preview-quote.png');
 }
 
 main().catch((err) => {

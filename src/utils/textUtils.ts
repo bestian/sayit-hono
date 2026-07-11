@@ -15,7 +15,7 @@ const NAMED_ENTITIES: Record<string, string> = {
 	gt: '>',
 	quot: '"',
 	apos: "'",
-	nbsp: ' '
+	nbsp: ' ',
 };
 
 /**
@@ -61,7 +61,7 @@ export function toPlainText(html: string): string {
 			.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
 			.replace(/<br\s*\/?>/gi, ' ')
 			.replace(/<\/(p|div|section|article|li|blockquote|h[1-6]|tr|td|th)>/gi, ' ')
-			.replace(/<[^>]+>/g, ' ')
+			.replace(/<[^>]+>/g, ' '),
 	)
 		.replace(/\s+/g, ' ')
 		.trim();
@@ -69,10 +69,5 @@ export function toPlainText(html: string): string {
 
 /** Escape the five HTML-significant characters (& < > " ') to their entities. */
 export function escapeHtml(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
+	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

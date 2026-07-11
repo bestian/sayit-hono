@@ -2,19 +2,27 @@ import { createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import worker from '../src/index';
-import { SEARCH_INDEX_BASELINE_BR_KEY, SEARCH_INDEX_BASELINE_KEY, SEARCH_INDEX_MANIFEST_KEY, SEARCH_STATS_KEY } from '../src/search/indexFormat';
+import {
+	SEARCH_INDEX_BASELINE_BR_KEY,
+	SEARCH_INDEX_BASELINE_KEY,
+	SEARCH_INDEX_MANIFEST_KEY,
+	SEARCH_STATS_KEY,
+} from '../src/search/indexFormat';
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 type QueryResolver = (sql: string, args: unknown[]) => { success?: boolean; results: any[] };
 
-function createSsrEnv(resolver: QueryResolver, options: { preSeedR2?: Record<string, { body: string; contentType?: string; cacheControl?: string }> } = {}) {
+function createSsrEnv(
+	resolver: QueryResolver,
+	options: { preSeedR2?: Record<string, { body: string; contentType?: string; cacheControl?: string }> } = {},
+) {
 	const r2Store = new Map<string, { body: string; cacheControl?: string; contentType?: string }>();
 	for (const [k, v] of Object.entries(options.preSeedR2 ?? {})) {
 		r2Store.set(k, {
 			body: v.body,
 			cacheControl: v.cacheControl ?? 'public, max-age=3600',
-			contentType: v.contentType ?? 'text/html; charset=utf-8'
+			contentType: v.contentType ?? 'text/html; charset=utf-8',
 		});
 	}
 
@@ -32,20 +40,20 @@ function createSsrEnv(resolver: QueryResolver, options: { preSeedR2?: Record<str
 					size: entry.body.length,
 					httpEtag: null,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
 				r2Store.set(key, {
 					body,
 					cacheControl: options?.httpMetadata?.cacheControl,
-					contentType: options?.httpMetadata?.contentType
+					contentType: options?.httpMetadata?.contentType,
 				});
 			},
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -67,15 +75,15 @@ function createSsrEnv(resolver: QueryResolver, options: { preSeedR2?: Record<str
 					all: async () => {
 						const r = await callResolver(args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -156,9 +164,9 @@ describe('SSR /speaker/:route', () => {
 							longest_section_id: 99,
 							longest_section_content: '<p>long</p>',
 							longest_section_filename: '2026-demo',
-							longest_section_displayname: 'Demo'
-						}
-					]
+							longest_section_displayname: 'Demo',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -174,9 +182,9 @@ describe('SSR /speaker/:route', () => {
 						next_section_id: null,
 						section_speaker: 'audrey-tang',
 						section_content: '<p>Hi</p>',
-						display_name: 'Demo'
-					}
-				]
+						display_name: 'Demo',
+					},
+				],
 			};
 		}
 		return { success: true, results: [] };
@@ -185,7 +193,7 @@ describe('SSR /speaker/:route', () => {
 	it('renders a cached R2 body without hitting DB', async () => {
 		const cacheKey = `${CACHE_KEY_VERSION}/example.com/speaker/audrey-tang`;
 		const env = createSsrEnv(() => ({ success: false, results: [] }), {
-			preSeedR2: { [cacheKey]: { body: '<!doctype html><title>SEED</title>SPEAKER-SEED' } }
+			preSeedR2: { [cacheKey]: { body: '<!doctype html><title>SEED</title>SPEAKER-SEED' } },
 		});
 		const { res } = await request('/speaker/audrey-tang', env);
 		expect(res.status).toBe(200);
@@ -237,9 +245,9 @@ describe('SSR /speech/:section_id', () => {
 							photoURL: null,
 							name: 'Audrey Tang',
 							previous_content: null,
-							next_content: null
-						}
-					]
+							next_content: null,
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -282,13 +290,15 @@ describe('SSR /:filename', () => {
 			if (args[0] === '2026-flat') {
 				return {
 					success: true,
-					results: [{ filename: '2026-flat', display_name: 'Flat', isNested: 0, nest_filenames: null, nest_display_names: null }]
+					results: [{ filename: '2026-flat', display_name: 'Flat', isNested: 0, nest_filenames: null, nest_display_names: null }],
 				};
 			}
 			if (args[0] === '2026-nested') {
 				return {
 					success: true,
-					results: [{ filename: '2026-nested', display_name: 'Nested', isNested: 1, nest_filenames: '["a","b"]', nest_display_names: '["A","B"]' }]
+					results: [
+						{ filename: '2026-nested', display_name: 'Nested', isNested: 1, nest_filenames: '["a","b"]', nest_display_names: '["A","B"]' },
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -296,9 +306,12 @@ describe('SSR /:filename', () => {
 		if (sql.includes('FROM speech_index si') && sql.includes('alternate_filename')) {
 			return { success: true, results: [] };
 		}
-		if (sql.includes('FROM speech_content sc') && sql.includes('WHERE sc.filename = ?')
-			&& sql.includes('LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname')
-			&& !sql.includes('GROUP BY')) {
+		if (
+			sql.includes('FROM speech_content sc') &&
+			sql.includes('WHERE sc.filename = ?') &&
+			sql.includes('LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname') &&
+			!sql.includes('GROUP BY')
+		) {
 			if (args[0] === '2026-flat') {
 				return {
 					success: true,
@@ -311,7 +324,7 @@ describe('SSR /:filename', () => {
 							section_speaker: 'audrey-tang',
 							section_content: '<p>a</p>',
 							photoURL: null,
-							name: 'Audrey'
+							name: 'Audrey',
 						},
 						{
 							filename: '2026-flat',
@@ -321,9 +334,9 @@ describe('SSR /:filename', () => {
 							section_speaker: 'audrey-tang',
 							section_content: '<p>b</p>',
 							photoURL: null,
-							name: 'Audrey'
-						}
-					]
+							name: 'Audrey',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -333,8 +346,8 @@ describe('SSR /:filename', () => {
 				success: true,
 				results: [
 					{ nest_filename: 'a', nest_display_name: 'Alpha', section_count: 2, first_section_id: 10 },
-					{ nest_filename: 'b', nest_display_name: 'Beta', section_count: 1, first_section_id: 20 }
-				]
+					{ nest_filename: 'b', nest_display_name: 'Beta', section_count: 1, first_section_id: 20 },
+				],
 			};
 		}
 		if (sql.includes('WHERE section_id IN')) {
@@ -342,8 +355,8 @@ describe('SSR /:filename', () => {
 				success: true,
 				results: [
 					{ section_id: 10, section_content: '<p>First of alpha</p>' },
-					{ section_id: 20, section_content: '<p>First of beta</p>' }
-				]
+					{ section_id: 20, section_content: '<p>First of beta</p>' },
+				],
 			};
 		}
 		return { success: true, results: [] };
@@ -455,7 +468,7 @@ describe('SSR /:filename', () => {
 			if (sql.includes('FROM speech_index si') && sql.includes('alternate_filename')) {
 				return {
 					success: true,
-					results: [{ alternate_filename: '2026-flat-en', alternate_display_name: '2026-flat-en Demo' }]
+					results: [{ alternate_filename: '2026-flat-en', alternate_display_name: '2026-flat-en Demo' }],
 				};
 			}
 			return flatResolver(sql, args);
@@ -475,19 +488,21 @@ describe('SSR /:filename/:nest_filename', () => {
 			if (args[0] === '2026-nested') {
 				return {
 					success: true,
-					results: [{
-						filename: '2026-nested',
-						display_name: 'Nested',
-						isNested: 1,
-						nest_filenames: '["a","b"]',
-						nest_display_names: '["Alpha","Beta"]'
-					}]
+					results: [
+						{
+							filename: '2026-nested',
+							display_name: 'Nested',
+							isNested: 1,
+							nest_filenames: '["a","b"]',
+							nest_display_names: '["Alpha","Beta"]',
+						},
+					],
 				};
 			}
 			if (args[0] === '2026-flat') {
 				return {
 					success: true,
-					results: [{ filename: '2026-flat', display_name: 'Flat', isNested: 0, nest_filenames: null, nest_display_names: null }]
+					results: [{ filename: '2026-flat', display_name: 'Flat', isNested: 0, nest_filenames: null, nest_display_names: null }],
 				};
 			}
 			return { success: true, results: [] };
@@ -495,8 +510,7 @@ describe('SSR /:filename/:nest_filename', () => {
 		if (sql.includes('FROM speech_index si') && sql.includes('alternate_filename')) {
 			return { success: true, results: [] };
 		}
-		if (sql.includes('FROM speech_content sc')
-			&& sql.includes('WHERE sc.filename = ? AND sc.nest_filename = ?')) {
+		if (sql.includes('FROM speech_content sc') && sql.includes('WHERE sc.filename = ? AND sc.nest_filename = ?')) {
 			if (args[0] === '2026-nested' && args[1] === 'a') {
 				return {
 					success: true,
@@ -512,9 +526,9 @@ describe('SSR /:filename/:nest_filename', () => {
 							section_content: '<p>hi</p>',
 							display_name: 'Nested',
 							photoURL: null,
-							name: 'Audrey'
-						}
-					]
+							name: 'Audrey',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -570,8 +584,7 @@ describe('SSR /:filename/:nest_filename', () => {
 	it('returns 500 when nested sections query fails', async () => {
 		const env = createSsrEnv((sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) return resolver(sql, args);
-			if (sql.includes('FROM speech_content sc')
-				&& sql.includes('WHERE sc.filename = ? AND sc.nest_filename = ?')) {
+			if (sql.includes('FROM speech_content sc') && sql.includes('WHERE sc.filename = ? AND sc.nest_filename = ?')) {
 				return { success: false, results: [] };
 			}
 			return { success: true, results: [] };
@@ -584,7 +597,7 @@ describe('SSR /:filename/:nest_filename', () => {
 describe('Static search/stats endpoints', () => {
 	it('serves brotli search index when Accept-Encoding supports br', async () => {
 		const env = createSsrEnv(() => ({ success: true, results: [] }), {
-			preSeedR2: { [SEARCH_INDEX_BASELINE_BR_KEY]: { body: 'compressed-bytes', contentType: 'application/json; charset=utf-8' } }
+			preSeedR2: { [SEARCH_INDEX_BASELINE_BR_KEY]: { body: 'compressed-bytes', contentType: 'application/json; charset=utf-8' } },
 		});
 		const { res } = await request('/search-index.json', env, { headers: { 'Accept-Encoding': 'gzip, br' } });
 		expect(res.status).toBe(200);
@@ -593,7 +606,9 @@ describe('Static search/stats endpoints', () => {
 
 	it('falls back to uncompressed when brotli object is absent', async () => {
 		const env = createSsrEnv(() => ({ success: true, results: [] }), {
-			preSeedR2: { [SEARCH_INDEX_BASELINE_KEY]: { body: '{"pages":[],"speakers":[],"docs":[]}', contentType: 'application/json; charset=utf-8' } }
+			preSeedR2: {
+				[SEARCH_INDEX_BASELINE_KEY]: { body: '{"pages":[],"speakers":[],"docs":[]}', contentType: 'application/json; charset=utf-8' },
+			},
 		});
 		const { res } = await request('/search-index.json', env, { headers: { 'Accept-Encoding': 'gzip, br' } });
 		expect(res.status).toBe(200);
@@ -608,7 +623,7 @@ describe('Static search/stats endpoints', () => {
 
 	it('returns stored manifest when present', async () => {
 		const env = createSsrEnv(() => ({ success: true, results: [] }), {
-			preSeedR2: { [SEARCH_INDEX_MANIFEST_KEY]: { body: '{"v":1}' } }
+			preSeedR2: { [SEARCH_INDEX_MANIFEST_KEY]: { body: '{"v":1}' } },
 		});
 		const { res } = await request('/search-index-manifest.json', env);
 		expect(res.status).toBe(200);
@@ -625,7 +640,7 @@ describe('Static search/stats endpoints', () => {
 
 	it('serves search-updates/*.json when present, 404 otherwise', async () => {
 		const env = createSsrEnv(() => ({ success: true, results: [] }), {
-			preSeedR2: { 'search-updates/demo.json': { body: '{"v":2}' } }
+			preSeedR2: { 'search-updates/demo.json': { body: '{"v":2}' } },
 		});
 		const hit = await request('/search-updates/demo.json', env);
 		expect(hit.res.status).toBe(200);
@@ -639,7 +654,7 @@ describe('Static search/stats endpoints', () => {
 		expect((await request('/stats.json', envMiss)).res.status).toBe(404);
 
 		const envHit = createSsrEnv(() => ({ success: true, results: [] }), {
-			preSeedR2: { [SEARCH_STATS_KEY]: { body: '{"speeches":1}' } }
+			preSeedR2: { [SEARCH_STATS_KEY]: { body: '{"speeches":1}' } },
 		});
 		const { res } = await request('/stats.json', envHit);
 		expect(res.status).toBe(200);
@@ -651,7 +666,7 @@ describe('Static search/stats endpoints', () => {
 		expect((await request('/sections-dump.json', envMiss)).res.status).toBe(404);
 
 		const envHit = createSsrEnv(() => ({ success: true, results: [] }), {
-			preSeedR2: { 'sections-dump.json': { body: '[{"id":1}]' } }
+			preSeedR2: { 'sections-dump.json': { body: '[{"id":1}]' } },
 		});
 		const { res } = await request('/sections-dump.json', envHit);
 		expect(res.status).toBe(200);
@@ -706,16 +721,18 @@ describe('canonical middleware redirects', () => {
 });
 
 describe('speech_redirects 301 fallback', () => {
-	const buildResolver = (redirects: Record<string, string>): QueryResolver => (sql, args) => {
-		if (sql.includes('FROM speech_index WHERE filename = ?')) {
+	const buildResolver =
+		(redirects: Record<string, string>): QueryResolver =>
+		(sql, args) => {
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) {
+				const to = redirects[String(args[0])];
+				return { success: true, results: to ? [{ new_filename: to }] : [] };
+			}
 			return { success: true, results: [] };
-		}
-		if (sql.includes('FROM speech_redirects WHERE old_filename = ?')) {
-			const to = redirects[String(args[0])];
-			return { success: true, results: to ? [{ new_filename: to }] : [] };
-		}
-		return { success: true, results: [] };
-	};
+		};
 
 	it('301 redirects an unknown flat filename when a redirect exists', async () => {
 		const env = createSsrEnv(buildResolver({ 'old-filename': 'new-filename' }));

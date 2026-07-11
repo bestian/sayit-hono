@@ -8,8 +8,7 @@ export { CACHE_KEY_VERSION };
 
 /** Front-of-Worker s-maxage for default HTML pages. */
 export const EDGE_TTL_SECONDS = 300;
-export const DEFAULT_HTML_CACHE_CONTROL =
-	`public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}, stale-while-revalidate=86400`;
+export const DEFAULT_HTML_CACHE_CONTROL = `public, max-age=0, must-revalidate, s-maxage=${EDGE_TTL_SECONDS}, stale-while-revalidate=86400`;
 export const SEARCH_API_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
 export const SEARCH_HTML_CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
 export const FEED_CACHE_CONTROL = 'public, max-age=300, s-maxage=300';
@@ -26,17 +25,14 @@ export const tags = {
 	listTerms: 'list:terms',
 	listSearch: 'list:search',
 	speech: (filename: string) => `speech:${encodeURIComponent(filename)}`,
-	speaker: (routePathname: string) => `speaker:${encodeURIComponent(routePathname)}`
+	speaker: (routePathname: string) => `speaker:${encodeURIComponent(routePathname)}`,
 } as const;
 
 /**
  * R2 origin keys for SSR HTML + RSS only — NOT for an/md/search/OG.
  * Shape: `${CACHE_KEY_VERSION}/${host}${pathname}[?search]`
  */
-export function buildR2HtmlKey(
-	url: string,
-	{ includeSearch = true }: { includeSearch?: boolean } = {}
-): string {
+export function buildR2HtmlKey(url: string, { includeSearch = true }: { includeSearch?: boolean } = {}): string {
 	const u = new URL(url);
 	return `${CACHE_KEY_VERSION}/${u.host}${u.pathname}${includeSearch ? u.search : ''}`;
 }
@@ -62,11 +58,7 @@ export function r2OgSectionKey(sectionId: number | string): string {
 }
 
 /** Attach Cache-Control and optional Cache-Tag for front Workers Cache. */
-export function withCacheHeaders(
-	response: Response,
-	cacheControl = DEFAULT_HTML_CACHE_CONTROL,
-	tagList?: string[]
-): Response {
+export function withCacheHeaders(response: Response, cacheControl = DEFAULT_HTML_CACHE_CONTROL, tagList?: string[]): Response {
 	const res = new Response(response.body, response);
 	res.headers.set('Cache-Control', cacheControl);
 	if (tagList && tagList.length > 0) {
@@ -79,7 +71,7 @@ export function withCacheHeaders(
 export async function readR2Cache(
 	bucket: R2Bucket,
 	cacheKey: string,
-	defaultContentType = 'text/html; charset=utf-8'
+	defaultContentType = 'text/html; charset=utf-8',
 ): Promise<Response | null> {
 	try {
 		console.log('reading from r2 cache', cacheKey);
@@ -118,7 +110,7 @@ export async function writeR2Cache(
 	bucket: R2Bucket,
 	cacheKey: string,
 	response: Response,
-	defaultContentType = 'text/html; charset=utf-8'
+	defaultContentType = 'text/html; charset=utf-8',
 ) {
 	try {
 		const cloned = response.clone();
@@ -130,9 +122,9 @@ export async function writeR2Cache(
 		await bucket.put(cacheKey, body, {
 			httpMetadata: {
 				cacheControl,
-				contentType
+				contentType,
 			},
-			...(cacheTag ? { customMetadata: { cacheTag } } : {})
+			...(cacheTag ? { customMetadata: { cacheTag } } : {}),
 		});
 	} catch (err) {
 		console.error('[r2 cache] write error', err);
@@ -190,9 +182,6 @@ export async function purgeWorkersCache(options: PurgeOptions): Promise<boolean>
 	}
 	return false;
 }
-
-
-
 
 /** Canonical request path for a speech filename (percent-encoded; no raw Unicode). */
 export function speechRequestPath(filename: string): string {

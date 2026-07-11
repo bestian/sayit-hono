@@ -20,10 +20,15 @@ function env(resolver: Resolver) {
 		BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
 		ASSETS: { fetch: () => new Response('NF', { status: 404 }) },
 		SPEECH_CACHE: {
-			delete: async (key: string) => { deletedKeys.push(key); return true; },
+			delete: async (key: string) => {
+				deletedKeys.push(key);
+				return true;
+			},
 			get: async () => null,
-			put: async (key: string, body: string) => { putObjects.set(key, body); },
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			put: async (key: string, body: string) => {
+				putObjects.set(key, body);
+			},
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -45,13 +50,13 @@ function env(resolver: Resolver) {
 					run: async () => {
 						directRuns.push({ sql, args });
 						return { success: true, meta: { changes: 1 } };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
 					all: async () => run([]).all(),
-					run: async () => run([]).run()
+					run: async () => run([]).run(),
 				};
 			},
 			batch: async (stmts: any[]) => {
@@ -59,8 +64,8 @@ function env(resolver: Resolver) {
 					if (typeof s.sql === 'string') operations.push({ sql: s.sql, args: s.args });
 				}
 				return stmts.map(() => ({ meta: { changes: 1 } }));
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -76,7 +81,7 @@ describe('upload_markdown DELETE — empty filename after trim', () => {
 		const e = env(() => ({ success: true, results: [] }));
 		const { res } = await req('/api/upload_markdown?filename=%20%20%20', e, {
 			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
+			headers: { Authorization: 'Bearer token-audrey' },
 		});
 		expect(res.status).toBe(400);
 	});
@@ -91,7 +96,7 @@ describe('orderSectionsByLinks remaining-after-chain branch', () => {
 				if (args[0] === 'broken-next') {
 					return {
 						success: true,
-						results: [{ filename: 'broken-next', display_name: 'Broken', isNested: 0, alternate_filename: null }]
+						results: [{ filename: 'broken-next', display_name: 'Broken', isNested: 0, alternate_filename: null }],
 					};
 				}
 				return { success: true, results: [] };
@@ -102,8 +107,8 @@ describe('orderSectionsByLinks remaining-after-chain branch', () => {
 					results: [
 						{ section_id: 100, previous_section_id: null, next_section_id: 999, section_speaker: 'A', section_content: '<p>a</p>' },
 						{ section_id: 300, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>b</p>' },
-						{ section_id: 200, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>c</p>' }
-					]
+						{ section_id: 200, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>c</p>' },
+					],
 				};
 			}
 			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
@@ -122,8 +127,8 @@ describe('orderSectionsByLinks remaining-after-chain branch', () => {
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				filename: 'broken-next',
-				markdown: '# Broken\n## A:\nfresh content'
-			})
+				markdown: '# Broken\n## A:\nfresh content',
+			}),
 		});
 		expect(res.status).toBe(200);
 	});
@@ -139,14 +144,14 @@ describe('LCS paired-inner-loop push (line 378)', () => {
 			{ section_id: 101, previous_section_id: 100, next_section_id: 102, section_speaker: 'A', section_content: '<p>M1</p>' },
 			{ section_id: 102, previous_section_id: 101, next_section_id: 103, section_speaker: 'A', section_content: '<p>Y</p>' },
 			{ section_id: 103, previous_section_id: 102, next_section_id: 104, section_speaker: 'A', section_content: '<p>M2</p>' },
-			{ section_id: 104, previous_section_id: 103, next_section_id: null, section_speaker: 'A', section_content: '<p>Z</p>' }
+			{ section_id: 104, previous_section_id: 103, next_section_id: null, section_speaker: 'A', section_content: '<p>Z</p>' },
 		];
 		const e = env((sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
 				if (args[0] === 'lcs-multi') {
 					return {
 						success: true,
-						results: [{ filename: 'lcs-multi', display_name: 'LCS Multi', isNested: 0, alternate_filename: null }]
+						results: [{ filename: 'lcs-multi', display_name: 'LCS Multi', isNested: 0, alternate_filename: null }],
 					};
 				}
 				return { success: true, results: [] };
@@ -170,8 +175,8 @@ describe('LCS paired-inner-loop push (line 378)', () => {
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				filename: 'lcs-multi',
-				markdown: '# LCS Multi\n## A:\nA\n\nM1\n\nB\n\nM2\n\nC'
-			})
+				markdown: '# LCS Multi\n## A:\nA\n\nM1\n\nB\n\nM2\n\nC',
+			}),
 		});
 		expect(res.status).toBe(200);
 	});
@@ -184,14 +189,14 @@ describe('LCS pairs iteration branches (buildLcsPairs)', () => {
 		const oldContent = [
 			{ section_id: 100, previous_section_id: null, next_section_id: 101, section_speaker: 'A', section_content: '<p>old X</p>' },
 			{ section_id: 101, previous_section_id: 100, next_section_id: 102, section_speaker: 'A', section_content: '<p>middle Y</p>' },
-			{ section_id: 102, previous_section_id: 101, next_section_id: null, section_speaker: 'A', section_content: '<p>old Z</p>' }
+			{ section_id: 102, previous_section_id: 101, next_section_id: null, section_speaker: 'A', section_content: '<p>old Z</p>' },
 		];
 		const e = env((sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
 				if (args[0] === 'lcs-demo') {
 					return {
 						success: true,
-						results: [{ filename: 'lcs-demo', display_name: 'LCS', isNested: 0, alternate_filename: null }]
+						results: [{ filename: 'lcs-demo', display_name: 'LCS', isNested: 0, alternate_filename: null }],
 					};
 				}
 				return { success: true, results: [] };
@@ -215,8 +220,8 @@ describe('LCS pairs iteration branches (buildLcsPairs)', () => {
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				filename: 'lcs-demo',
-				markdown: '# LCS\n## A:\nnew A\n\nnew B\n\nmiddle Y\n\nnew D\n\nnew E'
-			})
+				markdown: '# LCS\n## A:\nnew A\n\nnew B\n\nmiddle Y\n\nnew D\n\nnew E',
+			}),
 		});
 		expect(res.status).toBe(200);
 	});
@@ -229,7 +234,7 @@ describe('PATCH alternate_filename explicit null', () => {
 				if (args[0] === 'unset-alt') {
 					return {
 						success: true,
-						results: [{ filename: 'unset-alt', display_name: 'UA', isNested: 0, alternate_filename: 'old-partner' }]
+						results: [{ filename: 'unset-alt', display_name: 'UA', isNested: 0, alternate_filename: 'old-partner' }],
 					};
 				}
 				return { success: true, results: [] };
@@ -248,8 +253,8 @@ describe('PATCH alternate_filename explicit null', () => {
 			body: JSON.stringify({
 				filename: 'unset-alt',
 				markdown: '# Unset\n## A:\nstill here',
-				alternate_filename: null
-			})
+				alternate_filename: null,
+			}),
 		});
 		expect(res.status).toBe(200);
 	});
@@ -261,14 +266,14 @@ describe('PATCH >99 inserts uses reserved fresh ids', () => {
 		// positional gap cap no longer applies; inserted sections come from the
 		// fresh reserved id block.
 		const oldSections = [
-			{ section_id: 500, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor-X</p>' }
+			{ section_id: 500, previous_section_id: null, next_section_id: null, section_speaker: 'A', section_content: '<p>anchor-X</p>' },
 		];
 		const e = env((sql, args) => {
 			if (sql.includes('FROM speech_index WHERE filename = ?')) {
 				if (args[0] === 'too-many') {
 					return {
 						success: true,
-						results: [{ filename: 'too-many', display_name: 'Many', isNested: 0, alternate_filename: null }]
+						results: [{ filename: 'too-many', display_name: 'Many', isNested: 0, alternate_filename: null }],
 					};
 				}
 				return { success: true, results: [] };
@@ -291,8 +296,8 @@ describe('PATCH >99 inserts uses reserved fresh ids', () => {
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				filename: 'too-many',
-				markdown: `# Too Many\n${newSections}`
-			})
+				markdown: `# Too Many\n${newSections}`,
+			}),
 		});
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
@@ -302,7 +307,7 @@ describe('PATCH >99 inserts uses reserved fresh ids', () => {
 			sectionsCount: 101,
 			insertedCount: 100,
 			updatedCount: 1,
-			deletedCount: 0
+			deletedCount: 0,
 		});
 		const insertedIds = e.__operations
 			.filter((stmt) => typeof stmt.sql === 'string' && stmt.sql.startsWith('INSERT INTO speech_content'))
@@ -340,8 +345,8 @@ describe('decodeURIComponent catch for speaker name', () => {
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				filename: 'percent-name',
-				markdown: '# Percent\n## 50%:\nat fifty'
-			})
+				markdown: '# Percent\n## 50%:\nat fifty',
+			}),
 		});
 		expect(res.status).toBe(200);
 	});

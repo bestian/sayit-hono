@@ -16,14 +16,16 @@ type SpeechIndexRow = {
 	alternate_filename?: string | null;
 };
 
-function createUpsertEnv(options: {
-	/** If set, this filename exists in speech_index already */
-	existingFilename?: string;
-	/** Rows to return for the speech_index lookup */
-	speechIndexRows?: SpeechIndexRow[];
-	/** speech_redirects mapping: old_filename -> new_filename */
-	redirects?: Record<string, string>;
-} = {}) {
+function createUpsertEnv(
+	options: {
+		/** If set, this filename exists in speech_index already */
+		existingFilename?: string;
+		/** Rows to return for the speech_index lookup */
+		speechIndexRows?: SpeechIndexRow[];
+		/** speech_redirects mapping: old_filename -> new_filename */
+		redirects?: Record<string, string>;
+	} = {},
+) {
 	const operations: PreparedStatement[] = [];
 	const directStatements: PreparedStatement[] = [];
 	const deletedKeys: string[] = [];
@@ -88,7 +90,7 @@ function createUpsertEnv(options: {
 			put: async (key: string, body: string) => {
 				putObjects.set(key, body);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -103,13 +105,13 @@ function createUpsertEnv(options: {
 					run: async () => {
 						directStatements.push({ sql, args });
 						return { success: true, meta: { changes: 1 } };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
 					all: async () => run([]).all(),
-					run: async () => run([]).run()
+					run: async () => run([]).run(),
 				};
 			},
 			batch: async (statements: PreparedStatement[]) => {
@@ -117,20 +119,16 @@ function createUpsertEnv(options: {
 					if (typeof stmt.sql === 'string') operations.push(stmt);
 				}
 				return statements.map(() => ({ meta: { changes: 1 } }));
-			}
+			},
 		},
 		__operations: operations,
 		__directStatements: directStatements,
 		__deletedKeys: deletedKeys,
-		__putObjects: putObjects
+		__putObjects: putObjects,
 	};
 }
 
-async function request(
-	path: string,
-	env: ReturnType<typeof createUpsertEnv>,
-	init?: RequestInit<IncomingRequestCfProperties>
-) {
+async function request(path: string, env: ReturnType<typeof createUpsertEnv>, init?: RequestInit<IncomingRequestCfProperties>) {
 	const req = new IncomingRequest(`https://example.com${path}`, init);
 	const ctx = createExecutionContext();
 	const res = await worker.fetch(req, env as any, ctx);
@@ -145,12 +143,12 @@ describe('PATCH /api/upload_markdown — upsert when filename missing', () => {
 			method: 'PATCH',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
 			body: JSON.stringify({
 				filename: 'fresh-speech',
-				markdown: '# Fresh Speech\nHello world'
-			})
+				markdown: '# Fresh Speech\nHello world',
+			}),
 		});
 
 		expect(res.status).toBe(200);
@@ -166,26 +164,28 @@ describe('PATCH /api/upload_markdown — upsert when filename missing', () => {
 	it('rewrites filename via speech_redirects when speech_index misses, and does not auto-create', async () => {
 		const env = createUpsertEnv({
 			redirects: { 'deprecated-filename': 'canonical-filename' },
-			speechIndexRows: [{
-				filename: 'canonical-filename',
-				display_name: 'Canonical',
-				isNested: 0,
-				nest_filenames: '',
-				nest_display_names: '',
-				alternate_filename: null
-			}]
+			speechIndexRows: [
+				{
+					filename: 'canonical-filename',
+					display_name: 'Canonical',
+					isNested: 0,
+					nest_filenames: '',
+					nest_display_names: '',
+					alternate_filename: null,
+				},
+			],
 		});
 
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'PATCH',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
 			body: JSON.stringify({
 				filename: 'deprecated-filename',
-				markdown: '# Canonical\nContent'
-			})
+				markdown: '# Canonical\nContent',
+			}),
 		});
 
 		expect(res.status).toBe(200);
@@ -200,26 +200,28 @@ describe('PATCH /api/upload_markdown — upsert when filename missing', () => {
 
 	it('does NOT call the upsert insert when row already exists', async () => {
 		const env = createUpsertEnv({
-			speechIndexRows: [{
-				filename: 'existing-speech',
-				display_name: 'Existing',
-				isNested: 0,
-				nest_filenames: '',
-				nest_display_names: '',
-				alternate_filename: null
-			}]
+			speechIndexRows: [
+				{
+					filename: 'existing-speech',
+					display_name: 'Existing',
+					isNested: 0,
+					nest_filenames: '',
+					nest_display_names: '',
+					alternate_filename: null,
+				},
+			],
 		});
 
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'PATCH',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
 			body: JSON.stringify({
 				filename: 'existing-speech',
-				markdown: '# Existing\nNew content'
-			})
+				markdown: '# Existing\nNew content',
+			}),
 		});
 
 		expect(res.status).toBe(200);
@@ -229,27 +231,29 @@ describe('PATCH /api/upload_markdown — upsert when filename missing', () => {
 
 	it('rejects alternate_filename === filename with 400', async () => {
 		const env = createUpsertEnv({
-			speechIndexRows: [{
-				filename: 'dup',
-				display_name: 'Dup',
-				isNested: 0,
-				nest_filenames: '',
-				nest_display_names: '',
-				alternate_filename: null
-			}]
+			speechIndexRows: [
+				{
+					filename: 'dup',
+					display_name: 'Dup',
+					isNested: 0,
+					nest_filenames: '',
+					nest_display_names: '',
+					alternate_filename: null,
+				},
+			],
 		});
 
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'PATCH',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
 			body: JSON.stringify({
 				filename: 'dup',
 				markdown: '# X\nY',
-				alternate_filename: 'dup'
-			})
+				alternate_filename: 'dup',
+			}),
 		});
 
 		expect(res.status).toBe(400);
@@ -257,27 +261,29 @@ describe('PATCH /api/upload_markdown — upsert when filename missing', () => {
 
 	it('rejects non-string alternate_filename with 400', async () => {
 		const env = createUpsertEnv({
-			speechIndexRows: [{
-				filename: 'x',
-				display_name: 'X',
-				isNested: 0,
-				nest_filenames: '',
-				nest_display_names: '',
-				alternate_filename: null
-			}]
+			speechIndexRows: [
+				{
+					filename: 'x',
+					display_name: 'X',
+					isNested: 0,
+					nest_filenames: '',
+					nest_display_names: '',
+					alternate_filename: null,
+				},
+			],
 		});
 
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'PATCH',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
 			body: JSON.stringify({
 				filename: 'x',
 				markdown: '# X\nY',
-				alternate_filename: 123
-			})
+				alternate_filename: 123,
+			}),
 		});
 
 		expect(res.status).toBe(400);

@@ -51,15 +51,10 @@
 	 * Static Assets
 	 * https://developers.cloudflare.com/workers/static-assets/binding/
 	 */
-	"assets": { "directory": "./www/", "binding": "ASSETS" },
-	// satori references process / process.env which don't exist in Workers
-	"define": {
-		"process.env.NODE_ENV": "\"production\"",
-		"process.env.SATORI_STANDALONE": "undefined",
-		"process.env.JEST_WORKER_ID": "undefined",
-		"process.env": "{}",
-		"process": "{\"env\":{}}"
-	},
+	"assets": { "directory": "./public/", "binding": "ASSETS" },
+	// satori's process/process.env polyfill now lives in vite.config.ts's
+	// `define` — Vite owns `define` once @cloudflare/vite-plugin builds this
+	// worker, and ignores (with a warning) this field if left here.
 	/**
 	 * Staging environment — fully self-contained (named environments do NOT
 	 * inherit top-level bindings in Wrangler; every binding is redeclared here
@@ -91,7 +86,7 @@
 					"bucket_name": "sayit-speech-cache-staging"
 				}
 			],
-			"assets": { "directory": "./www/", "binding": "ASSETS" },
+			"assets": { "directory": "./public/", "binding": "ASSETS" },
 			"define": {
 				"process.env.NODE_ENV": "\"production\"",
 				"process.env.SATORI_STANDALONE": "undefined",

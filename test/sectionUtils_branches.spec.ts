@@ -4,7 +4,7 @@ import { reorderSections, type SectionLike } from '../src/utils/sectionUtils';
 const mk = (id: number, prev: number | null, next: number | null): SectionLike => ({
 	section_id: id,
 	previous_section_id: prev,
-	next_section_id: next
+	next_section_id: next,
 });
 
 describe('reorderSections fallback branches', () => {

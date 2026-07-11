@@ -11,7 +11,8 @@
  */
 
 import { exec } from 'node:child_process';
-import { writeFile, mkdir, readdir, rm } from 'node:fs/promises';
+import { assertNotProd } from './lib/assert-not-prod';
+import { writeFile, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
@@ -20,7 +21,7 @@ const execAsync = promisify(exec);
 
 const LOCAL = process.env.WARM_TARGET || 'http://localhost:8787';
 const PROD_HOST = 'archive.tw';
-const PROD_BUCKET = 'sayit-speech-cache';
+const PROD_BUCKET = process.env.WARM_CACHE_R2_BUCKET ?? 'sayit-speech-cache';
 const CACHE_VERSION = process.argv[2] || CACHE_KEY_VERSION;
 const RENDER_CONCURRENCY = 5;
 const UPLOAD_CONCURRENCY = 10;
@@ -45,7 +46,6 @@ async function renderPage(pathname: string, index: number): Promise<boolean> {
 		const html = await resp.text();
 		// Encode pathname into filename: index + cache key (slashes → _)
 		const cacheKey = buildCacheKey(pathname);
-		const safeKey = cacheKey.replace(/\//g, '__');
 		const meta = JSON.stringify({ cacheKey, file: `${index}.html` });
 		await writeFile(path.join(tmpDir, `${index}.html`), html);
 		await writeFile(path.join(tmpDir, `${index}.meta`), meta);
@@ -58,13 +58,11 @@ async function renderPage(pathname: string, index: number): Promise<boolean> {
 // Phase 2: upload rendered files to R2
 async function uploadFile(index: number): Promise<boolean> {
 	try {
-		const metaRaw = await import('node:fs').then(fs =>
-			fs.readFileSync(path.join(tmpDir, `${index}.meta`), 'utf-8')
-		);
+		const metaRaw = await import('node:fs').then((fs) => fs.readFileSync(path.join(tmpDir, `${index}.meta`), 'utf-8'));
 		const { cacheKey } = JSON.parse(metaRaw);
 		const filePath = path.join(tmpDir, `${index}.html`);
 		await execAsync(
-			`npx wrangler r2 object put "${PROD_BUCKET}/${cacheKey}" --file "${filePath}" --content-type "text/html; charset=utf-8" --remote`
+			`npx wrangler r2 object put "${PROD_BUCKET}/${cacheKey}" --file "${filePath}" --content-type "text/html; charset=utf-8" --remote`,
 		);
 		return true;
 	} catch {
@@ -72,7 +70,12 @@ async function uploadFile(index: number): Promise<boolean> {
 	}
 }
 
-async function processQueue<T>(items: T[], concurrency: number, fn: (item: T) => Promise<boolean>, label: string): Promise<{ done: number; errors: number }> {
+async function processQueue<T>(
+	items: T[],
+	concurrency: number,
+	fn: (item: T) => Promise<boolean>,
+	label: string,
+): Promise<{ done: number; errors: number }> {
 	let done = 0;
 	let errors = 0;
 	const total = items.length;
@@ -95,11 +98,14 @@ async function processQueue<T>(items: T[], concurrency: number, fn: (item: T) =>
 }
 
 async function main() {
+	assertNotProd(PROD_BUCKET);
 	console.log(`[warm-cache] Cache version: ${CACHE_VERSION}`);
 	console.log(`[warm-cache] Rendering via ${LOCAL}`);
 
 	// Verify dev server
-	try { await fetch(`${LOCAL}/`); } catch {
+	try {
+		await fetch(`${LOCAL}/`);
+	} catch {
 		console.error('[warm-cache] Cannot reach localhost:8787');
 		process.exitCode = 1;
 		return;
@@ -138,30 +144,20 @@ async function main() {
 	// Phase 1: Render all pages
 	console.log(`[warm-cache] === Phase 1: Render (concurrency ${RENDER_CONCURRENCY}) ===`);
 	const indices = paths.map((_, i) => i);
-	const renderResult = await processQueue(
-		indices,
-		RENDER_CONCURRENCY,
-		(i) => renderPage(paths[i], i),
-		'Render'
-	);
+	const renderResult = await processQueue(indices, RENDER_CONCURRENCY, (i) => renderPage(paths[i], i), 'Render');
 	console.log(`[warm-cache] Rendered: ${renderResult.done - renderResult.errors} ok, ${renderResult.errors} errors\n`);
 
 	// Phase 2: Upload to R2
 	const successIndices = [];
 	for (let i = 0; i < paths.length; i++) {
 		try {
-			await import('node:fs').then(fs => fs.accessSync(path.join(tmpDir, `${i}.html`)));
+			await import('node:fs').then((fs) => fs.accessSync(path.join(tmpDir, `${i}.html`)));
 			successIndices.push(i);
 		} catch {}
 	}
 
 	console.log(`[warm-cache] === Phase 2: Upload ${successIndices.length} files (concurrency ${UPLOAD_CONCURRENCY}) ===`);
-	const uploadResult = await processQueue(
-		successIndices,
-		UPLOAD_CONCURRENCY,
-		uploadFile,
-		'Upload'
-	);
+	const uploadResult = await processQueue(successIndices, UPLOAD_CONCURRENCY, uploadFile, 'Upload');
 	console.log(`[warm-cache] Uploaded: ${uploadResult.done - uploadResult.errors} ok, ${uploadResult.errors} errors\n`);
 
 	// Cleanup

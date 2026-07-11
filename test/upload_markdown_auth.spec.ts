@@ -13,7 +13,7 @@ function createAuthEnv() {
 			delete: async () => true,
 			get: async () => null,
 			put: async () => {},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: () => {
@@ -21,8 +21,8 @@ function createAuthEnv() {
 			},
 			batch: async () => {
 				throw new Error('DB should never be batched when auth fails');
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -40,16 +40,14 @@ describe('/api/upload_markdown — auth gate', () => {
 	for (const method of mutationMethods) {
 		describe(method, () => {
 			const path = method === 'DELETE' ? '/api/upload_markdown?filename=x' : '/api/upload_markdown';
-			const body = method === 'DELETE'
-				? undefined
-				: JSON.stringify({ filename: 'x', markdown: '# x\ny' });
+			const body = method === 'DELETE' ? undefined : JSON.stringify({ filename: 'x', markdown: '# x\ny' });
 			const contentType = method === 'DELETE' ? undefined : 'application/json; charset=utf-8';
 
 			it('rejects missing Authorization header with 400', async () => {
 				const { res } = await request(path, {
 					method,
 					headers: contentType ? { 'Content-Type': contentType } : {},
-					body
+					body,
 				});
 				expect(res.status).toBe(400);
 			});
@@ -59,9 +57,9 @@ describe('/api/upload_markdown — auth gate', () => {
 					method,
 					headers: {
 						Authorization: 'Basic token-audrey',
-						...(contentType ? { 'Content-Type': contentType } : {})
+						...(contentType ? { 'Content-Type': contentType } : {}),
 					},
-					body
+					body,
 				});
 				expect(res.status).toBe(400);
 			});
@@ -71,9 +69,9 @@ describe('/api/upload_markdown — auth gate', () => {
 					method,
 					headers: {
 						Authorization: 'Bearer not-a-real-token',
-						...(contentType ? { 'Content-Type': contentType } : {})
+						...(contentType ? { 'Content-Type': contentType } : {}),
 					},
-					body
+					body,
 				});
 				expect(res.status).toBe(400);
 			});
@@ -83,9 +81,9 @@ describe('/api/upload_markdown — auth gate', () => {
 					method,
 					headers: {
 						Authorization: 'Bearer ',
-						...(contentType ? { 'Content-Type': contentType } : {})
+						...(contentType ? { 'Content-Type': contentType } : {}),
 					},
-					body
+					body,
 				});
 				expect(res.status).toBe(400);
 			});
@@ -102,7 +100,7 @@ describe('/api/purge_cache — auth gate', () => {
 	it('rejects unknown token with 403', async () => {
 		const { res } = await request('/api/purge_cache', {
 			method: 'POST',
-			headers: { Authorization: 'Bearer wrong' }
+			headers: { Authorization: 'Bearer wrong' },
 		});
 		expect(res.status).toBe(403);
 	});
@@ -110,7 +108,7 @@ describe('/api/purge_cache — auth gate', () => {
 	it('rejects non-Bearer scheme with 403', async () => {
 		const { res } = await request('/api/purge_cache', {
 			method: 'POST',
-			headers: { Authorization: 'Basic token-audrey' }
+			headers: { Authorization: 'Basic token-audrey' },
 		});
 		expect(res.status).toBe(403);
 	});

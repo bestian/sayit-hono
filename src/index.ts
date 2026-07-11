@@ -11,7 +11,7 @@ import {
 	readR2Cache,
 	tags,
 	withCacheHeaders,
-	writeR2Cache
+	writeR2Cache,
 } from './api/cache';
 
 import { speakersIndex } from './api/speakers_index';
@@ -27,19 +27,19 @@ import { rssFeed } from './api/rss';
 import { handleOgImage, handleOgSpeechImage } from './api/og_routes';
 import { ogLoader } from './api/og_loader';
 import type { ApiEnv } from './api/types';
-import HomeView, { styles as HomeViewStyles } from './.generated/views/HomeView';
-import SingleParagraphView, { styles as SingleParagraphViewStyles } from './.generated/views/SingleParagraphView';
-import SingleSpeechView, { styles as SingleSpeechViewStyles } from './.generated/views/SingleSpeechView';
-import NestedSpeechView, { styles as NestedSpeechViewStyles } from './.generated/views/NestedSpeechView';
-import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from './.generated/views/SingleNestedSpeechView';
-import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './.generated/views/SingleSpeakerView';
-import SearchResultView, { styles as SearchResultViewStyles } from './.generated/views/SearchResultView';
-import SpeechesView, { styles as SpeechesViewStyles } from './.generated/views/SpeechesView';
-import SpeakersView, { styles as SpeakersViewStyles } from './.generated/views/SpeakersView';
-import LegalPrivacyView, { styles as LegalPrivacyViewStyles } from './.generated/views/LegalPrivacyView';
-import LegalTermsView, { styles as LegalTermsViewStyles } from './.generated/views/LegalTermsView';
-import Navbar, { styles as NavbarStyles } from './.generated/components/Navbar';
-import Footer, { styles as FooterStyles } from './.generated/components/Footer';
+import HomeView, { styles as HomeViewStyles } from './views/HomeView.vue';
+import SingleParagraphView, { styles as SingleParagraphViewStyles } from './views/SingleParagraphView.vue';
+import SingleSpeechView, { styles as SingleSpeechViewStyles } from './views/SingleSpeechView.vue';
+import NestedSpeechView, { styles as NestedSpeechViewStyles } from './views/NestedSpeechView.vue';
+import SingleNestedSpeechView, { styles as SingleNestedSpeechViewStyles } from './views/SingleNestedSpeechView.vue';
+import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from './views/SingleSpeakerView.vue';
+import SearchResultView, { styles as SearchResultViewStyles } from './views/SearchResultView.vue';
+import SpeechesView, { styles as SpeechesViewStyles } from './views/SpeechesView.vue';
+import SpeakersView, { styles as SpeakersViewStyles } from './views/SpeakersView.vue';
+import LegalPrivacyView, { styles as LegalPrivacyViewStyles } from './views/LegalPrivacyView.vue';
+import LegalTermsView, { styles as LegalTermsViewStyles } from './views/LegalTermsView.vue';
+import Navbar, { styles as NavbarStyles } from './components/Navbar.vue';
+import Footer, { styles as FooterStyles } from './components/Footer.vue';
 import { renderHtml } from './ssr/render';
 import {
 	headForSpeechContent,
@@ -52,7 +52,7 @@ import {
 	headForSpeakers,
 	headForHome,
 	headForPrivacy,
-	headForTerms
+	headForTerms,
 } from './ssr/heads';
 import { buildPaginationPages } from './utils/pagination';
 import { normalizeSections } from './utils/sectionUtils';
@@ -63,14 +63,13 @@ import {
 	SEARCH_INDEX_MANIFEST_KEY,
 	SEARCH_STATS_KEY,
 	SEARCH_UPDATES_PREFIX,
-	createEmptySearchOverlayManifest
+	createEmptySearchOverlayManifest,
 } from './search/indexFormat';
 
 type WorkerEnv = ApiEnv['Bindings'];
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
-const VOLATILE_HTML_CACHE_CONTROL = 'no-store, no-cache, must-revalidate';
 const SEARCH_MIN_QUERY_LENGTH = 2;
 const SEARCH_MAX_QUERY_LENGTH = 80;
 const SEARCH_DEFAULT_PAGE_SIZE = 20;
@@ -89,7 +88,7 @@ const NAMED_ENTITIES: Record<string, string> = {
 	gt: '>',
 	quot: '"',
 	apos: "'",
-	nbsp: ' '
+	nbsp: ' ',
 };
 
 const excludedPaths = [
@@ -108,7 +107,7 @@ const excludedPaths = [
 	'robots.txt',
 	'static',
 	'media',
-	'index.html'
+	'index.html',
 ];
 
 function isExcludedPath(segment: string) {
@@ -198,11 +197,9 @@ app.use('*', canonicalHtmlPageMiddleware);
 // 靜態檔優先：先嘗試 ASSETS（Cloudflare CI 建置），找不到再走 API/SSR
 app.use('*', staticFirstMiddleware);
 
-
 function buildCacheKey(url: string, { includeSearch = true }: { includeSearch?: boolean } = {}): string {
 	return buildR2HtmlKey(url, { includeSearch });
 }
-
 
 function requestAcceptsBrotli(c: any): boolean {
 	const acceptEncoding = c.req.header('Accept-Encoding') ?? '';
@@ -214,11 +211,11 @@ async function serveBucketJson(
 	key: string,
 	{
 		cacheControl,
-		contentEncoding
+		contentEncoding,
 	}: {
 		cacheControl: string;
 		contentEncoding?: string;
-	}
+	},
 ): Promise<Response | null> {
 	const object = await c.env.SPEECH_CACHE.get(key);
 	if (!object) return null;
@@ -251,17 +248,18 @@ async function serveAsset(c: any, path?: string): Promise<Response> {
 async function staticFirstMiddleware(c: any, next: () => Promise<void>) {
 	const pathname = new URL(c.req.url).pathname;
 	if (
-		pathname.startsWith('/api/')
-		|| pathname.startsWith('/og/')
-		|| pathname.startsWith('/speech/')
-		|| pathname.startsWith('/speaker/')
-		|| pathname.startsWith('/search-updates/')
-		|| pathname === '/search-index.json'
-		|| pathname === '/search-index-manifest.json'
-		|| pathname === '/sections-dump.json'
-		|| pathname === '/stats.json'
-		|| pathname === '/version'
-	) return next();
+		pathname.startsWith('/api/') ||
+		pathname.startsWith('/og/') ||
+		pathname.startsWith('/speech/') ||
+		pathname.startsWith('/speaker/') ||
+		pathname.startsWith('/search-updates/') ||
+		pathname === '/search-index.json' ||
+		pathname === '/search-index-manifest.json' ||
+		pathname === '/sections-dump.json' ||
+		pathname === '/stats.json' ||
+		pathname === '/version'
+	)
+		return next();
 	if (
 		pathname === '/' ||
 		pathname === '/index.html' ||
@@ -310,19 +308,14 @@ function toPlainText(html: string) {
 			.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
 			.replace(/<br\s*\/?>/gi, ' ')
 			.replace(/<\/(p|div|section|article|li|blockquote|h[1-6]|tr|td|th)>/gi, ' ')
-			.replace(/<[^>]+>/g, ' ')
+			.replace(/<[^>]+>/g, ' '),
 	)
 		.replace(/\s+/g, ' ')
 		.trim();
 }
 
 function escapeHtml(value: string) {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
+	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function tokenizeSearchQuery(value: string): string[] {
@@ -398,7 +391,7 @@ async function loadSection(c: any, sectionId: number) {
 		LEFT JOIN speakers sp ON a.section_speaker = sp.route_pathname
 		LEFT JOIN speech_content prev_section ON a.section_id = prev_section.next_section_id
 		LEFT JOIN speech_content next_section ON a.section_id = next_section.previous_section_id
-		WHERE a.section_id = ?`
+		WHERE a.section_id = ?`,
 	)
 		.bind(sectionId)
 		.first();
@@ -489,12 +482,12 @@ type SearchPageResult = {
 async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow | null> {
 	const result = await c.env.DB.prepare(
 		`SELECT filename, display_name, isNested, nest_filenames, nest_display_names
-		 FROM speech_index WHERE filename = ?`
+		 FROM speech_index WHERE filename = ?`,
 	)
 		.bind(filename)
 		.first();
 
-	return result as SpeechIndexRow ?? null;
+	return (result as SpeechIndexRow) ?? null;
 }
 
 /**
@@ -503,11 +496,7 @@ async function loadSpeechMeta(c: any, filename: string): Promise<SpeechIndexRow 
  */
 async function loadSpeechRedirect(c: any, oldFilename: string): Promise<string | null> {
 	try {
-		const row = await c.env.DB.prepare(
-			'SELECT new_filename FROM speech_redirects WHERE old_filename = ?'
-		)
-			.bind(oldFilename)
-			.first();
+		const row = await c.env.DB.prepare('SELECT new_filename FROM speech_redirects WHERE old_filename = ?').bind(oldFilename).first();
 		const target = (row as { new_filename?: string } | null)?.new_filename;
 		return typeof target === 'string' && target.length > 0 ? target : null;
 	} catch (err) {
@@ -530,7 +519,7 @@ async function loadAlternateInfo(c: any, filename: string): Promise<AlternateInf
 			`SELECT si.alternate_filename, alt.display_name AS alternate_display_name
 			 FROM speech_index si
 			 LEFT JOIN speech_index alt ON si.alternate_filename = alt.filename
-			 WHERE si.filename = ? AND si.alternate_filename IS NOT NULL`
+			 WHERE si.filename = ? AND si.alternate_filename IS NOT NULL`,
 		)
 			.bind(filename)
 			.first();
@@ -541,7 +530,7 @@ async function loadAlternateInfo(c: any, filename: string): Promise<AlternateInf
 			url: `/${encodeURIComponent(row.alternate_filename)}`,
 			label: isCjk ? '華文' : 'English',
 			displayName,
-			hreflang: isCjk ? 'zh-Hant' : 'en'
+			hreflang: isCjk ? 'zh-Hant' : 'en',
 		};
 	} catch {
 		return null;
@@ -549,9 +538,7 @@ async function loadAlternateInfo(c: any, filename: string): Promise<AlternateInf
 }
 
 async function loadSpeeches(c: any): Promise<SpeechListItem[]> {
-	const result = await c.env.DB.prepare(
-		'SELECT filename, display_name FROM speech_index ORDER BY id ASC'
-	).all();
+	const result = await c.env.DB.prepare('SELECT filename, display_name FROM speech_index ORDER BY id ASC').all();
 
 	if (!result.success) {
 		throw new Error('Database query failed');
@@ -559,14 +546,12 @@ async function loadSpeeches(c: any): Promise<SpeechListItem[]> {
 
 	return result.results.map((row: any) => ({
 		filename: row.filename,
-		display_name: row.display_name
+		display_name: row.display_name,
 	}));
 }
 
 async function buildSpeechListDataToken(speeches: SpeechListItem[]): Promise<string> {
-	const payload = speeches
-		.map((speech) => `${speech.filename}\u0000${speech.display_name}`)
-		.join('\u0001');
+	const payload = speeches.map((speech) => `${speech.filename}\u0000${speech.display_name}`).join('\u0001');
 	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
 	const bytes = Array.from(new Uint8Array(digest.slice(0, 16)));
 	const hash = bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -581,7 +566,7 @@ async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
 				WHERE s2.name = speakers.name AND s2.photoURL IS NOT NULL
 				ORDER BY s2.id ASC LIMIT 1
 			)) AS photoURL
-		FROM speakers ORDER BY id ASC`
+		FROM speakers ORDER BY id ASC`,
 	).all();
 
 	if (!result.success) {
@@ -592,7 +577,7 @@ async function loadSpeakers(c: any): Promise<SpeakerListItem[]> {
 		id: row.id,
 		route_pathname: row.route_pathname,
 		name: row.name,
-		photoURL: row.photoURL ?? null
+		photoURL: row.photoURL ?? null,
 	}));
 }
 
@@ -607,13 +592,13 @@ async function runSearchQuery(
 		query,
 		page = 1,
 		pageSize = SEARCH_DEFAULT_PAGE_SIZE,
-		speakerId
+		speakerId,
 	}: {
 		query: string;
 		page?: number;
 		pageSize?: number;
 		speakerId?: number;
-	}
+	},
 ): Promise<SearchPageResult> {
 	const normalizedQuery = normalizeSearchQuery(query);
 	const safePageSize = Math.max(1, Math.min(SEARCH_MAX_PAGE_SIZE, Math.floor(pageSize || SEARCH_DEFAULT_PAGE_SIZE)));
@@ -623,11 +608,9 @@ async function runSearchQuery(
 	let filteredSpeakerName: string | null = null;
 	let filteredSpeakerRoutePathname: string | null = null;
 	if (speakerId && Number.isFinite(speakerId) && speakerId > 0) {
-		const speakerRow = await c.env.DB.prepare(
-			'SELECT id, route_pathname, name FROM speakers WHERE id = ?'
-		)
+		const speakerRow = (await c.env.DB.prepare('SELECT id, route_pathname, name FROM speakers WHERE id = ?')
 			.bind(Math.floor(speakerId))
-			.first() as { id: number; route_pathname: string; name: string } | null;
+			.first()) as { id: number; route_pathname: string; name: string } | null;
 		if (speakerRow?.route_pathname) {
 			filteredSpeakerId = Number(speakerRow.id);
 			filteredSpeakerRoutePathname = speakerRow.route_pathname;
@@ -646,7 +629,7 @@ async function runSearchQuery(
 			total_sections: 0,
 			pagination_pages: [1],
 			filteredSpeakerId,
-			filteredSpeakerName
+			filteredSpeakerName,
 		};
 	}
 
@@ -658,14 +641,14 @@ async function runSearchQuery(
 		filteredSpeakerRoutePathname
 			? Promise.resolve({ success: true, results: [] as SearchSpeakerRow[] })
 			: c.env.DB.prepare(
-				`SELECT id, route_pathname, name, photoURL
+					`SELECT id, route_pathname, name, photoURL
 				FROM speakers
 				WHERE instr(lower(COALESCE(name, '')), ?) > 0
 				ORDER BY instr(lower(COALESCE(name, '')), ?), name ASC
-				LIMIT ?`
-			)
-				.bind(normalizedLowerQuery, normalizedLowerQuery, SEARCH_SPEAKER_LIMIT)
-				.all(),
+				LIMIT ?`,
+				)
+					.bind(normalizedLowerQuery, normalizedLowerQuery, SEARCH_SPEAKER_LIMIT)
+					.all(),
 		c.env.DB.prepare(
 			`SELECT COUNT(*) AS count
 			FROM speech_content sc
@@ -675,10 +658,10 @@ async function runSearchQuery(
 				instr(lower(COALESCE(si.display_name, '')), ?) > 0
 				OR instr(lower(COALESCE(sp.name, '')), ?) > 0
 				OR instr(lower(COALESCE(sc.section_content, '')), ?) > 0
-			) ${sectionFilterSql}`
+			) ${sectionFilterSql}`,
 		)
 			.bind(normalizedLowerQuery, normalizedLowerQuery, normalizedLowerQuery, ...sectionFilterBindings)
-			.first() as Promise<{ count: number | string | null } | null>
+			.first() as Promise<{ count: number | string | null } | null>,
 	]);
 
 	if (!speakerResult.success) {
@@ -716,7 +699,7 @@ async function runSearchQuery(
 			END,
 			sc.filename DESC,
 			sc.section_id ASC
-		LIMIT ? OFFSET ?`
+		LIMIT ? OFFSET ?`,
 	)
 		.bind(
 			normalizedLowerQuery,
@@ -726,7 +709,7 @@ async function runSearchQuery(
 			normalizedLowerQuery,
 			normalizedLowerQuery,
 			safePageSize,
-			offset
+			offset,
 		)
 		.all();
 
@@ -740,28 +723,30 @@ async function runSearchQuery(
 			route_pathname: row.route_pathname,
 			name: row.name,
 			photoURL: row.photoURL ?? null,
-			snippet: highlightSearchText(row.name ?? '', normalizedQuery)
+			snippet: highlightSearchText(row.name ?? '', normalizedQuery),
 		})),
-		sections: ((sectionResult.results ?? []) as Array<SearchResultRow & { section_speaker?: string | null; photoURL?: string | null }>).map((row) => ({
-			section_id: Number(row.section_id),
-			filename: row.filename,
-			nest_filename: row.nest_filename ?? null,
-			section_speaker: row.section_speaker ?? null,
-			speaker_name: row.speaker_name ?? null,
-			display_name: row.display_name,
-			photoURL: row.photoURL ?? null,
-			snippet: highlightSearchText(
-				buildSearchSnippet(toPlainText(parseContent(row.section_content ?? '')), normalizedQuery),
-				normalizedQuery
-			)
-		})),
+		sections: ((sectionResult.results ?? []) as Array<SearchResultRow & { section_speaker?: string | null; photoURL?: string | null }>).map(
+			(row) => ({
+				section_id: Number(row.section_id),
+				filename: row.filename,
+				nest_filename: row.nest_filename ?? null,
+				section_speaker: row.section_speaker ?? null,
+				speaker_name: row.speaker_name ?? null,
+				display_name: row.display_name,
+				photoURL: row.photoURL ?? null,
+				snippet: highlightSearchText(
+					buildSearchSnippet(toPlainText(parseContent(row.section_content ?? '')), normalizedQuery),
+					normalizedQuery,
+				),
+			}),
+		),
 		page: resolvedPage,
 		page_size: safePageSize,
 		total_pages: totalPages,
 		total_sections: totalSections,
 		pagination_pages: buildPaginationPages(resolvedPage, totalPages),
 		filteredSpeakerId,
-		filteredSpeakerName
+		filteredSpeakerName,
 	};
 }
 
@@ -788,13 +773,11 @@ async function renderSearchPage(c: Context<{ Bindings: WorkerEnv }>) {
 		styles,
 		components: { Navbar, Footer },
 		props: result,
-		scripts: PAGEFIND_SCRIPT
+		scripts: PAGEFIND_SCRIPT,
 	});
 
 	return withCacheHeaders(c.html(html), SEARCH_HTML_CACHE_CONTROL, [tags.listSearch]);
 }
-
-
 
 // /、/speeches、/speakers 由 SSR 路由提供，其餘靜態資源由 staticFirstMiddleware 嘗試從 ASSETS 提供
 
@@ -807,7 +790,7 @@ app.get('/search-index.json', async (c) => {
 	if (requestAcceptsBrotli(c)) {
 		const compressed = await serveBucketJson(c, SEARCH_INDEX_BASELINE_BR_KEY, {
 			cacheControl,
-			contentEncoding: 'br'
+			contentEncoding: 'br',
 		});
 		if (compressed) return compressed;
 	}
@@ -817,24 +800,24 @@ app.get('/search-index.json', async (c) => {
 
 app.get('/search-index-manifest.json', async (c) => {
 	const response = await serveBucketJson(c, SEARCH_INDEX_MANIFEST_KEY, {
-		cacheControl: 'public, max-age=60, s-maxage=60'
+		cacheControl: 'public, max-age=60, s-maxage=60',
 	});
 	if (response) return response;
 	return c.json(createEmptySearchOverlayManifest(), 200, {
-		'Cache-Control': 'public, max-age=60, s-maxage=60'
+		'Cache-Control': 'public, max-age=60, s-maxage=60',
 	});
 });
 
 app.get('/search-updates/:path{[^/]+\\.json}', async (c) => {
 	const response = await serveBucketJson(c, `${SEARCH_UPDATES_PREFIX}/${c.req.param('path')}`, {
-		cacheControl: 'public, max-age=3600, s-maxage=86400'
+		cacheControl: 'public, max-age=3600, s-maxage=86400',
 	});
 	return response ?? c.text('Not found', 404);
 });
 
 app.get('/stats.json', async (c) => {
 	const response = await serveBucketJson(c, SEARCH_STATS_KEY, {
-		cacheControl: 'public, max-age=300, s-maxage=300'
+		cacheControl: 'public, max-age=300, s-maxage=300',
 	});
 	return response ?? c.text('Not found', 404);
 });
@@ -850,9 +833,7 @@ app.get('/sections-dump.json', async (c) => {
 	});
 });
 
-app.get('/version', (c) =>
-	c.json({ version: CACHE_KEY_VERSION }, 200, { 'Cache-Control': 'no-store' })
-);
+app.get('/version', (c) => c.json({ version: CACHE_KEY_VERSION }, 200, { 'Cache-Control': 'no-store' }));
 
 // D1 APIs
 app.get('/api/speech_index.json', (c) => speechIndex(c));
@@ -879,15 +860,11 @@ app.get('/api/search.json', async (c) => {
 			url: `${pageUrl}#s${row.section_id}`,
 			date: extractDate(row.display_name ?? ''),
 			speaker: row.speaker_name ?? '',
-			snippet: decodeHtmlEntities(row.snippet.replace(/<\/?em>/g, ''))
+			snippet: decodeHtmlEntities(row.snippet.replace(/<\/?em>/g, '')),
 		};
 	});
 
-	return withCacheHeaders(
-		c.json({ results }),
-		SEARCH_API_CACHE_CONTROL,
-		[tags.listSearch]
-	);
+	return withCacheHeaders(c.json({ results }), SEARCH_API_CACHE_CONTROL, [tags.listSearch]);
 });
 
 // /search is redirected to /search/ by the canonical-URL middleware.
@@ -911,7 +888,7 @@ app.post('/api/purge_cache', async (c) => {
 	const authorized = await isAuthorizedFromHeader(
 		c.req.header('Authorization'),
 		c.env.AUDREYT_TRANSCRIPT_TOKEN,
-		c.env.BESTIAN_TRANSCRIPT_TOKEN
+		c.env.BESTIAN_TRANSCRIPT_TOKEN,
 	);
 	if (!authorized) return c.text('Forbidden', 403);
 
@@ -919,10 +896,7 @@ app.post('/api/purge_cache', async (c) => {
 	const frontOnly = new URL(c.req.url).searchParams.get('front_only') === '1';
 	if (frontOnly) {
 		const purged = await purgeWorkersCache({ purgeEverything: true });
-		return c.json(
-			{ frontOnly: true, purged },
-			purged ? 200 : 503
-		);
+		return c.json({ frontOnly: true, purged }, purged ? 200 : 503);
 	}
 
 	const bucket = c.env.SPEECH_CACHE;
@@ -938,17 +912,14 @@ app.post('/api/purge_cache', async (c) => {
 		cursor = list.truncated ? list.cursor : undefined;
 	} while (cursor);
 	const purged = await purgeWorkersCache({ purgeEverything: true });
-	return c.json(
-		{ deleted, purged },
-		purged ? 200 : 503
-	);
+	return c.json({ deleted, purged }, purged ? 200 : 503);
 });
 
 app.post('/api/cleanup_old_cache', async (c) => {
 	const authorized = await isAuthorizedFromHeader(
 		c.req.header('Authorization'),
 		c.env.AUDREYT_TRANSCRIPT_TOKEN,
-		c.env.BESTIAN_TRANSCRIPT_TOKEN
+		c.env.BESTIAN_TRANSCRIPT_TOKEN,
 	);
 	if (!authorized) return c.text('Forbidden', 403);
 
@@ -959,16 +930,11 @@ app.post('/api/cleanup_old_cache', async (c) => {
 	const bucket = c.env.SPEECH_CACHE;
 	let deleted = 0;
 	const LIST_LIMIT = 1000;
-	const MAX_DELETES =
-		Number.isFinite(maxDeletesParam) && maxDeletesParam > 0
-			? Math.min(Math.floor(maxDeletesParam), 100000)
-			: 100000;
+	const MAX_DELETES = Number.isFinite(maxDeletesParam) && maxDeletesParam > 0 ? Math.min(Math.floor(maxDeletesParam), 100000) : 100000;
 	let cursor: string | undefined;
 	do {
 		const list = await bucket.list({ cursor, limit: LIST_LIMIT });
-		const toDelete = list.objects
-			.filter((o: { key: string }) => !o.key.startsWith(currentPrefix))
-			.map((o: { key: string }) => o.key);
+		const toDelete = list.objects.filter((o: { key: string }) => !o.key.startsWith(currentPrefix)).map((o: { key: string }) => o.key);
 		if (toDelete.length > 0) {
 			await bucket.delete(toDelete);
 			deleted += toDelete.length;
@@ -981,7 +947,6 @@ app.post('/api/cleanup_old_cache', async (c) => {
 	return c.json({ deleted, more: false });
 });
 
-
 async function renderPrivacyPage(c: Context<{ Bindings: WorkerEnv }>) {
 	const styles = [LegalPrivacyViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForPrivacy();
@@ -989,7 +954,7 @@ async function renderPrivacyPage(c: Context<{ Bindings: WorkerEnv }>) {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: {}
+		props: {},
 	});
 	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.listPrivacy]);
 }
@@ -1001,7 +966,7 @@ async function renderTermsPage(c: Context<{ Bindings: WorkerEnv }>) {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: {}
+		props: {},
 	});
 	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.listTerms]);
 }
@@ -1014,7 +979,7 @@ async function renderHomePage(c: Context<{ Bindings: WorkerEnv }>) {
 		styles,
 		components: { Navbar, Footer },
 		props: {},
-		scripts: [PAGEFIND_SCRIPT, STATS_SCRIPT].join('\n')
+		scripts: [PAGEFIND_SCRIPT, STATS_SCRIPT].join('\n'),
 	});
 
 	return withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.listHome]);
@@ -1042,7 +1007,7 @@ async function renderSpeechesPage(c: Context<{ Bindings: WorkerEnv }>) {
 		styles,
 		components: { Navbar, Footer },
 		props: { speeches },
-		scripts: PAGEFIND_SCRIPT
+		scripts: PAGEFIND_SCRIPT,
 	});
 
 	let response = c.html(html);
@@ -1072,7 +1037,7 @@ async function renderSpeakersPage(c: Context<{ Bindings: WorkerEnv }>) {
 		head,
 		styles,
 		components: { Navbar, Footer },
-		props: { speakers }
+		props: { speakers },
 	});
 
 	let response = c.html(html);
@@ -1113,11 +1078,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 	// Cache-Tag restored from R2 customMetadata when present (writeR2Cache stores it).
 	if (r2Cached) {
 		const existingTag = r2Cached.headers.get('Cache-Tag');
-		return withCacheHeaders(
-			r2Cached,
-			DEFAULT_HTML_CACHE_CONTROL,
-			existingTag ? existingTag.split(',') : undefined
-		);
+		return withCacheHeaders(r2Cached, DEFAULT_HTML_CACHE_CONTROL, existingTag ? existingTag.split(',') : undefined);
 	}
 
 	let section: any;
@@ -1134,7 +1095,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 
 	const sectionHtml = parseContent(section.section_content ?? '');
 	const plain = toPlainText(sectionHtml);
-	const snippet = plain ? `${plain.slice(0, 80)}${plain.length > 80 ? '...' : ''}` : section.display_name ?? '';
+	const snippet = plain ? `${plain.slice(0, 80)}${plain.length > 80 ? '...' : ''}` : (section.display_name ?? '');
 	const titleText = snippet ? `”${snippet}”` : 'View Section';
 	const styles = [SingleParagraphViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const navigationScript = `<script>(function(){var box=document.getElementById('keyboard-shortcuts');if(!box)return;var prev=box.getAttribute('data-prev-url')||'';var next=box.getAttribute('data-next-url')||'';function editable(el){if(!el)return false;var tag=el.tagName?el.tagName.toLowerCase():'';return tag==='input'||tag==='textarea'||tag==='select'||tag==='option'||el.isContentEditable;}document.addEventListener('keydown',function(e){if(e.metaKey||e.ctrlKey||e.altKey)return;if(editable(document.activeElement))return;if(e.key==='j'){if(next){window.location.href=next;}}else if(e.key==='k'){if(prev){window.location.href=prev;}}});})();</script>`;
@@ -1146,7 +1107,7 @@ app.on(['GET', 'HEAD'], '/speech/:section_id', async (c) => {
 		styles,
 		components: { Navbar, Footer },
 		props: { section },
-		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
+		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
 	});
 
 	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.speech(section.filename)]);
@@ -1167,9 +1128,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 	let sections: Section[];
 	try {
 		// 取得講者基本資料
-		const speakerRow = await c.env.DB.prepare('SELECT * FROM speakers_view WHERE route_pathname = ?')
-			.bind(routePathname)
-			.first();
+		const speakerRow = await c.env.DB.prepare('SELECT * FROM speakers_view WHERE route_pathname = ?').bind(routePathname).first();
 
 		if (!speakerRow) {
 			return c.text('Not Found', 404);
@@ -1196,7 +1155,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 			LEFT JOIN speech_index si ON sc.filename = si.filename
 			WHERE sc.section_speaker = ?
 			ORDER BY sc.filename DESC, sc.section_id ASC
-			LIMIT ? OFFSET ?`
+			LIMIT ? OFFSET ?`,
 		)
 			.bind(routePathname, pageSize, offset)
 			.all();
@@ -1215,9 +1174,9 @@ app.get('/speaker/:route_pathname', async (c) => {
 				section_speaker: row.section_speaker,
 				section_content: row.section_content,
 				photoURL: null,
-				name: null
+				name: null,
 			})),
-			false // 分頁結果，不做重新串接
+			false, // 分頁結果，不做重新串接
 		);
 
 		const longestSection = speakerRow.longest_section_id
@@ -1225,12 +1184,11 @@ app.get('/speaker/:route_pathname', async (c) => {
 					section_id: speakerRow.longest_section_id,
 					section_content: speakerRow.longest_section_content || '',
 					section_filename: speakerRow.longest_section_filename || '',
-					section_display_name: speakerRow.longest_section_displayname || ''
-			  }
+					section_display_name: speakerRow.longest_section_displayname || '',
+				}
 			: null;
 
-		const totalSections =
-			(typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length;
+		const totalSections = (typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length;
 		const totalPages = Math.max(1, Math.ceil(totalSections / pageSize));
 		const paginationPages = buildPaginationPages(page, totalPages);
 
@@ -1246,7 +1204,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 			total_pages: totalPages,
 			pagination_pages: paginationPages,
 			sections,
-			longest_section: longestSection
+			longest_section: longestSection,
 		};
 	} catch (err) {
 		console.error('[speaker SSR] DB error', err);
@@ -1262,7 +1220,7 @@ app.get('/speaker/:route_pathname', async (c) => {
 		styles,
 		components: { Navbar, Footer },
 		props: { initialSpeaker: speaker, routePathname: speaker.route_pathname },
-		scripts: ['<script src="/static/speeches/js/masonry.pkgd.min.js"></script>', PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
+		scripts: ['<script src="/static/speeches/js/masonry.pkgd.min.js"></script>', PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
 	});
 
 	let response = c.html(html);
@@ -1275,7 +1233,6 @@ app.get('/speaker/:route_pathname', async (c) => {
 
 	return response;
 });
-
 
 // favicon、robots、/media/*、/static/* 由 staticFirstMiddleware 從 ASSETS 提供
 
@@ -1312,10 +1269,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 	if (!speechMeta) {
 		const redirectTo = await loadSpeechRedirect(c, filename);
 		if (redirectTo) {
-			return buildSpeechRedirectResponse(
-				c,
-				`/${encodeURIComponent(redirectTo)}/${encodeURIComponent(nestFilename)}`
-			);
+			return buildSpeechRedirectResponse(c, `/${encodeURIComponent(redirectTo)}/${encodeURIComponent(nestFilename)}`);
 		}
 		return c.text('Not Found', 404);
 	}
@@ -1343,7 +1297,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 			LEFT JOIN speech_index si ON sc.filename = si.filename
 			LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
 			WHERE sc.filename = ? AND sc.nest_filename = ?
-			ORDER BY sc.section_id ASC`
+			ORDER BY sc.section_id ASC`,
 		)
 			.bind(filename, nestFilename)
 			.all();
@@ -1363,7 +1317,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 			section_content: row.section_content,
 			display_name: row.display_name,
 			photoURL: row.photoURL,
-			name: row.name
+			name: row.name,
 		}));
 
 		if (rawSections.length === 0) {
@@ -1382,7 +1336,7 @@ app.get('/:filename/:nest_filename', async (c) => {
 	const nestDisplayNames = parseToArray(speechMeta.nest_display_names);
 	const siblings = nestFilenames.map((nest, idx) => ({
 		nest_filename: nest,
-		nest_display_name: nestDisplayNames[idx] ?? nest
+		nest_display_name: nestDisplayNames[idx] ?? nest,
 	}));
 	const alternate = await loadAlternateInfo(c, filename);
 	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
@@ -1409,9 +1363,9 @@ app.get('/:filename/:nest_filename', async (c) => {
 			speechDisplayName,
 			siblings,
 			alternateUrl: alternate?.url ?? null,
-			alternateLabel: alternate?.label ?? null
+			alternateLabel: alternate?.label ?? null,
 		},
-		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
+		scripts: [navigationScript, PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
 	});
 
 	let response = c.html(html);
@@ -1476,8 +1430,7 @@ app.get('/:filename', async (c) => {
 	}
 
 	if (speechMeta.isNested) {
-		let nests: Array<{ nest_filename: string; nest_display_name: string; section_count: number; preview?: string }> =
-			[];
+		let nests: Array<{ nest_filename: string; nest_display_name: string; section_count: number; preview?: string }> = [];
 
 		try {
 			// Aggregation query: count sections and get first section content per nest
@@ -1490,7 +1443,7 @@ app.get('/:filename', async (c) => {
 				FROM speech_content
 				WHERE filename = ? AND nest_filename IS NOT NULL
 				GROUP BY nest_filename, nest_display_name
-				ORDER BY first_section_id ASC`
+				ORDER BY first_section_id ASC`,
 			)
 				.bind(filename)
 				.all();
@@ -1505,7 +1458,7 @@ app.get('/:filename', async (c) => {
 			if (firstIds.length > 0) {
 				const placeholders = firstIds.map(() => '?').join(',');
 				const previewResult = await c.env.DB.prepare(
-					`SELECT section_id, section_content FROM speech_content WHERE section_id IN (${placeholders})`
+					`SELECT section_id, section_content FROM speech_content WHERE section_id IN (${placeholders})`,
 				)
 					.bind(...firstIds)
 					.all();
@@ -1522,7 +1475,7 @@ app.get('/:filename', async (c) => {
 				nest_filename: row.nest_filename,
 				nest_display_name: row.nest_display_name ?? row.nest_filename,
 				section_count: row.section_count,
-				preview: previewMap.get(row.first_section_id)
+				preview: previewMap.get(row.first_section_id),
 			}));
 		} catch (err) {
 			console.error('[nested speech list] DB error', err);
@@ -1549,9 +1502,9 @@ app.get('/:filename', async (c) => {
 				speechName: filename,
 				displayName: speechMeta.display_name ?? filename,
 				alternateUrl: alternate?.url ?? null,
-				alternateLabel: alternate?.label ?? null
+				alternateLabel: alternate?.label ?? null,
 			},
-			scripts: PAGEFIND_SCRIPT
+			scripts: PAGEFIND_SCRIPT,
 		});
 
 		let response = c.html(html);
@@ -1580,7 +1533,7 @@ app.get('/:filename', async (c) => {
 			FROM speech_content sc
 			LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
 			WHERE sc.filename = ?
-			ORDER BY sc.section_id ASC`
+			ORDER BY sc.section_id ASC`,
 		)
 			.bind(filename)
 			.all();
@@ -1599,7 +1552,7 @@ app.get('/:filename', async (c) => {
 			section_content: row.section_content,
 			display_name: displayName_,
 			photoURL: row.photoURL ?? null,
-			name: row.name ?? null
+			name: row.name ?? null,
 		}));
 
 		if (rawSections.length === 0) {
@@ -1626,7 +1579,7 @@ app.get('/:filename', async (c) => {
 		styles,
 		components: { Navbar, Footer },
 		props: { sections, speechName: filename, displayName, alternateUrl: alternate?.url ?? null, alternateLabel: alternate?.label ?? null },
-		scripts: [PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n')
+		scripts: [PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
 	});
 
 	let response = c.html(html);
@@ -1638,7 +1591,6 @@ app.get('/:filename', async (c) => {
 
 	return response;
 });
-
 
 // 其餘請求：靜態已由 middleware 嘗試過，未匹配則 404
 app.get('*', (c) => c.text('Not Found', 404));

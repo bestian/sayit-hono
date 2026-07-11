@@ -1,8 +1,10 @@
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
+import { sfcSsrPlugin } from './vite-plugin-sfc-ssr';
 
 export default defineConfig({
 	plugins: [
+		sfcSsrPlugin(),
 		cloudflareTest({
 			wrangler: { configPath: './wrangler.vitest.jsonc' },
 		}),
@@ -24,10 +26,9 @@ export default defineConfig({
 		coverage: {
 			provider: 'istanbul',
 			reporter: ['text', 'html'],
-			include: ['src/**'],
+			include: ['src/**/*.ts'],
 			exclude: [
 				'src/**/*.vue',
-				'src/.generated/**',
 				'src/api/og.ts',
 				'src/api/og_loader.ts',
 				'src/marked.d.ts',

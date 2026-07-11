@@ -23,7 +23,7 @@ describe('reserveSectionIds failure handling', () => {
 				delete: async () => true,
 				get: async () => null,
 				put: async () => {},
-				list: async () => ({ objects: [], truncated: false, cursor: '' })
+				list: async () => ({ objects: [], truncated: false, cursor: '' }),
 			},
 			DB: {
 				prepare: (sql: string) => {
@@ -33,18 +33,18 @@ describe('reserveSectionIds failure handling', () => {
 						bind: (...bound: unknown[]) => statement(bound),
 						first: async () => query().results[0] ?? null,
 						all: async () => query(),
-						run: async () => ({ success: true, meta: { changes: 1 } })
+						run: async () => ({ success: true, meta: { changes: 1 } }),
 					});
 					return statement();
 				},
-				batch: async (stmts: any[]) => stmts.map(() => ({ meta: { changes: 1 } }))
-			}
+				batch: async (stmts: any[]) => stmts.map(() => ({ meta: { changes: 1 } })),
+			},
 		};
 
 		const req = new IncomingRequest('https://example.com/api/upload_markdown', {
 			method: 'POST',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ filename: 'no-counter', markdown: '# Title\n\nhello world' })
+			body: JSON.stringify({ filename: 'no-counter', markdown: '# Title\n\nhello world' }),
 		});
 		const ctx = createExecutionContext();
 		const res = await worker.fetch(req, env as any, ctx);

@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   test:
-    name: Typecheck and test
+    name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -20,14 +20,31 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Cache bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build Vue SSR views
-        run: bun run build:views
+      - name: Lint
+        run: bun run lint
+
+      - name: Format check
+        run: bun run fmt:check
 
       - name: Typecheck
         run: bun run typecheck
 
       - name: Run tests with coverage (enforces 100% lines + functions per file)
         run: bun run test:coverage
+
+      - name: Build (production Worker bundle via Vite)
+        run: bun run build
+
+      - name: Validate deploy config (dry run — no network mutation)
+        run: npx wrangler deploy --dry-run

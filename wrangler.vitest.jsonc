@@ -25,7 +25,7 @@
 			"preview_bucket_name": "sayit-speech-cache-preview"
 		}
 	],
-	"assets": { "directory": "./www/", "binding": "ASSETS" },
+	"assets": { "directory": "./public/", "binding": "ASSETS" },
 	"define": {
 		"process.env.NODE_ENV": "\"test\"",
 		"process.env.SATORI_STANDALONE": "undefined",

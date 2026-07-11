@@ -72,13 +72,13 @@ export async function redirectsSync(c: Context<ApiEnv>) {
 	const corsHeaders = getCorsHeaders(origin);
 	const corsHeadersWithMethods = {
 		...corsHeaders,
-		'Access-Control-Allow-Methods': corsMethods
+		'Access-Control-Allow-Methods': corsMethods,
 	};
 
 	const authorized = await isAuthorizedFromHeader(
 		c.req.header('Authorization'),
 		c.env.AUDREYT_TRANSCRIPT_TOKEN,
-		c.env.BESTIAN_TRANSCRIPT_TOKEN
+		c.env.BESTIAN_TRANSCRIPT_TOKEN,
 	);
 	if (!authorized) {
 		return c.text('Forbidden', 400, corsHeadersWithMethods);
@@ -103,11 +103,7 @@ export async function redirectsSync(c: Context<ApiEnv>) {
 				const oldFilename = r.old.trim();
 				const newFilename = r.new.trim();
 				if (!oldFilename || !newFilename || oldFilename === newFilename) {
-					return c.json(
-						{ error: 'old/new must be non-empty and distinct' },
-						400,
-						corsHeadersWithMethods
-					);
+					return c.json({ error: 'old/new must be non-empty and distinct' }, 400, corsHeadersWithMethods);
 				}
 				incoming.push({ old_filename: oldFilename, new_filename: newFilename });
 			}
@@ -123,26 +119,20 @@ export async function redirectsSync(c: Context<ApiEnv>) {
 	const seen = new Set<string>();
 	for (const pair of incoming) {
 		if (seen.has(pair.old_filename)) {
-			return c.json(
-				{ error: `Duplicate old_filename in snapshot: ${pair.old_filename}` },
-				400,
-				corsHeadersWithMethods
-			);
+			return c.json({ error: `Duplicate old_filename in snapshot: ${pair.old_filename}` }, 400, corsHeadersWithMethods);
 		}
 		seen.add(pair.old_filename);
 	}
 
 	let existing: RedirectPair[];
 	try {
-		const result = await c.env.DB.prepare(
-			'SELECT old_filename, new_filename FROM speech_redirects'
-		).all();
+		const result = await c.env.DB.prepare('SELECT old_filename, new_filename FROM speech_redirects').all();
 		if (!result.success) {
 			throw new Error('speech_redirects query failed');
 		}
 		existing = (result.results as Array<{ old_filename: string; new_filename: string }>).map((row) => ({
 			old_filename: row.old_filename,
-			new_filename: row.new_filename
+			new_filename: row.new_filename,
 		}));
 	} catch (err) {
 		console.error('[redirects] read error', err);
@@ -152,33 +142,26 @@ export async function redirectsSync(c: Context<ApiEnv>) {
 	const plan = planRedirectDiff(incoming, existing);
 
 	if (plan.toInsert.length === 0 && plan.toUpdate.length === 0 && plan.toDelete.length === 0) {
-		return c.json(
-			{ inserted: 0, updated: 0, deleted: 0, total: existing.length },
-			200,
-			corsHeadersWithMethods
-		);
+		return c.json({ inserted: 0, updated: 0, deleted: 0, total: existing.length }, 200, corsHeadersWithMethods);
 	}
 
 	try {
 		const stmts: Parameters<typeof c.env.DB.batch>[0] = [];
 		for (const pair of plan.toInsert) {
 			stmts.push(
-				c.env.DB.prepare(
-					'INSERT INTO speech_redirects (old_filename, new_filename) VALUES (?, ?)'
-				).bind(pair.old_filename, pair.new_filename)
+				c.env.DB.prepare('INSERT INTO speech_redirects (old_filename, new_filename) VALUES (?, ?)').bind(
+					pair.old_filename,
+					pair.new_filename,
+				),
 			);
 		}
 		for (const pair of plan.toUpdate) {
 			stmts.push(
-				c.env.DB.prepare(
-					'UPDATE speech_redirects SET new_filename = ? WHERE old_filename = ?'
-				).bind(pair.new_filename, pair.old_filename)
+				c.env.DB.prepare('UPDATE speech_redirects SET new_filename = ? WHERE old_filename = ?').bind(pair.new_filename, pair.old_filename),
 			);
 		}
 		for (const oldFilename of plan.toDelete) {
-			stmts.push(
-				c.env.DB.prepare('DELETE FROM speech_redirects WHERE old_filename = ?').bind(oldFilename)
-			);
+			stmts.push(c.env.DB.prepare('DELETE FROM speech_redirects WHERE old_filename = ?').bind(oldFilename));
 		}
 		await c.env.DB.batch(stmts);
 	} catch (err) {
@@ -191,9 +174,9 @@ export async function redirectsSync(c: Context<ApiEnv>) {
 			inserted: plan.toInsert.length,
 			updated: plan.toUpdate.length,
 			deleted: plan.toDelete.length,
-			total: incoming.length
+			total: incoming.length,
 		},
 		200,
-		corsHeadersWithMethods
+		corsHeadersWithMethods,
 	);
 }

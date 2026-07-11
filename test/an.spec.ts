@@ -7,10 +7,17 @@ const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 type DbRow = Record<string, unknown>;
 type Resolver = (sql: string, args: unknown[]) => { success?: boolean; results: DbRow[] };
 
-function createAnEnv(resolver: Resolver, options: { preSeedR2?: Record<string, { body: string; contentType?: string; cacheControl?: string }> } = {}) {
+function createAnEnv(
+	resolver: Resolver,
+	options: { preSeedR2?: Record<string, { body: string; contentType?: string; cacheControl?: string }> } = {},
+) {
 	const r2Store = new Map<string, { body: string; cacheControl?: string; contentType?: string }>();
 	for (const [k, v] of Object.entries(options.preSeedR2 ?? {})) {
-		r2Store.set(k, { body: v.body, cacheControl: v.cacheControl ?? 'public, max-age=3600', contentType: v.contentType ?? 'text/plain; charset=utf-8' });
+		r2Store.set(k, {
+			body: v.body,
+			cacheControl: v.cacheControl ?? 'public, max-age=3600',
+			contentType: v.contentType ?? 'text/plain; charset=utf-8',
+		});
 	}
 
 	return {
@@ -27,7 +34,7 @@ function createAnEnv(resolver: Resolver, options: { preSeedR2?: Record<string, {
 					size: entry.body.length,
 					httpEtag: null,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
@@ -36,7 +43,7 @@ function createAnEnv(resolver: Resolver, options: { preSeedR2?: Record<string, {
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -45,15 +52,15 @@ function createAnEnv(resolver: Resolver, options: { preSeedR2?: Record<string, {
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -71,12 +78,14 @@ describe('.an endpoints (section)', () => {
 				if (args[0] === 42) {
 					return {
 						success: true,
-						results: [{
-							section_speaker: 'audrey-tang',
-							section_content: '<p>Hi &amp; bye</p>',
-							display_name: 'Demo',
-							name: 'Audrey Tang'
-						}]
+						results: [
+							{
+								section_speaker: 'audrey-tang',
+								section_content: '<p>Hi &amp; bye</p>',
+								display_name: 'Demo',
+								name: 'Audrey Tang',
+							},
+						],
 					};
 				}
 				return { success: true, results: [] };
@@ -100,7 +109,7 @@ describe('.an endpoints (section)', () => {
 				if (args[0] === 777) {
 					return {
 						success: true,
-						results: [{ section_speaker: null, section_content: 'Plain text', display_name: null, name: null }]
+						results: [{ section_speaker: null, section_content: 'Plain text', display_name: null, name: null }],
 					};
 				}
 				return { success: true, results: [] };
@@ -120,12 +129,14 @@ describe('.an endpoints (section)', () => {
 			if (sql.includes('FROM sections WHERE section_id = ?') && args[0] === 42) {
 				return {
 					success: true,
-					results: [{
-						section_speaker: 'a',
-						section_content: 'Hello',
-						display_name: 'Demo',
-						name: 'A'
-					}]
+					results: [
+						{
+							section_speaker: 'a',
+							section_content: 'Hello',
+							display_name: 'Demo',
+							name: 'A',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -145,16 +156,18 @@ describe('.an endpoints (section)', () => {
 
 describe('.an endpoints (full speech)', () => {
 	const speechResolver: Resolver = (sql, args) => {
-		if (sql.includes('FROM speech_content sc')
-			&& sql.includes('LEFT JOIN speech_index si ON sc.filename = si.filename')
-			&& sql.includes('WHERE sc.filename = ?')) {
+		if (
+			sql.includes('FROM speech_content sc') &&
+			sql.includes('LEFT JOIN speech_index si ON sc.filename = si.filename') &&
+			sql.includes('WHERE sc.filename = ?')
+		) {
 			if (args[0] === '2026-demo') {
 				return {
 					success: true,
 					results: [
 						{ section_speaker: 'a', section_content: '<p>One</p>', display_name: 'Demo', name: 'Audrey' },
-						{ section_speaker: 'b', section_content: 'Plain two', display_name: 'Demo', name: 'Bestian' }
-					]
+						{ section_speaker: 'b', section_content: 'Plain two', display_name: 'Demo', name: 'Bestian' },
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -176,7 +189,7 @@ describe('.an endpoints (full speech)', () => {
 
 	it('serves the cached R2 body on subsequent hits', async () => {
 		const env = createAnEnv(speechResolver, {
-			preSeedR2: { 'an/2026-demo': { body: 'CACHED-BODY', contentType: 'text/plain; charset=utf-8' } }
+			preSeedR2: { 'an/2026-demo': { body: 'CACHED-BODY', contentType: 'text/plain; charset=utf-8' } },
 		});
 		const { res } = await request('/api/an/2026-demo.an', env);
 		expect(res.status).toBe(200);
@@ -192,7 +205,7 @@ describe('.an endpoints (full speech)', () => {
 
 	it('responds to HEAD against a cached object with empty body', async () => {
 		const env = createAnEnv(speechResolver, {
-			preSeedR2: { 'an/2026-demo': { body: 'C', contentType: 'text/plain; charset=utf-8' } }
+			preSeedR2: { 'an/2026-demo': { body: 'C', contentType: 'text/plain; charset=utf-8' } },
 		});
 		const { res } = await request('/api/an/2026-demo.an', env, { method: 'HEAD' });
 		expect(res.status).toBe(200);
@@ -201,7 +214,7 @@ describe('.an endpoints (full speech)', () => {
 
 	it('clears caches when the URL contains a query (purge flag)', async () => {
 		const env = createAnEnv(speechResolver, {
-			preSeedR2: { 'an/2026-demo': { body: 'C', contentType: 'text/plain; charset=utf-8' } }
+			preSeedR2: { 'an/2026-demo': { body: 'C', contentType: 'text/plain; charset=utf-8' } },
 		});
 		const { res } = await request('/api/an/2026-demo.an?purge', env);
 		expect(res.status).toBe(200);
@@ -238,7 +251,7 @@ describe('.an endpoints (full speech)', () => {
 			if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si ON sc.filename = si.filename')) {
 				return {
 					success: true,
-					results: [{ section_speaker: 'a', section_content: '<p>One</p>', display_name: 'Demo', name: 'Audrey' }]
+					results: [{ section_speaker: 'a', section_content: '<p>One</p>', display_name: 'Demo', name: 'Audrey' }],
 				};
 			}
 			return { success: true, results: [] };

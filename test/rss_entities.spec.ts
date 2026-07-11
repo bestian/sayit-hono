@@ -15,7 +15,7 @@ function makeEnv(resolver: Resolver) {
 			get: async () => null,
 			put: async () => {},
 			delete: async () => true,
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -24,15 +24,15 @@ function makeEnv(resolver: Resolver) {
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -49,16 +49,18 @@ describe('rss decodeHtmlEntities branches', () => {
 			if (sql.includes('FROM speech_index si') && sql.includes('first_section_content')) {
 				return {
 					success: true,
-					results: [{
-						id: 1,
-						filename: '2026-06-10-demo',
-						display_name: '2026-06-10 Demo',
-						isNested: 0,
-						first_nest_filename: null,
-						first_nest_display_name: null,
-						first_section_content: '<p>A&#39;B &amp; C&#x26;D &nbsp;E</p>',
-						first_speaker_name: 'Audrey'
-					}]
+					results: [
+						{
+							id: 1,
+							filename: '2026-06-10-demo',
+							display_name: '2026-06-10 Demo',
+							isNested: 0,
+							first_nest_filename: null,
+							first_nest_display_name: null,
+							first_section_content: '<p>A&#39;B &amp; C&#x26;D &nbsp;E</p>',
+							first_speaker_name: 'Audrey',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -75,16 +77,18 @@ describe('rss decodeHtmlEntities branches', () => {
 			if (sql.includes('FROM speech_index si') && sql.includes('first_section_content')) {
 				return {
 					success: true,
-					results: [{
-						id: 1,
-						filename: '2026-06-11-demo',
-						display_name: '2026-06-11 Demo',
-						isNested: 0,
-						first_nest_filename: null,
-						first_nest_display_name: null,
-						first_section_content: '<p>Invalid &#99999999999999;</p>',
-						first_speaker_name: null
-					}]
+					results: [
+						{
+							id: 1,
+							filename: '2026-06-11-demo',
+							display_name: '2026-06-11 Demo',
+							isNested: 0,
+							first_nest_filename: null,
+							first_nest_display_name: null,
+							first_section_content: '<p>Invalid &#99999999999999;</p>',
+							first_speaker_name: null,
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };

@@ -1,6 +1,6 @@
 import { compileScript, compileStyle, compileTemplate, parse } from '@vue/compiler-sfc';
 import path from 'node:path';
-import type { Plugin } from 'vite';
+import { transformWithOxc, type Plugin } from 'vite';
 
 /**
  * Compiles this app's `.vue` SFCs (src/views/*, src/components/*) directly
@@ -30,7 +30,7 @@ export function sfcSsrPlugin(): Plugin {
 	return {
 		name: 'sayit-sfc-ssr',
 		enforce: 'pre',
-		transform(code, id) {
+		async transform(code, id) {
 			if (!id.endsWith('.vue')) return null;
 
 			const filename = id;
@@ -51,13 +51,11 @@ export function sfcSsrPlugin(): Plugin {
 						id: scopeId,
 						source: style.content,
 						scoped: style.scoped ?? false,
-						isProd: false
+						isProd: false,
 					});
 					if (result.errors.length > 0) {
 						throw new Error(
-							`編譯樣式失敗（${filename} 第 ${index + 1} 個 <style>）：${result.errors
-								.map((err) => String(err))
-								.join('; ')}`
+							`編譯樣式失敗（${filename} 第 ${index + 1} 個 <style>）：${result.errors.map((err) => String(err)).join('; ')}`,
 						);
 					}
 					return result.code;
@@ -74,8 +72,8 @@ export function sfcSsrPlugin(): Plugin {
 					templateOptions: {
 						ssr: true,
 						scoped: hasScoped,
-						ssrCssVars: descriptor.cssVars
-					}
+						ssrCssVars: descriptor.cssVars,
+					},
 				});
 
 				output = `${compiledScript.content}
@@ -89,7 +87,7 @@ export const styles = ${JSON.stringify(styles)};
 					id: scopeId,
 					ssr: true,
 					scoped: hasScoped,
-					ssrCssVars: descriptor.cssVars
+					ssrCssVars: descriptor.cssVars,
 				});
 
 				output = `import { defineComponent } from 'vue';
@@ -102,8 +100,16 @@ export const styles = ${JSON.stringify(styles)};
 export default _sfc_main;
 `;
 			}
-
-			return { code: output, map: null };
-		}
+			// compileScript/compileTemplate output is still TypeScript (type
+			// aliases, `as` casts, etc. from this app's <script setup lang="ts">
+			// SFCs) — Vite's own oxc-based TS stripping only kicks in by file
+			// extension, and this module keeps its original `.vue` id, so it
+			// never gets picked up automatically. Strip it explicitly here.
+			// (transformWithOxc, not the deprecated transformWithEsbuild —
+			// rolldown-vite's native Rust toolchain, same family as vp's
+			// oxlint/oxfmt/rolldown.)
+			const stripped = await transformWithOxc(output, filename, { lang: 'ts', sourcemap: false });
+			return { code: stripped.code, map: null };
+		},
 	};
 }

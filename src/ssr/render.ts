@@ -1,6 +1,6 @@
 import { createSSRApp, type Component } from 'vue';
 import { renderToString } from '@vue/server-renderer';
-import type { HeadSpec, LinkEntry } from './heads';
+import type { HeadSpec } from './heads';
 
 const BASE_HEAD = `<meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1090,12 +1090,7 @@ type RenderOptions = {
 // TODO(techdebt-phase3): duplicated from src/index.ts's escapeHtml; will be
 // consolidated into a shared src/utils/textUtils.ts in the decomposition pass.
 function escapeHtml(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
+	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function renderMeta(head?: HeadSpec) {
@@ -1188,10 +1183,7 @@ ${extraScripts}
 </html>`;
 }
 
-export async function renderHtml(
-	component: Component,
-	{ title, styles, components, props, head, scripts }: RenderOptions
-) {
+export async function renderHtml(component: Component, { title, styles, components, props, head, scripts }: RenderOptions) {
 	const app = createSSRApp(component, props);
 
 	if (components) {

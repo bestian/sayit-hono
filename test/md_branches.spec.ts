@@ -49,23 +49,23 @@ function createC(overrides: Partial<{ method: string; url: string; origin: strin
 		req: {
 			method: overrides.method ?? 'GET',
 			url: overrides.url ?? 'https://example.com/api/md/demo.md',
-			header: (k: string) => (k === 'Origin' ? overrides.origin ?? null : null)
+			header: (k: string) => (k === 'Origin' ? (overrides.origin ?? null) : null),
 		},
 		env: {
 			SPEECH_CACHE: {
 				get: async () => null,
 				put: async () => {},
-				delete: async () => true
+				delete: async () => true,
 			},
 			DB: {
 				prepare: () => ({
 					bind: () => ({ first: async () => null, all: async () => ({ success: true, results: [] }) }),
 					first: async () => null,
-					all: async () => ({ success: true, results: [] })
-				})
-			}
+					all: async () => ({ success: true, results: [] }),
+				}),
+			},
 		},
-		text: (body: string, status = 200, headers: Record<string, string> = {}) => new Response(body, { status, headers })
+		text: (body: string, status = 200, headers: Record<string, string> = {}) => new Response(body, { status, headers }),
 	} as unknown as Context<ApiEnv>;
 }
 

@@ -11,15 +11,12 @@
  * Env: CLOUDFLARE_* for wrangler r2 put --remote (optional with --out-dir only)
  */
 import { execFileSync, execSync } from 'node:child_process';
+import { assertNotProd } from './lib/assert-not-prod';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { CACHE_KEY_VERSION as BUILT_CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import { resolveCacheKeyVersion } from './lib/archive-cache-version';
-import {
-	lanyangFontsInstalled,
-	renderLanyangSpeechPng,
-	slugFromMarkdownPath,
-} from './og-lanyang-lib';
+import { lanyangFontsInstalled, renderLanyangSpeechPng, slugFromMarkdownPath } from './og-lanyang-lib';
 
 const PROD_BUCKET = process.env.OG_R2_BUCKET ?? 'sayit-speech-cache';
 const API_BASE = process.env.ARCHIVE_API_BASE ?? 'https://archive.tw';
@@ -38,11 +35,11 @@ function parseArgs(argv: string[]): {
 } {
 	const dryRun = argv.includes('--dry-run');
 	const outIdx = argv.indexOf('--out-dir');
-	const outDir = outIdx >= 0 ? argv[outIdx + 1] ?? null : null;
+	const outDir = outIdx >= 0 ? (argv[outIdx + 1] ?? null) : null;
 	const trIdx = argv.indexOf('--transcript-root');
-	const transcriptRoot = trIdx >= 0 ? argv[trIdx + 1] ?? process.cwd() : process.cwd();
+	const transcriptRoot = trIdx >= 0 ? (argv[trIdx + 1] ?? process.cwd()) : process.cwd();
 	const saIdx = argv.indexOf('--start-after');
-	const startAfter = saIdx >= 0 ? argv[saIdx + 1] ?? null : null;
+	const startAfter = saIdx >= 0 ? (argv[saIdx + 1] ?? null) : null;
 
 	if (argv.includes('--all')) {
 		return { mode: 'all', filenames: [], dryRun, outDir, transcriptRoot, startAfter };
@@ -72,11 +69,10 @@ function parseArgs(argv: string[]): {
 }
 
 function gitDiffMdPaths(before: string, after: string, root: string): string[] {
-	const out = execFileSync(
-		'git',
-		['diff', '--name-status', '-z', before, after, '--', '*.md', '.alternates'],
-		{ cwd: root, encoding: 'utf-8' }
-	);
+	const out = execFileSync('git', ['diff', '--name-status', '-z', before, after, '--', '*.md', '.alternates'], {
+		cwd: root,
+		encoding: 'utf-8',
+	});
 	const tokens = out.split('\0').filter(Boolean);
 	const paths: string[] = [];
 	for (let i = 0; i + 1 < tokens.length; i += 2) {
@@ -132,17 +128,17 @@ function uploadR2(cacheKey: string, filePath: string, dryRun: boolean): void {
 		console.log(`[dry-run] r2 put ${PROD_BUCKET}/${cacheKey} <= ${filePath}`);
 		return;
 	}
-	execSync(
-		`npx wrangler r2 object put "${PROD_BUCKET}/${cacheKey}" --file "${filePath}" --content-type image/png --remote`,
-		{ stdio: 'inherit' }
-	);
+	assertNotProd(PROD_BUCKET);
+	execSync(`npx wrangler r2 object put "${PROD_BUCKET}/${cacheKey}" --file "${filePath}" --content-type image/png --remote`, {
+		stdio: 'inherit',
+	});
 }
 
 async function bakeOne(
 	filename: string,
 	index: SpeechRow[],
 	cacheKeyVersion: string,
-	opts: { dryRun: boolean; outDir: string | null }
+	opts: { dryRun: boolean; outDir: string | null },
 ): Promise<boolean> {
 	const meta = index.find((r) => r.filename === filename);
 	if (!meta) {

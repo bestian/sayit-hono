@@ -13,14 +13,7 @@
  *
  * This module produces ONLY the string keys and tag values — no I/O.
  */
-import {
-	CACHE_KEY_VERSION,
-	r2AnKey,
-	r2MdKey,
-	r2OgSpeechKey,
-	r2OgSectionKey,
-	tags
-} from '../api/cache';
+import { CACHE_KEY_VERSION, r2AnKey, r2MdKey, r2OgSpeechKey, r2OgSectionKey, tags } from '../api/cache';
 
 /**
  * Description of what changed — drives which R2 origin keys and Workers Cache
@@ -53,18 +46,14 @@ export interface CacheInvalidationOutput {
 // and encodeURIComponent — none lsc-expressible — so lsc skips it and any
 // ensures on it would be unverifiable. Additionally the imported
 // r2OgSectionKey has a `number | string` param that Dafny cannot parse.
-export function planSpeechInvalidation(
-	host: string,
-	filename: string,
-	sectionIds: number[]
-): CacheInvalidationOutput {
+export function planSpeechInvalidation(host: string, filename: string, sectionIds: number[]): CacheInvalidationOutput {
 	const encodedFilename = encodeURIComponent(filename);
 	const r2Keys: string[] = [
 		r2AnKey(filename),
 		r2MdKey(filename),
 		`${CACHE_KEY_VERSION}/${host}/${filename}`,
 		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`,
-		r2OgSpeechKey(filename)
+		r2OgSpeechKey(filename),
 	];
 
 	const filteredSectionIds = new Set<number>();
@@ -77,12 +66,7 @@ export function planSpeechInvalidation(
 		r2Keys.push(r2OgSectionKey(sectionId));
 	}
 
-	const purgeTags = [
-		tags.speech(filename),
-		tags.listHome,
-		tags.listSpeeches,
-		tags.listRss
-	];
+	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
 
 	return { r2Keys, tags: purgeTags };
 }
@@ -99,10 +83,7 @@ export function planSpeechInvalidation(
  */
 // LemmaScript annotations skipped: uses Set and encodeURIComponent (not
 // lsc-expressible); lsc skips this function, so ensures would be unverifiable.
-export function planSpeakerInvalidation(
-	host: string,
-	routePathnames: string[]
-): CacheInvalidationOutput {
+export function planSpeakerInvalidation(host: string, routePathnames: string[]): CacheInvalidationOutput {
 	const r2Keys = new Set<string>([`${CACHE_KEY_VERSION}/${host}/speakers`]);
 
 	for (const routePathname of routePathnames) {
@@ -133,12 +114,7 @@ export function planSpeakerInvalidation(
  */
 // LemmaScript annotations skipped: uses Set (not lsc-expressible); lsc skips
 // this function, so ensures would be unverifiable.
-export function planListInvalidation(
-	host: string,
-	home: boolean,
-	speeches: boolean,
-	speakers: boolean
-): CacheInvalidationOutput {
+export function planListInvalidation(host: string, home: boolean, speeches: boolean, speakers: boolean): CacheInvalidationOutput {
 	const r2Keys = new Set<string>();
 
 	if (home) {
@@ -169,9 +145,7 @@ export function planListInvalidation(
  * for any of the three cache-invalidation call shapes. No I/O — caller performs
  * the actual R2 deletes and Workers Cache purges.
  */
-export function planCacheInvalidation(
-	input: CacheInvalidationInput
-): CacheInvalidationOutput {
+export function planCacheInvalidation(input: CacheInvalidationInput): CacheInvalidationOutput {
 	switch (input.kind) {
 		case 'speech':
 			return planSpeechInvalidation(input.host, input.filename, input.sectionIds);

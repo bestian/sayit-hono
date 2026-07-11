@@ -13,7 +13,7 @@ function createEnv(options: { failDb?: boolean } = {}) {
 			delete: async () => true,
 			get: async () => null,
 			put: async () => {},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: () => ({
@@ -29,17 +29,17 @@ function createEnv(options: { failDb?: boolean } = {}) {
 					run: async () => {
 						if (options.failDb) throw new Error('retry me');
 						return { success: true, meta: { changes: 1 } };
-					}
+					},
 				}),
 				first: async () => null,
 				all: async () => ({ success: true, results: [] }),
-				run: async () => ({ success: true, meta: { changes: 1 } })
+				run: async () => ({ success: true, meta: { changes: 1 } }),
 			}),
 			batch: async () => {
 				if (options.failDb) throw new Error('retry me');
 				return [];
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -53,53 +53,69 @@ async function request(path: string, init: RequestInit<IncomingRequestCfProperti
 describe('upload_markdown — unsupported method', () => {
 	it('returns 400 for PUT (not POST/PATCH/DELETE)', async () => {
 		const env = createEnv();
-		const { res } = await request('/api/upload_markdown', {
-			method: 'PUT',
-			headers: {
-				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json'
+		const { res } = await request(
+			'/api/upload_markdown',
+			{
+				method: 'PUT',
+				headers: {
+					Authorization: 'Bearer token-audrey',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ filename: 'x', markdown: 'y' }),
 			},
-			body: JSON.stringify({ filename: 'x', markdown: 'y' })
-		}, env);
+			env,
+		);
 		expect(res.status).toBe(404);
 	});
 
 	it('returns 400 for invalid JSON on PATCH', async () => {
 		const env = createEnv();
-		const { res } = await request('/api/upload_markdown', {
-			method: 'PATCH',
-			headers: {
-				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json'
+		const { res } = await request(
+			'/api/upload_markdown',
+			{
+				method: 'PATCH',
+				headers: {
+					Authorization: 'Bearer token-audrey',
+					'Content-Type': 'application/json',
+				},
+				body: '{not json',
 			},
-			body: '{not json'
-		}, env);
+			env,
+		);
 		expect(res.status).toBe(400);
 	});
 
 	it('returns 400 when PATCH is missing filename', async () => {
 		const env = createEnv();
-		const { res } = await request('/api/upload_markdown', {
-			method: 'PATCH',
-			headers: {
-				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json'
+		const { res } = await request(
+			'/api/upload_markdown',
+			{
+				method: 'PATCH',
+				headers: {
+					Authorization: 'Bearer token-audrey',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ markdown: '# x\ny' }),
 			},
-			body: JSON.stringify({ markdown: '# x\ny' })
-		}, env);
+			env,
+		);
 		expect(res.status).toBe(400);
 	});
 
 	it('returns 400 when PATCH is missing markdown', async () => {
 		const env = createEnv();
-		const { res } = await request('/api/upload_markdown', {
-			method: 'PATCH',
-			headers: {
-				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json'
+		const { res } = await request(
+			'/api/upload_markdown',
+			{
+				method: 'PATCH',
+				headers: {
+					Authorization: 'Bearer token-audrey',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ filename: 'x' }),
 			},
-			body: JSON.stringify({ filename: 'x' })
-		}, env);
+			env,
+		);
 		expect(res.status).toBe(400);
 	});
 });
@@ -107,10 +123,14 @@ describe('upload_markdown — unsupported method', () => {
 describe('upload_markdown — 503 on DB failure', () => {
 	it('returns 503 with Retry-After when DB retry ultimately fails', async () => {
 		const env = createEnv({ failDb: true });
-		const { res } = await request('/api/upload_markdown?filename=demo', {
-			method: 'DELETE',
-			headers: { Authorization: 'Bearer token-audrey' }
-		}, env);
+		const { res } = await request(
+			'/api/upload_markdown?filename=demo',
+			{
+				method: 'DELETE',
+				headers: { Authorization: 'Bearer token-audrey' },
+			},
+			env,
+		);
 		expect(res.status).toBe(503);
 		expect(res.headers.get('Retry-After')).toBe('2');
 	}, 15000);

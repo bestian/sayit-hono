@@ -42,7 +42,10 @@ function speechImageMeta(filename: string): MetaEntry[] {
 }
 
 function toPlainText(html: string): string {
-	return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+	return html
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 export function headForHome(): HeadSpec {
@@ -52,14 +55,14 @@ export function headForHome(): HeadSpec {
 export function headForPrivacy(): HeadSpec {
 	return {
 		title: ' Privacy Policy :: SayIt ',
-		meta: [og('Privacy Policy'), ogDescription('Privacy policy for AI questions on SayIt.'), ...defaultImageMeta()]
+		meta: [og('Privacy Policy'), ogDescription('Privacy policy for AI questions on SayIt.'), ...defaultImageMeta()],
 	};
 }
 
 export function headForTerms(): HeadSpec {
 	return {
 		title: ' Terms of Use :: SayIt ',
-		meta: [og('Terms of Use'), ogDescription('Terms of use for AI questions on SayIt.'), ...defaultImageMeta()]
+		meta: [og('Terms of Use'), ogDescription('Terms of use for AI questions on SayIt.'), ...defaultImageMeta()],
 	};
 }
 
@@ -75,7 +78,7 @@ export function headForSearch(query: string): HeadSpec {
 	const safeQuery = query?.trim() || 'Search';
 	return {
 		title: ` Search: ${safeQuery} :: SayIt `,
-		meta: [og(`Search: ${safeQuery} :: SayIt`), ogDescription(baseOgDescription), ...defaultImageMeta()]
+		meta: [og(`Search: ${safeQuery} :: SayIt`), ogDescription(baseOgDescription), ...defaultImageMeta()],
 	};
 }
 
@@ -83,7 +86,7 @@ export function headForSingleSpeech(displayName: string, filename: string): Head
 	const name = displayName ?? '';
 	return {
 		title: ` View Section: ${name} :: SayIt `,
-		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription), ...speechImageMeta(filename)]
+		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription), ...speechImageMeta(filename)],
 	};
 }
 
@@ -92,7 +95,7 @@ export function headForSpeaker(routePathname: string): HeadSpec {
 	const cleaned = decoded.replace(/-\d+$/, '').replace(/\s+/g, ' ').trim();
 	return {
 		title: ` View Speaker: ${cleaned} :: SayIt `,
-		meta: [og(`View Speaker: ${cleaned} :: SayIt`), ogDescription(baseOgDescription), ...defaultImageMeta()]
+		meta: [og(`View Speaker: ${cleaned} :: SayIt`), ogDescription(baseOgDescription), ...defaultImageMeta()],
 	};
 }
 
@@ -112,7 +115,7 @@ export function headForSpeechContent(titleText: string, sectionId: number, secti
 	}
 	return {
 		title: `${safeTitle} :: SayIt `,
-		meta
+		meta,
 	};
 }
 
@@ -120,7 +123,7 @@ export function headForNestedSpeech(displayName: string, filename: string): Head
 	const name = displayName ?? '';
 	return {
 		title: ` View Section: ${name} :: SayIt `,
-		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription), ...speechImageMeta(filename)]
+		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription), ...speechImageMeta(filename)],
 	};
 }
 
@@ -128,6 +131,6 @@ export function headForNestedSpeechDetail(nestDisplayName: string, filename: str
 	const name = nestDisplayName ?? '';
 	return {
 		title: ` View Section: ${name} :: SayIt `,
-		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription), ...speechImageMeta(filename)]
+		meta: [og(`View Section: ${name} :: SayIt`), ogDescription(baseOgDescription), ...speechImageMeta(filename)],
 	};
 }

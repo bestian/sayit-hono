@@ -11,7 +11,7 @@ function makeEnv(preSeedR2: Record<string, { body: string; contentType?: string;
 			body: v.body,
 			cacheControl: v.cacheControl ?? 'public, max-age=3600, s-maxage=3600',
 			contentType: v.contentType,
-			customMetadata: v.cacheTag ? { cacheTag: v.cacheTag } : undefined
+			customMetadata: v.cacheTag ? { cacheTag: v.cacheTag } : undefined,
 		});
 	}
 	return {
@@ -29,35 +29,39 @@ function makeEnv(preSeedR2: Record<string, { body: string; contentType?: string;
 					httpEtag: null,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
 					customMetadata: entry.customMetadata,
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
-			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string }; customMetadata?: Record<string, string> }) => {
+			put: async (
+				key: string,
+				body: string,
+				options?: { httpMetadata?: { cacheControl?: string; contentType?: string }; customMetadata?: Record<string, string> },
+			) => {
 				r2Store.set(key, {
 					body,
 					cacheControl: options?.httpMetadata?.cacheControl,
 					contentType: options?.httpMetadata?.contentType,
-					customMetadata: options?.customMetadata
+					customMetadata: options?.customMetadata,
 				});
 			},
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: () => {
 				const run = () => ({
 					first: async () => null,
-					all: async () => ({ success: true, results: [] })
+					all: async () => ({ success: true, results: [] }),
 				});
 				return {
 					bind: () => run(),
 					first: async () => null,
-					all: async () => ({ success: true, results: [] })
+					all: async () => ({ success: true, results: [] }),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -74,8 +78,8 @@ describe('an origin cache (R2)', () => {
 			'an/demo-edge': {
 				body: 'R2-AN',
 				contentType: 'text/plain; charset=utf-8',
-				cacheTag: 'speech:demo-edge'
-			}
+				cacheTag: 'speech:demo-edge',
+			},
 		});
 		const { res } = await request('/api/an/demo-edge.an', env);
 		expect(res.status).toBe(200);
@@ -89,8 +93,8 @@ describe('an origin cache (R2)', () => {
 			'an/demo-edge-head': {
 				body: 'R2-AN',
 				contentType: 'text/plain; charset=utf-8',
-				cacheTag: 'speech:demo-edge-head'
-			}
+				cacheTag: 'speech:demo-edge-head',
+			},
 		});
 		const { res } = await request('/api/an/demo-edge-head.an', env, { method: 'HEAD' });
 		expect(res.status).toBe(200);
@@ -104,8 +108,8 @@ describe('md origin cache (R2)', () => {
 			'md/demo-edge-md': {
 				body: 'R2-MD',
 				contentType: 'text/markdown; charset=utf-8',
-				cacheTag: 'speech:demo-edge-md'
-			}
+				cacheTag: 'speech:demo-edge-md',
+			},
 		});
 		const { res } = await request('/api/md/demo-edge-md.md', env);
 		expect(res.status).toBe(200);

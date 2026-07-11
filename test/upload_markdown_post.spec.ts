@@ -61,7 +61,7 @@ function createPostEnv(options: { hasExistingFilename?: boolean; redirects?: Rec
 			put: async (key: string, body: string) => {
 				putObjects.set(key, body);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -72,12 +72,12 @@ function createPostEnv(options: { hasExistingFilename?: boolean; redirects?: Rec
 						const result = query(sql, args);
 						return result.results[0] ?? null;
 					},
-					all: async () => query(sql, args)
+					all: async () => query(sql, args),
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
 			},
 			batch: async (statements: PreparedStatement[]) => {
@@ -85,19 +85,15 @@ function createPostEnv(options: { hasExistingFilename?: boolean; redirects?: Rec
 					if (typeof stmt.sql === 'string') operations.push(stmt);
 				}
 				return statements.map(() => ({ meta: { changes: 1 } }));
-			}
+			},
 		},
 		__operations: operations,
 		__deletedKeys: deletedKeys,
-		__putObjects: putObjects
+		__putObjects: putObjects,
 	};
 }
 
-async function request(
-	path: string,
-	env: ReturnType<typeof createPostEnv>,
-	init?: RequestInit<IncomingRequestCfProperties>
-) {
+async function request(path: string, env: ReturnType<typeof createPostEnv>, init?: RequestInit<IncomingRequestCfProperties>) {
 	const req = new IncomingRequest(`https://example.com${path}`, init);
 	const ctx = createExecutionContext();
 	const res = await worker.fetch(req, env as any, ctx);
@@ -108,22 +104,15 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 	it('creates speech_index, speakers (ON CONFLICT), speech_speakers, and speech_content', async () => {
 		const env = createPostEnv();
 
-		const markdown = [
-			'# New Speech',
-			'## Audrey Tang:',
-			'Hello world.',
-			'',
-			'## Bestian:',
-			'Another paragraph.'
-		].join('\n');
+		const markdown = ['# New Speech', '## Audrey Tang:', 'Hello world.', '', '## Bestian:', 'Another paragraph.'].join('\n');
 
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
-			body: JSON.stringify({ filename: 'new-speech', markdown })
+			body: JSON.stringify({ filename: 'new-speech', markdown }),
 		});
 
 		expect(res.status).toBe(200);
@@ -137,9 +126,7 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 
 		const speakerUpserts = env.__operations.filter((s) => s.sql.includes('INSERT INTO speakers'));
 		expect(speakerUpserts.length).toBe(2);
-		expect(speakerUpserts.map((s) => s.args[0])).toEqual(
-			expect.arrayContaining(['Audrey%20Tang', 'Bestian'])
-		);
+		expect(speakerUpserts.map((s) => s.args[0])).toEqual(expect.arrayContaining(['Audrey%20Tang', 'Bestian']));
 		// ON CONFLICT clause is present
 		expect(speakerUpserts[0].sql).toContain('ON CONFLICT');
 
@@ -148,8 +135,8 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 		expect(speechSpeakersLinks.map((s) => s.args)).toEqual(
 			expect.arrayContaining([
 				['new-speech', 'Audrey%20Tang'],
-				['new-speech', 'Bestian']
-			])
+				['new-speech', 'Bestian'],
+			]),
 		);
 
 		const contentInserts = env.__operations.filter((s) => s.sql.startsWith('INSERT INTO speech_content'));
@@ -158,16 +145,16 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 
 	it('rewrites filename via speech_redirects when speech_index misses, treating canonical as the existing target', async () => {
 		const env = createPostEnv({
-			redirects: { 'deprecated-name': 'canonical-name' }
+			redirects: { 'deprecated-name': 'canonical-name' },
 		});
 
 		const { res } = await request('/api/upload_markdown', env, {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
-			body: JSON.stringify({ filename: 'deprecated-name', markdown: '# Canonical\n## A:\nHi' })
+			body: JSON.stringify({ filename: 'deprecated-name', markdown: '# Canonical\n## A:\nHi' }),
 		});
 
 		expect(res.status).toBe(200);
@@ -185,9 +172,9 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
-			body: JSON.stringify({ filename: 'new-speech', markdown: '# New\n## A:\nHi' })
+			body: JSON.stringify({ filename: 'new-speech', markdown: '# New\n## A:\nHi' }),
 		});
 
 		expect(res.status).toBe(200);
@@ -207,18 +194,20 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
-			body: JSON.stringify({ filename: 'new-speech', markdown: '# New\n## A:\nHi' })
+			body: JSON.stringify({ filename: 'new-speech', markdown: '# New\n## A:\nHi' }),
 		});
 
-		expect(env.__deletedKeys).toEqual(expect.arrayContaining([
-			`${CACHE_KEY_VERSION}/example.com/new-speech`,
-			`${CACHE_KEY_VERSION}/example.com/speaker/A`,
-			`${CACHE_KEY_VERSION}/example.com/speakers`,
-			`${CACHE_KEY_VERSION}/example.com/speeches`,
-			`${CACHE_KEY_VERSION}/example.com/rss.xml`
-		]));
+		expect(env.__deletedKeys).toEqual(
+			expect.arrayContaining([
+				`${CACHE_KEY_VERSION}/example.com/new-speech`,
+				`${CACHE_KEY_VERSION}/example.com/speaker/A`,
+				`${CACHE_KEY_VERSION}/example.com/speakers`,
+				`${CACHE_KEY_VERSION}/example.com/speeches`,
+				`${CACHE_KEY_VERSION}/example.com/rss.xml`,
+			]),
+		);
 	});
 
 	it('rejects missing filename with 400', async () => {
@@ -227,9 +216,9 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
-			body: JSON.stringify({ markdown: '# X\nY' })
+			body: JSON.stringify({ markdown: '# X\nY' }),
 		});
 		expect(res.status).toBe(400);
 	});
@@ -240,9 +229,9 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
-			body: JSON.stringify({ filename: 'x' })
+			body: JSON.stringify({ filename: 'x' }),
 		});
 		expect(res.status).toBe(400);
 	});
@@ -253,9 +242,9 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
-			body: '{not json'
+			body: '{not json',
 		});
 		expect(res.status).toBe(400);
 	});
@@ -267,12 +256,12 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
 			body: JSON.stringify({
 				filename: 'new-speech',
-				markdown: '# Title\n## A:\nHello <script>alert(1)</script> world'
-			})
+				markdown: '# Title\n## A:\nHello <script>alert(1)</script> world',
+			}),
 		});
 
 		const contentInserts = env.__operations.filter((s) => s.sql.startsWith('INSERT INTO speech_content'));
@@ -289,24 +278,22 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer token-audrey',
-				'Content-Type': 'application/json; charset=utf-8'
+				'Content-Type': 'application/json; charset=utf-8',
 			},
 			body: JSON.stringify({
 				filename: 'new-speech',
 				markdown: '# New\n## A:\nHi',
-				alternate_filename: 'paired-speech'
-			})
+				alternate_filename: 'paired-speech',
+			}),
 		});
 
-		const altUpdates = env.__operations.filter((s) =>
-			s.sql.includes('UPDATE speech_index SET alternate_filename')
-		);
+		const altUpdates = env.__operations.filter((s) => s.sql.includes('UPDATE speech_index SET alternate_filename'));
 		expect(altUpdates.length).toBe(2);
 		expect(altUpdates.map((s) => s.args)).toEqual(
 			expect.arrayContaining([
 				['paired-speech', 'new-speech'],
-				['new-speech', 'paired-speech']
-			])
+				['new-speech', 'paired-speech'],
+			]),
 		);
 	});
 });

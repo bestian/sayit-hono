@@ -9,7 +9,7 @@ const NAMED_ENTITIES: Record<string, string> = {
 	gt: '>',
 	quot: '"',
 	apos: "'",
-	nbsp: ' '
+	nbsp: ' ',
 };
 
 export type ApiSection = {
@@ -51,7 +51,7 @@ export function stripHtml(html: string): string {
 			.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
 			.replace(/<br\s*\/?>/gi, ' ')
 			.replace(/<\/(p|div|section|article|li|blockquote|h[1-6]|tr|td|th)>/gi, ' ')
-			.replace(/<[^>]+>/g, ' ')
+			.replace(/<[^>]+>/g, ' '),
 	)
 		.replace(/\s+/g, ' ')
 		.trim();
@@ -113,11 +113,7 @@ function buildOfflineExcerpt(content: string, maxChars = MAX_OFFLINE_CONTENT_CHA
 	return `${normalized.slice(0, maxChars).trimEnd()}...`;
 }
 
-export function docsFromSections(
-	sections: ApiSection[],
-	baseUrl: string,
-	filename = sections[0]?.filename || ''
-): SearchDocRecord[] {
+export function docsFromSections(sections: ApiSection[], baseUrl: string, filename = sections[0]?.filename || ''): SearchDocRecord[] {
 	const title = sections[0]?.display_name || '';
 	const docs: SearchDocRecord[] = [];
 
@@ -130,15 +126,15 @@ export function docsFromSections(
 	}
 
 	for (const [nestFilename, groupSections] of groups) {
-		const pageUrl = nestFilename
-			? `${baseUrl}/${encodeURIComponent(nestFilename)}`
-			: baseUrl;
-		const content = buildOfflineExcerpt(mergeContentBlocks(
-			groupSections.map((section) => ({
-				content: stripHtml(section.section_content || ''),
-				speaker: section.name ?? null
-			}))
-		));
+		const pageUrl = nestFilename ? `${baseUrl}/${encodeURIComponent(nestFilename)}` : baseUrl;
+		const content = buildOfflineExcerpt(
+			mergeContentBlocks(
+				groupSections.map((section) => ({
+					content: stripHtml(section.section_content || ''),
+					speaker: section.name ?? null,
+				})),
+			),
+		);
 		if (!content) continue;
 
 		docs.push({
@@ -147,7 +143,7 @@ export function docsFromSections(
 			title,
 			content,
 			sectionId: null,
-			speaker: summarizeSpeakers(groupSections.map((section) => section.name))
+			speaker: summarizeSpeakers(groupSections.map((section) => section.name)),
 		});
 	}
 
@@ -169,7 +165,7 @@ export function docsFromMarkdown(markdown: string, pageUrl: string, filename: st
 		if (!content) return;
 		blocks.push({
 			content,
-			speaker: currentSpeaker
+			speaker: currentSpeaker,
 		});
 	}
 
@@ -191,7 +187,7 @@ export function docsFromMarkdown(markdown: string, pageUrl: string, filename: st
 		if (content) {
 			blocks.push({
 				content,
-				speaker: null
+				speaker: null,
 			});
 		}
 	}
@@ -199,12 +195,14 @@ export function docsFromMarkdown(markdown: string, pageUrl: string, filename: st
 	const mergedContent = buildOfflineExcerpt(mergeContentBlocks(blocks));
 	if (!mergedContent) return [];
 
-	return [{
-		filename,
-		pageUrl,
-		title,
-		content: mergedContent,
-		sectionId: null,
-		speaker: summarizeSpeakers(blocks.map((block) => block.speaker))
-	}];
+	return [
+		{
+			filename,
+			pageUrl,
+			title,
+			content: mergedContent,
+			sectionId: null,
+			speaker: summarizeSpeakers(blocks.map((block) => block.speaker)),
+		},
+	];
 }

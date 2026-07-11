@@ -194,7 +194,7 @@ function an2md(anXml: string): string {
 					p
 						.split('\n')
 						.map((l) => (l.length === 0 ? '>' : `> ${l}`))
-						.join('\n')
+						.join('\n'),
 				)
 				.join('\n>\n');
 			merged.push(quoted);
@@ -217,7 +217,7 @@ function an2md(anXml: string): string {
 }
 
 export const __test__ = {
-	an2md
+	an2md,
 };
 
 /** 提供 .md 檔案，依 objectKey 取得 .an 後轉成 markdown

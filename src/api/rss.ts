@@ -1,11 +1,5 @@
 import type { Context } from 'hono';
-import {
-	FEED_CACHE_CONTROL,
-	buildR2HtmlKey,
-	readR2Cache,
-	tags,
-	writeR2Cache
-} from './cache';
+import { FEED_CACHE_CONTROL, buildR2HtmlKey, readR2Cache, tags, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 
 const SITE_URL = 'https://archive.tw';
@@ -41,16 +35,11 @@ const NAMED_ENTITIES: Record<string, string> = {
 	gt: '>',
 	quot: '"',
 	apos: "'",
-	nbsp: ' '
+	nbsp: ' ',
 };
 
 function escapeXml(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&apos;');
+	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
 function decodeHtmlEntities(value: string): string {
@@ -76,7 +65,7 @@ function toPlainText(html: string): string {
 			.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
 			.replace(/<br\s*\/?>/gi, ' ')
 			.replace(/<\/(p|div|section|article|li|blockquote|h[1-6]|tr|td|th)>/gi, ' ')
-			.replace(/<[^>]+>/g, ' ')
+			.replace(/<[^>]+>/g, ' '),
 	)
 		.replace(/\s+/g, ' ')
 		.trim();
@@ -101,11 +90,7 @@ function parseRssDateFromFilename(filename: string): string | null {
 	const day = Number.parseInt(match[3], 10);
 	const parsed = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
 
-	if (
-		parsed.getUTCFullYear() !== year ||
-		parsed.getUTCMonth() !== month - 1 ||
-		parsed.getUTCDate() !== day
-	) {
+	if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
 		return null;
 	}
 
@@ -146,7 +131,7 @@ function rowToFeedItem(row: FeedRow): FeedItem {
 		link,
 		guid: link,
 		description: buildItemDescription(row),
-		pubDate: parseRssDateFromFilename(row.filename)
+		pubDate: parseRssDateFromFilename(row.filename),
 	};
 }
 
@@ -179,8 +164,6 @@ ${itemXml}
   </channel>
 </rss>`;
 }
-
-
 
 export async function rssFeed(c: Context<ApiEnv>) {
 	const cacheKey = buildR2HtmlKey(c.req.url);
@@ -239,7 +222,7 @@ export async function rssFeed(c: Context<ApiEnv>) {
 				) AS first_speaker_name
 			FROM speech_index si
 			ORDER BY si.id DESC
-			LIMIT ?`
+			LIMIT ?`,
 		)
 			.bind(FEED_LIMIT)
 			.all();
@@ -255,8 +238,8 @@ export async function rssFeed(c: Context<ApiEnv>) {
 			headers: {
 				'Content-Type': FEED_CONTENT_TYPE,
 				'Cache-Control': FEED_CACHE_CONTROL,
-				'Cache-Tag': tags.listRss
-			}
+				'Cache-Tag': tags.listRss,
+			},
 		});
 
 		await writeR2Cache(c.env.SPEECH_CACHE, cacheKey, response.clone(), FEED_CONTENT_TYPE);

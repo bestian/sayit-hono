@@ -10,7 +10,7 @@ import {
 	headForSpeaker,
 	headForSpeechContent,
 	headForNestedSpeech,
-	headForNestedSpeechDetail
+	headForNestedSpeechDetail,
 } from '../src/ssr/heads';
 
 describe('heads', () => {
@@ -27,8 +27,8 @@ describe('heads', () => {
 		expect(privacy.meta).toEqual(
 			expect.arrayContaining([
 				{ property: 'og:title', content: 'Privacy Policy' },
-				{ property: 'og:description', content: 'Privacy policy for AI questions on SayIt.' }
-			])
+				{ property: 'og:description', content: 'Privacy policy for AI questions on SayIt.' },
+			]),
 		);
 		expect(privacy.meta?.some((m) => m.property === 'og:image')).toBe(true);
 
@@ -37,8 +37,8 @@ describe('heads', () => {
 		expect(terms.meta).toEqual(
 			expect.arrayContaining([
 				{ property: 'og:title', content: 'Terms of Use' },
-				{ property: 'og:description', content: 'Terms of use for AI questions on SayIt.' }
-			])
+				{ property: 'og:description', content: 'Terms of use for AI questions on SayIt.' },
+			]),
 		);
 		expect(terms.meta?.some((m) => m.property === 'og:image')).toBe(true);
 	});

@@ -10,7 +10,11 @@ type Resolver = (sql: string, args: unknown[]) => { success?: boolean; results: 
 function createRssEnv(resolver: Resolver, preSeedR2: Record<string, { body: string; cacheControl?: string; contentType?: string }> = {}) {
 	const r2Store = new Map<string, { body: string; cacheControl?: string; contentType?: string }>();
 	for (const [k, v] of Object.entries(preSeedR2)) {
-		r2Store.set(k, { body: v.body, cacheControl: v.cacheControl ?? 'public, max-age=300', contentType: v.contentType ?? 'application/rss+xml; charset=utf-8' });
+		r2Store.set(k, {
+			body: v.body,
+			cacheControl: v.cacheControl ?? 'public, max-age=300',
+			contentType: v.contentType ?? 'application/rss+xml; charset=utf-8',
+		});
 	}
 	return {
 		__r2Store: r2Store,
@@ -26,7 +30,7 @@ function createRssEnv(resolver: Resolver, preSeedR2: Record<string, { body: stri
 					size: entry.body.length,
 					httpEtag: null,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
@@ -35,7 +39,7 @@ function createRssEnv(resolver: Resolver, preSeedR2: Record<string, { body: stri
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -44,15 +48,15 @@ function createRssEnv(resolver: Resolver, preSeedR2: Record<string, { body: stri
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -74,7 +78,7 @@ describe('/rss.xml', () => {
 	it('serves a cached R2 body without edge write', async () => {
 		const cacheKey = `${CACHE_KEY_VERSION}/example.com/rss.xml`;
 		const env = createRssEnv(() => ({ success: true, results: [] }), {
-			[cacheKey]: { body: '<rss>cached</rss>', contentType: 'application/rss+xml; charset=utf-8' }
+			[cacheKey]: { body: '<rss>cached</rss>', contentType: 'application/rss+xml; charset=utf-8' },
 		});
 		const { res } = await request('/rss.xml', env);
 		expect(res.status).toBe(200);
@@ -86,16 +90,18 @@ describe('/rss.xml', () => {
 			if (sql.includes('FROM speech_index si') && sql.includes('first_section_content')) {
 				return {
 					success: true,
-					results: [{
-						id: 1,
-						filename: '2026-05-10-nested',
-						display_name: '2026-05-10 Parent',
-						isNested: 1,
-						first_nest_filename: 'child',
-						first_nest_display_name: 'Child Display',
-						first_section_content: '<p>Body</p>',
-						first_speaker_name: null
-					}]
+					results: [
+						{
+							id: 1,
+							filename: '2026-05-10-nested',
+							display_name: '2026-05-10 Parent',
+							isNested: 1,
+							first_nest_filename: 'child',
+							first_nest_display_name: 'Child Display',
+							first_section_content: '<p>Body</p>',
+							first_speaker_name: null,
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -112,16 +118,18 @@ describe('/rss.xml', () => {
 			if (sql.includes('FROM speech_index si') && sql.includes('first_section_content')) {
 				return {
 					success: true,
-					results: [{
-						id: 2,
-						filename: 'no-date-speech',
-						display_name: 'No Date',
-						isNested: 0,
-						first_nest_filename: null,
-						first_nest_display_name: null,
-						first_section_content: null,
-						first_speaker_name: null
-					}]
+					results: [
+						{
+							id: 2,
+							filename: 'no-date-speech',
+							display_name: 'No Date',
+							isNested: 0,
+							first_nest_filename: null,
+							first_nest_display_name: null,
+							first_section_content: null,
+							first_speaker_name: null,
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -137,16 +145,18 @@ describe('/rss.xml', () => {
 			if (sql.includes('FROM speech_index si') && sql.includes('first_section_content')) {
 				return {
 					success: true,
-					results: [{
-						id: 3,
-						filename: '2026-13-99-bad',
-						display_name: 'Invalid Date',
-						isNested: 0,
-						first_nest_filename: null,
-						first_nest_display_name: null,
-						first_section_content: '<p>Body text</p>',
-						first_speaker_name: 'A'
-					}]
+					results: [
+						{
+							id: 3,
+							filename: '2026-13-99-bad',
+							display_name: 'Invalid Date',
+							isNested: 0,
+							first_nest_filename: null,
+							first_nest_display_name: null,
+							first_section_content: '<p>Body text</p>',
+							first_speaker_name: 'A',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -163,16 +173,18 @@ describe('/rss.xml', () => {
 			if (sql.includes('FROM speech_index si') && sql.includes('first_section_content')) {
 				return {
 					success: true,
-					results: [{
-						id: 4,
-						filename: '2026-06-01-demo',
-						display_name: '2026-06-01 Demo',
-						isNested: 0,
-						first_nest_filename: null,
-						first_nest_display_name: null,
-						first_section_content: `<p>${longBody}</p>`,
-						first_speaker_name: ' '
-					}]
+					results: [
+						{
+							id: 4,
+							filename: '2026-06-01-demo',
+							display_name: '2026-06-01 Demo',
+							isNested: 0,
+							first_nest_filename: null,
+							first_nest_display_name: null,
+							first_section_content: `<p>${longBody}</p>`,
+							first_speaker_name: ' ',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };

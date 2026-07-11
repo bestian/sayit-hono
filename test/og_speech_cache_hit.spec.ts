@@ -21,7 +21,7 @@ describe('og speech R2 hit tagging', () => {
 				},
 				put: async () => {},
 				delete: async () => true,
-				list: async () => ({ objects: [], truncated: false, cursor: '' })
+				list: async () => ({ objects: [], truncated: false, cursor: '' }),
 			},
 			DB: {
 				prepare: (sql: string) => ({
@@ -32,12 +32,12 @@ describe('og speech R2 hit tagging', () => {
 							}
 							return null;
 						},
-						all: async () => ({ success: true, results: [] })
+						all: async () => ({ success: true, results: [] }),
 					}),
 					first: async () => null,
-					all: async () => ({ success: true, results: [] })
-				})
-			}
+					all: async () => ({ success: true, results: [] }),
+				}),
+			},
 		};
 		const req = new IncomingRequest('https://example.com/og/speech/7.png');
 		const res = await worker.fetch(req, env as any, createExecutionContext());
@@ -60,7 +60,7 @@ describe('og speech R2 hit tagging', () => {
 				},
 				put: async () => {},
 				delete: async () => true,
-				list: async () => ({ objects: [], truncated: false, cursor: '' })
+				list: async () => ({ objects: [], truncated: false, cursor: '' }),
 			},
 			DB: {
 				prepare: () => ({
@@ -68,14 +68,14 @@ describe('og speech R2 hit tagging', () => {
 						first: async () => {
 							throw new Error('db down');
 						},
-						all: async () => ({ success: true, results: [] })
+						all: async () => ({ success: true, results: [] }),
 					}),
 					first: async () => {
 						throw new Error('db down');
 					},
-					all: async () => ({ success: true, results: [] })
-				})
-			}
+					all: async () => ({ success: true, results: [] }),
+				}),
+			},
 		};
 		const req = new IncomingRequest('https://example.com/og/speech/8.png');
 		const res = await worker.fetch(req, env as any, createExecutionContext());

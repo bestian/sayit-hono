@@ -26,7 +26,7 @@ function createMdEnv(resolver: Resolver, preSeedR2: Record<string, { body: strin
 					size: entry.body.length,
 					httpEtag: null,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
@@ -35,7 +35,7 @@ function createMdEnv(resolver: Resolver, preSeedR2: Record<string, { body: strin
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -44,15 +44,15 @@ function createMdEnv(resolver: Resolver, preSeedR2: Record<string, { body: strin
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -126,12 +126,14 @@ describe('/api/md/* and /speech/:id.md', () => {
 			if (args[0] === 55) {
 				return {
 					success: true,
-					results: [{
-						section_speaker: 'audrey-tang',
-						section_content: '<p>Body text</p>',
-						display_name: 'Demo',
-						name: 'Audrey'
-					}]
+					results: [
+						{
+							section_speaker: 'audrey-tang',
+							section_content: '<p>Body text</p>',
+							display_name: 'Demo',
+							name: 'Audrey',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -165,13 +167,15 @@ describe('/api/md/* and /speech/:id.md', () => {
 	});
 
 	const fullResolver: Resolver = (sql, args) => {
-		if (sql.includes('FROM speech_content sc')
-			&& sql.includes('LEFT JOIN speech_index si ON sc.filename = si.filename')
-			&& sql.includes('WHERE sc.filename = ?')) {
+		if (
+			sql.includes('FROM speech_content sc') &&
+			sql.includes('LEFT JOIN speech_index si ON sc.filename = si.filename') &&
+			sql.includes('WHERE sc.filename = ?')
+		) {
 			if (args[0] === '2026-demo') {
 				return {
 					success: true,
-					results: [{ section_speaker: 'a', section_content: '<p>Hello.</p>', display_name: 'Demo', name: 'Audrey' }]
+					results: [{ section_speaker: 'a', section_content: '<p>Hello.</p>', display_name: 'Demo', name: 'Audrey' }],
 				};
 			}
 			return { success: true, results: [] };
@@ -188,7 +192,7 @@ describe('/api/md/* and /speech/:id.md', () => {
 
 	it('serves cached full-speech .md from R2 when pre-seeded', async () => {
 		const env = createMdEnv(fullResolver, {
-			'md/2026-demo': { body: '# cached content', contentType: 'text/markdown; charset=utf-8' }
+			'md/2026-demo': { body: '# cached content', contentType: 'text/markdown; charset=utf-8' },
 		});
 		const { res } = await request('/api/md/2026-demo.md', env);
 		expect(res.status).toBe(200);
@@ -197,7 +201,7 @@ describe('/api/md/* and /speech/:id.md', () => {
 
 	it('purges caches when ?purge is present and regenerates the body', async () => {
 		const env = createMdEnv(fullResolver, {
-			'md/2026-demo': { body: 'STALE', contentType: 'text/markdown; charset=utf-8' }
+			'md/2026-demo': { body: 'STALE', contentType: 'text/markdown; charset=utf-8' },
 		});
 		const { res } = await request('/api/md/2026-demo.md?purge', env);
 		expect(res.status).toBe(200);

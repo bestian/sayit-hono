@@ -10,7 +10,7 @@ describe('SSR layout', () => {
 	it('renders the global share control and share script', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).toContain('data-sayit-share');
@@ -26,10 +26,10 @@ describe('SSR layout', () => {
 				title: `"><script>alert(1)</script>`,
 				meta: [
 					{ property: 'og:title', content: `Quote " and <tag> & amp` },
-					{ name: 'description', content: `'single' "double"` }
+					{ name: 'description', content: `'single' "double"` },
 				],
-				links: [{ rel: 'canonical', href: `https://example.com/?a=1&b="2`, hreflang: 'zh-Hant' }]
-			}
+				links: [{ rel: 'canonical', href: `https://example.com/?a=1&b="2`, hreflang: 'zh-Hant' }],
+			},
 		});
 
 		expect(html).not.toContain('<script>alert(1)</script>');
@@ -42,7 +42,7 @@ describe('SSR layout', () => {
 	it('navbar share control has no legacy margin-top in SSR CSS', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).not.toContain('margin-top: 5px');
@@ -52,7 +52,7 @@ describe('SSR layout', () => {
 	it('renders the homepage Ask UI hidden by default', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).toContain('id="sayit-site-lang-toggle"');
@@ -70,7 +70,7 @@ describe('SSR layout', () => {
 	it('renders homepage site language toggle with emoji flag labels', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		const toggleMatch = html.match(/<button[^>]*id="sayit-site-lang-toggle"[^>]*>[\s\S]*?<\/button>/);
@@ -80,11 +80,10 @@ describe('SSR layout', () => {
 		expect(toggleHtml).toContain('🇹🇼');
 	});
 
-
 	it('renders footer ask notice with local privacy and terms links', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).toContain('sayit-footer-ask-notice');
@@ -105,8 +104,8 @@ describe('SSR layout', () => {
 				page_size: 20,
 				total_pages: 1,
 				total_sections: 0,
-				pagination_pages: [1]
-			}
+				pagination_pages: [1],
+			},
 		});
 
 		expect(html).not.toContain('id="sayit-ask"');
@@ -120,7 +119,7 @@ describe('SSR layout', () => {
 	it('renders bilingual privacy policy content', async () => {
 		const html = await renderHtml(LegalPrivacyView, {
 			styles: [LegalPrivacyViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
-			components: { Navbar, Footer }
+			components: { Navbar, Footer },
 		});
 
 		expect(html).toContain('id="privacy-zh"');

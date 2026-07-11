@@ -5,7 +5,7 @@ import {
 	headForSpeaker,
 	headForSpeechContent,
 	headForNestedSpeech,
-	headForNestedSpeechDetail
+	headForNestedSpeechDetail,
 } from '../src/ssr/heads';
 
 describe('heads nullish / edge branches', () => {

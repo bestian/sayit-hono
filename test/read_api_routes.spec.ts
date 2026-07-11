@@ -24,20 +24,20 @@ function createReadEnv(resolver: QueryResolver) {
 					size: entry.body.length,
 					httpEtag: null,
 					httpMetadata: { cacheControl: entry.cacheControl, contentType: entry.contentType },
-					text: async () => entry.body
+					text: async () => entry.body,
 				};
 			},
 			put: async (key: string, body: string, options?: { httpMetadata?: { cacheControl?: string; contentType?: string } }) => {
 				r2Store.set(key, {
 					body,
 					cacheControl: options?.httpMetadata?.cacheControl,
-					contentType: options?.httpMetadata?.contentType
+					contentType: options?.httpMetadata?.contentType,
 				});
 			},
 			delete: async (keys: string | string[]) => {
 				for (const key of Array.isArray(keys) ? keys : [keys]) r2Store.delete(key);
 			},
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -63,15 +63,15 @@ function createReadEnv(resolver: QueryResolver) {
 						const out = await callResolver(args);
 						if (out == null) return { success: false, results: [] };
 						return { success: out.success ?? true, results: out.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -90,8 +90,8 @@ describe('GET /api/speakers_index.json', () => {
 					success: true,
 					results: [
 						{ id: 1, route_pathname: 'audrey-tang', name: 'Audrey Tang', photoURL: '/media/a.jpg' },
-						{ id: 2, route_pathname: 'bestian', name: 'Bestian', photoURL: null }
-					]
+						{ id: 2, route_pathname: 'bestian', name: 'Bestian', photoURL: null },
+					],
 				};
 			}
 			return { success: true, results: [] };
@@ -139,71 +139,71 @@ describe('GET /api/speech_index.json', () => {
 							display_name: 'Flat',
 							isNested: 0,
 							nest_filenames: null,
-							nest_display_names: null
+							nest_display_names: null,
 						},
 						{
 							filename: 'nested-json',
 							display_name: 'Nested JSON',
 							isNested: 1,
 							nest_filenames: '["a","b"]',
-							nest_display_names: '["Alpha","Beta"]'
+							nest_display_names: '["Alpha","Beta"]',
 						},
 						{
 							filename: 'nested-csv',
 							display_name: 'Nested CSV',
 							isNested: 1,
 							nest_filenames: 'a, b; c\nd',
-							nest_display_names: 'Alpha, Beta; Gamma\nDelta'
+							nest_display_names: 'Alpha, Beta; Gamma\nDelta',
 						},
 						{
 							filename: 'nested-mismatch',
 							display_name: 'Mismatch',
 							isNested: 1,
 							nest_filenames: '["a","b","c"]',
-							nest_display_names: '["Alpha"]'
+							nest_display_names: '["Alpha"]',
 						},
-							{
-								filename: 'nested-number',
-								display_name: 'Number',
-								isNested: 1,
-								nest_filenames: 42,
-								nest_display_names: ['X']
-							},
-							{
-								filename: 'nested-whitespace',
-								display_name: 'Whitespace',
-								isNested: 1,
-								nest_filenames: '   ',
-								nest_display_names: '   '
-							}
-						]
-					};
-				}
+						{
+							filename: 'nested-number',
+							display_name: 'Number',
+							isNested: 1,
+							nest_filenames: 42,
+							nest_display_names: ['X'],
+						},
+						{
+							filename: 'nested-whitespace',
+							display_name: 'Whitespace',
+							isNested: 1,
+							nest_filenames: '   ',
+							nest_display_names: '   ',
+						},
+					],
+				};
+			}
 			return { success: true, results: [] };
 		});
 
-			const { res } = await request('/api/speech_index.json', env);
-			expect(res.status).toBe(200);
-			const json = (await res.json()) as any[];
-			expect(json).toHaveLength(6);
-			expect(json[0].nest).toEqual([]);
-			expect(json[1].nest).toEqual([
-				{ filename: 'a', display_name: 'Alpha' },
-			{ filename: 'b', display_name: 'Beta' }
+		const { res } = await request('/api/speech_index.json', env);
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as any[];
+		expect(json).toHaveLength(6);
+		expect(json[0].nest).toEqual([]);
+		expect(json[1].nest).toEqual([
+			{ filename: 'a', display_name: 'Alpha' },
+			{ filename: 'b', display_name: 'Beta' },
 		]);
 		expect(json[2].nest).toEqual([
 			{ filename: 'a', display_name: 'Alpha' },
 			{ filename: 'b', display_name: 'Beta' },
 			{ filename: 'c', display_name: 'Gamma' },
-			{ filename: 'd', display_name: 'Delta' }
+			{ filename: 'd', display_name: 'Delta' },
 		]);
-			expect(json[3].nest[2]).toEqual({ filename: 'c', display_name: 'c' });
-			expect(json[4].nest).toEqual([]);
-			expect(json[4].nest_display_names).toEqual(['X']);
-			expect(json[5].nest).toEqual([]);
-			expect(json[5].nest_filenames).toEqual([]);
-			expect(json[5].nest_display_names).toEqual([]);
-		});
+		expect(json[3].nest[2]).toEqual({ filename: 'c', display_name: 'c' });
+		expect(json[4].nest).toEqual([]);
+		expect(json[4].nest_display_names).toEqual(['X']);
+		expect(json[5].nest).toEqual([]);
+		expect(json[5].nest_filenames).toEqual([]);
+		expect(json[5].nest_display_names).toEqual([]);
+	});
 
 	it('returns 500 when DB reports failure', async () => {
 		const env = createReadEnv((sql) => {
@@ -274,7 +274,7 @@ describe('GET /api/speech/*', () => {
 		display_name: 'Demo',
 		photoURL: null,
 		name: null,
-		...overrides
+		...overrides,
 	});
 
 	it('returns sections for a flat speech', async () => {
@@ -283,10 +283,7 @@ describe('GET /api/speech/*', () => {
 				if (args[0] === '2026-demo') {
 					return {
 						success: true,
-						results: [
-							makeSection({ section_id: 1, next_section_id: 2 }),
-							makeSection({ section_id: 2, previous_section_id: 1 })
-						]
+						results: [makeSection({ section_id: 1, next_section_id: 2 }), makeSection({ section_id: 2, previous_section_id: 1 })],
 					};
 				}
 				return { success: true, results: [] };
@@ -357,7 +354,7 @@ describe('GET /api/speaker_detail/:route.json', () => {
 		longest_section_filename: '2026-demo',
 		longest_section_nest_filename: null,
 		longest_section_nest_display_name: null,
-		longest_section_displayname: 'Demo'
+		longest_section_displayname: 'Demo',
 	};
 
 	function resolver(rowFound = true, failAll = false): QueryResolver {
@@ -385,9 +382,9 @@ describe('GET /api/speaker_detail/:route.json', () => {
 							next_section_id: null,
 							section_speaker: args[0],
 							section_content: '<p>one</p>',
-							display_name: 'Demo'
-						}
-					]
+							display_name: 'Demo',
+						},
+					],
 				};
 			}
 			return { success: true, results: [] };

@@ -38,6 +38,12 @@ export function checkMonotonic<T extends SectionLike>(sections: T[]): boolean {
 /**
  * 依 previous_section_id / next_section_id 頭尾相接重排
  * 使用 Map 達成 O(n) 複雜度，避免大量資料時 O(n²) 導致逾時
+ *
+ * 防禦性設計：next_section_id 鏈結若因資料損毀形成循環，或斷成多段，walk
+ * 用 visited 集合保證終止（不會在 Workers CPU 時限內卡死），走訪不到的
+ * 段落於最後依 section_id 排序附加在尾端，確保回傳值恆為輸入的排列
+ * （不會靜默漏掉任何段落）。與 upload_markdown.ts 的 orderSectionsByLinks
+ * 為姊妹實作，修正後兩者的防護邏輯一致。
  */
 // not lsc-verifiable: lsc emits unresolved type param T, Infinity, != None on datatypes, in on maps with wrong element types — 18 resolution/type errors prevent Dafny verification
 //@ ensures Perm(\result, sections)
@@ -76,13 +82,25 @@ export function reorderSections<T extends SectionLike>(sections: T[]): T[] {
 	if (!first) return sections;
 
 	const ordered: T[] = [];
+	const visited = new Set<number>();
 	let current: T | null = first;
 	//@ decreases sections.length - ordered.length
-	while (current) {
+	while (current && !visited.has(current.section_id)) {
 		ordered.push(current);
+		visited.add(current.section_id);
 		const nextId: number | null = current.next_section_id;
-		current = nextId != null && byId.has(nextId) ? (byId.get(nextId) as T) : null;
+		current = nextId != null ? (byId.get(nextId) ?? null) : null;
 	}
+
+	if (ordered.length !== sections.length) {
+		const remains: T[] = [];
+		for (const s of sections) {
+			if (s != null && !visited.has(s.section_id)) remains.push(s);
+		}
+		remains.sort((a, b) => a.section_id - b.section_id);
+		ordered.push(...remains);
+	}
+
 	return ordered;
 }
 
@@ -93,10 +111,7 @@ export function reorderSections<T extends SectionLike>(sections: T[]): T[] {
 // not lsc-verifiable: lsc emits unresolved type param T, Infinity, != None on datatypes, in on maps with wrong element types — 18 resolution/type errors prevent Dafny verification
 //@ ensures !allowReorder ==> \result == rawData
 //@ ensures allowReorder ==> \result == rawData || Perm(\result, rawData)
-export function normalizeSections<T extends SectionLike>(
-	rawData: T[],
-	allowReorder = true
-): T[] {
+export function normalizeSections<T extends SectionLike>(rawData: T[], allowReorder = true): T[] {
 	if (!allowReorder) return rawData;
 	return checkMonotonic(rawData) ? rawData : reorderSections(rawData);
 }

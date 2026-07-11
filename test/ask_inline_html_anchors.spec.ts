@@ -13,11 +13,7 @@ function isSafeHttpUrl(value: string): boolean {
 }
 
 function escapeHtml(str: string): string {
-	return String(str)
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
+	return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function extractAskInlineHtmlAnchors(text: string): {
@@ -28,11 +24,14 @@ function extractAskInlineHtmlAnchors(text: string): {
 	const withPlaceholders = String(text || '').replace(
 		/<a\b[^>]*\bhref\s*=\s*(["'])([^"'>\s]+)\1[^>]*>([\s\S]*?)<\/a>/gi,
 		(_m, _quote: string, href: string, label: string) => {
-			const cleanLabel = String(label).replace(/<[^>]+>/g, '').trim() || href;
+			const cleanLabel =
+				String(label)
+					.replace(/<[^>]+>/g, '')
+					.trim() || href;
 			const id = anchors.length;
 			anchors.push({ href, label: cleanLabel });
 			return `\u0000ASKA${id}\u0000`;
-		}
+		},
 	);
 	return { text: withPlaceholders, anchors };
 }
@@ -68,9 +67,7 @@ describe('ask inline HTML anchors (issue #141)', () => {
 
 	it('keeps plain markdown links working', () => {
 		const html = renderAskInlineMarkdown('see [archive](https://archive.tw)');
-		expect(html).toBe(
-			'see <a href="https://archive.tw" target="_blank" rel="noopener noreferrer">archive</a>'
-		);
+		expect(html).toBe('see <a href="https://archive.tw" target="_blank" rel="noopener noreferrer">archive</a>');
 	});
 
 	it('strips unsafe schemes instead of linking them', () => {
@@ -80,9 +77,7 @@ describe('ask inline HTML anchors (issue #141)', () => {
 	});
 
 	it('does not let anchor labels inject markdown link targets', () => {
-		const html = renderAskInlineMarkdown(
-			'<a href="https://archive.tw">click](https://evil.example)</a>'
-		);
+		const html = renderAskInlineMarkdown('<a href="https://archive.tw">click](https://evil.example)</a>');
 		// href must stay on archive.tw; label may still show the injection attempt as text
 		expect(html).toContain('href="https://archive.tw"');
 		expect(html).not.toMatch(/href="[^"]*evil\.example/);

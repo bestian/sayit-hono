@@ -15,7 +15,7 @@ function makeEnv(resolver: Resolver) {
 			get: async () => null,
 			put: async () => {},
 			delete: async () => true,
-			list: async () => ({ objects: [], truncated: false, cursor: '' })
+			list: async () => ({ objects: [], truncated: false, cursor: '' }),
 		},
 		DB: {
 			prepare: (sql: string) => {
@@ -24,15 +24,15 @@ function makeEnv(resolver: Resolver) {
 					all: async () => {
 						const r = resolver(sql, args);
 						return { success: r.success ?? true, results: r.results };
-					}
+					},
 				});
 				return {
 					bind: (...args: unknown[]) => run(args),
 					first: async () => run([]).first(),
-					all: async () => run([]).all()
+					all: async () => run([]).all(),
 				};
-			}
-		}
+			},
+		},
 	};
 }
 
@@ -54,21 +54,21 @@ describe('/api/search.json — speaker filter branches', () => {
 		if (sql.includes('SELECT COUNT(*) AS count') && sql.includes('FROM speech_content sc')) {
 			return { success: true, results: [{ count: 1 }] };
 		}
-		if (sql.includes('FROM speech_content sc')
-			&& sql.includes('LEFT JOIN speech_index si')
-			&& sql.includes('ORDER BY')) {
+		if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si') && sql.includes('ORDER BY')) {
 			return {
 				success: true,
-				results: [{
-					filename: '2026-demo',
-					nest_filename: 'child',
-					display_name: '2026-demo Demo',
-					section_id: 42,
-					section_speaker: 'audrey-tang',
-					section_content: '<p>a needle here</p>',
-					speaker_name: 'Audrey Tang',
-					photoURL: null
-				}]
+				results: [
+					{
+						filename: '2026-demo',
+						nest_filename: 'child',
+						display_name: '2026-demo Demo',
+						section_id: 42,
+						section_speaker: 'audrey-tang',
+						section_content: '<p>a needle here</p>',
+						speaker_name: 'Audrey Tang',
+						photoURL: null,
+					},
+				],
 			};
 		}
 		return { success: true, results: [] };
@@ -120,21 +120,21 @@ describe('/search/ — speaker filter branches', () => {
 		if (sql.includes('SELECT COUNT(*) AS count') && sql.includes('FROM speech_content sc')) {
 			return { success: true, results: [{ count: 3 }] };
 		}
-		if (sql.includes('FROM speech_content sc')
-			&& sql.includes('LEFT JOIN speech_index si')
-			&& sql.includes('ORDER BY')) {
+		if (sql.includes('FROM speech_content sc') && sql.includes('LEFT JOIN speech_index si') && sql.includes('ORDER BY')) {
 			return {
 				success: true,
-				results: [{
-					filename: '2026-demo',
-					nest_filename: null,
-					display_name: '2026-demo Demo',
-					section_id: 42,
-					section_speaker: 'audrey-tang',
-					section_content: '<p>needle match</p>',
-					speaker_name: 'Audrey Tang',
-					photoURL: null
-				}]
+				results: [
+					{
+						filename: '2026-demo',
+						nest_filename: null,
+						display_name: '2026-demo Demo',
+						section_id: 42,
+						section_speaker: 'audrey-tang',
+						section_content: '<p>needle match</p>',
+						speaker_name: 'Audrey Tang',
+						photoURL: null,
+					},
+				],
 			};
 		}
 		return { success: true, results: [] };
