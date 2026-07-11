@@ -30,9 +30,6 @@ method hashString(value: string) returns (res: int)
   var hash := 0;
   var i := 0;
   while (i < |value|)
-    invariant (0 <= i)
-    invariant (i <= |value|)
-    decreases (|value| - i)
   {
     hash := (((hash * 32) - hash) + (value[i] as int));
     hash := BitOr(hash, 0);

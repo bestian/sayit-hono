@@ -98,7 +98,7 @@ export function reorderSections<T extends SectionLike>(sections: T[]): T[] {
 			if (s != null && !visited.has(s.section_id)) remains.push(s);
 		}
 		remains.sort((a, b) => a.section_id - b.section_id);
-		ordered.push(...remains);
+		for (const r of remains) ordered.push(r);
 	}
 
 	return ordered;

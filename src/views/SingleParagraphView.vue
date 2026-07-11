@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getSpeakerColor } from '../utils/speakerColor'
+import { parseContent, toPlainText } from '../utils/textUtils'
 
 type Section = {
 	filename: string;
@@ -25,19 +26,6 @@ const speakerColor = getSpeakerColor(
 );
 const avatarStyle = { borderColor: speakerColor, backgroundColor: speakerColor };
 
-function parseContent(raw?: string | null) {
-	if (!raw) return '';
-	try {
-		const parsed = JSON.parse(raw);
-		return typeof parsed === 'string' ? parsed : raw;
-	} catch {
-		return raw;
-	}
-}
-
-function stripHtmlTags(html: string): string {
-	return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-}
 
 function sanitizeHtmlContent(html: string): string {
 	// Remove script tags with various formats and replace with warning comment
@@ -49,10 +37,10 @@ function sanitizeHtmlContent(html: string): string {
 
 const parsedContent = sanitizeHtmlContent(parseContent(props.section?.section_content));
 const previousTextPreview = props.section?.previous_content
-	? stripHtmlTags(parseContent(props.section.previous_content)).slice(0, 30)
+	? toPlainText(parseContent(props.section.previous_content)).slice(0, 30)
 	: '';
 const nextTextPreview = props.section?.next_content
-	? stripHtmlTags(parseContent(props.section.next_content)).slice(0, 30)
+	? toPlainText(parseContent(props.section.next_content)).slice(0, 30)
 	: '';
 
 const getSpeakerUrl = (route_pathname: string | null) => (route_pathname ? `/speaker/${route_pathname}` : '#');

@@ -3,19 +3,11 @@ import { getCorsHeaders } from './cors';
 import { isAuthorizedFromHeader } from './auth';
 import type { ApiEnv } from './types';
 import { marked } from 'marked';
-import {
-	CACHE_KEY_VERSION,
-	deleteR2Cache,
-	purgeWorkersCache,
-	r2AnKey,
-	r2MdKey,
-	r2OgSectionKey,
-	r2OgSpeechKey,
-	speechRequestPath,
-	speakerRequestPath,
-	tags,
-} from './cache';
+import { deleteR2Cache, purgeWorkersCache, speechRequestPath, speakerRequestPath, tags } from './cache';
 import { markSpeechDeletedInSearch, syncSearchStats, writeSearchOverlayForSpeech } from '../search/runtime';
+import { orderSectionsByLinks, assignPatchedSections, withSectionLinks } from '../utils/sectionPatch';
+import type { NormalizedSection, ExistingSection, PatchAssignedSection } from '../utils/sectionPatch';
+import { planSpeechInvalidation, planSpeakerInvalidation, planListInvalidation } from '../utils/cachePlan';
 
 const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
 
@@ -95,30 +87,6 @@ type ParsedSection = {
 	isFromQuote: boolean;
 	startLine: number;
 };
-
-type NormalizedSection = {
-	section_id: number;
-	previous_section_id: number | null;
-	next_section_id: number | null;
-	section_speaker: string | null;
-	section_content: string;
-};
-
-type ExistingSection = {
-	section_id: number;
-	previous_section_id: number | null;
-	next_section_id: number | null;
-	section_speaker: string | null;
-	section_content: string;
-};
-
-type SectionPayload = {
-	markdown: string;
-	speaker: string | null;
-	section_content: string;
-};
-
-type PatchAssignedSection = SectionPayload & { section_id: number };
 
 /** 從講者標記陣列取出不重複的 route_pathname（用於 DB 關聯與快取失效） */
 function getUniqueSpeakerRoutePathnames(speakerMarks: SpeakerMark[]): string[] {
@@ -293,207 +261,6 @@ function stripMarkdownTitleLine(markdown: string): string {
 	return mdLines.join('\n');
 }
 
-/** 段落比對鍵：用於 LCS 判斷「同一段」是否相同（講者 + 內容） */
-function normalizeSectionComparableContent(input: string): string {
-	return (
-		input
-			// 先把常見換行型標記轉成空白，再移除其餘 HTML 標記
-			.replace(/<br\s*\/?>/gi, ' ')
-			.replace(/<\/?p\b[^>]*>/gi, ' ')
-			.replace(/<[^>]+>/g, ' ')
-			// Markdown link/image：保留可讀文字，移除 URL
-			.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-			.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-			// Markdown inline code
-			.replace(/`([^`]+)`/g, '$1')
-			// 行首 markdown 記號（標題、引用、清單）
-			.replace(/^\s{0,3}#{1,6}\s+/gm, '')
-			.replace(/^\s{0,3}>\s?/gm, '')
-			.replace(/^\s{0,3}[-*+]\s+/gm, '')
-			// decode 常見 HTML entity（避免同內容不同編碼）
-			.replace(/&nbsp;/gi, ' ')
-			.replace(/&amp;/gi, '&')
-			.replace(/&lt;/gi, '<')
-			.replace(/&gt;/gi, '>')
-			.replace(/&quot;/gi, '"')
-			.replace(/&apos;/gi, "'")
-			// 斷行與多空白差異一律視為同值
-			.replace(/\s+/g, ' ')
-			.trim()
-	);
-}
-
-/** 偵測段落是否「以 svg / iframe 嵌入區塊為主體」；若是，回傳該標籤名 */
-function detectEmbeddedMediaTag(input: string): 'svg' | 'iframe' | null {
-	let detected: 'svg' | 'iframe' | null = null;
-	let stripped = input;
-	for (const tag of ['svg', 'iframe'] as const) {
-		const re = new RegExp(`<\\s*${tag}\\b[^>]*>[\\s\\S]*?<\\s*/\\s*${tag}\\s*>`, 'gi');
-		const replaced = stripped.replace(re, ' ');
-		if (replaced !== stripped) {
-			detected ??= tag;
-			stripped = replaced;
-		}
-	}
-	if (!detected) return null;
-	// 只有「去掉媒體區塊與 HTML 標記後幾乎沒剩文字」才視為純嵌入段落，避免誤傷夾帶說明文字的段落
-	const remainder = stripped
-		.replace(/<[^>]+>/g, ' ')
-		.replace(/\s+/g, ' ')
-		.trim();
-	return remainder === '' ? detected : null;
-}
-
-function sectionMatchKey(section: { markdown: string; speaker: string | null }) {
-	// svg / iframe 區塊內部小幅變動（viewBox、src query）不應觸發 LCS 重排，直接以標籤類型作 key
-	const mediaTag = detectEmbeddedMediaTag(section.markdown);
-	if (mediaTag) {
-		return `${section.speaker ?? ''}\u0000__embedded_${mediaTag}__`;
-	}
-	return `${section.speaker ?? ''}\u0000${normalizeSectionComparableContent(section.markdown)}`;
-}
-
-/** 依 previous/next 鏈結將 DB 取出的段落排成正確順序；找不到頭則改依 section_id 排序 */
-function orderSectionsByLinks(rows: ExistingSection[]): ExistingSection[] {
-	if (rows.length <= 1) return rows;
-	const byId = new Map<number, ExistingSection>();
-	for (const row of rows) {
-		byId.set(row.section_id, row);
-	}
-
-	// 找出「頭」：previous 為 null 或不在列表內的段落
-	let head: ExistingSection | null = null;
-	for (const row of rows) {
-		if (row.previous_section_id == null || !byId.has(row.previous_section_id)) {
-			if (!head || row.section_id < head.section_id) {
-				head = row;
-			}
-		}
-	}
-
-	if (!head) return [...rows].sort((a, b) => a.section_id - b.section_id);
-
-	const ordered: ExistingSection[] = [];
-	const visited = new Set<number>();
-	let current: ExistingSection | null = head;
-	while (current && !visited.has(current.section_id)) {
-		ordered.push(current);
-		visited.add(current.section_id);
-		const nextId: number | null = current.next_section_id;
-		current = nextId != null ? (byId.get(nextId) ?? null) : null;
-	}
-
-	if (ordered.length !== rows.length) {
-		const remains: ExistingSection[] = [];
-		for (const row of rows) {
-			if (!visited.has(row.section_id)) remains.push(row);
-		}
-		remains.sort((a, b) => a.section_id - b.section_id);
-		ordered.push(...remains);
-	}
-
-	return ordered;
-}
-
-/** PATCH 用：以 LCS（最長共同子序列）找出舊/新段落對應的 (oldIdx, newIdx)  pairs，供 assignPatchedSections 沿用 section_id */
-function buildLcsPairs(oldSections: SectionPayload[], newSections: SectionPayload[]): Array<[number, number]> {
-	const n = oldSections.length;
-	const m = newSections.length;
-	const oldKeys = oldSections.map(sectionMatchKey);
-	const newKeys = newSections.map(sectionMatchKey);
-	const dp: number[][] = Array.from({ length: n + 1 }, () => Array.from({ length: m + 1 }, () => 0));
-
-	for (let i = 1; i <= n; i += 1) {
-		for (let j = 1; j <= m; j += 1) {
-			if (oldKeys[i - 1] === newKeys[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
-			else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-		}
-	}
-
-	const pairs: Array<[number, number]> = [];
-	let i = n;
-	let j = m;
-	while (i > 0 && j > 0) {
-		if (oldKeys[i - 1] === newKeys[j - 1]) {
-			pairs.push([i - 1, j - 1]);
-			i -= 1;
-			j -= 1;
-		} else if (dp[i - 1][j] >= dp[i][j - 1]) {
-			i -= 1;
-		} else {
-			j -= 1;
-		}
-	}
-
-	return pairs.reverse();
-}
-
-/**
- * PATCH 用：以 LCS 對齊舊/新段落，能對上的沿用舊 section_id（URL 穩定），多出來
- * 的新段落用 `allocateFresh()` 取得全域唯一的新 ID。
- *
- * allocateFresh() draws sequentially from a block pre-reserved via
- * reserveSectionIds (globalMax+1..), so every inserted id is strictly greater
- * than every existing section_id and than every other id minted this request —
- * cross-speech / intra-request UNIQUE-PK collisions are impossible by
- * construction. There is no positional `base*100+N` scheme any more: section_id
- * is pure identity and display order comes from the previous/next link chain
- * (withSectionLinks + sectionUtils), so non-local inserted ids are fine.
- */
-function assignPatchedSections(
-	oldRows: ExistingSection[],
-	newSections: SectionPayload[],
-	allocateFresh: () => number,
-): PatchAssignedSection[] {
-	const oldSections: Array<SectionPayload & { section_id: number }> = oldRows.map((row) => ({
-		section_id: row.section_id,
-		markdown: row.section_content,
-		speaker: row.section_speaker,
-		section_content: row.section_content,
-	}));
-	const output: PatchAssignedSection[] = [];
-	let oldCursor = 0;
-	let newCursor = 0;
-
-	const emit = (section: SectionPayload, sectionId: number) => {
-		output.push({ ...section, section_id: sectionId });
-	};
-
-	// Special case: 改第一段（新第一段是陌生內容）時，強制沿用舊第一段 section_id
-	if (oldSections.length > 0 && newSections.length > 0 && sectionMatchKey(oldSections[0]) !== sectionMatchKey(newSections[0])) {
-		emit(newSections[0], oldSections[0].section_id);
-		oldCursor = 1;
-		newCursor = 1;
-	}
-
-	const lcsPairs = buildLcsPairs(oldSections.slice(oldCursor), newSections.slice(newCursor)).map(
-		([oldIdx, newIdx]) => [oldIdx + oldCursor, newIdx + newCursor] as [number, number],
-	);
-
-	for (const [oldMatchIdx, newMatchIdx] of lcsPairs) {
-		const oldGap = oldSections.slice(oldCursor, oldMatchIdx);
-		const newGap = newSections.slice(newCursor, newMatchIdx);
-		const pairedCount = Math.min(oldGap.length, newGap.length);
-
-		// Reuse old ids for paired sections in the gap; fresh ids for the rest.
-		for (let k = 0; k < pairedCount; k += 1) emit(newGap[k], oldGap[k].section_id);
-		for (let k = pairedCount; k < newGap.length; k += 1) emit(newGap[k], allocateFresh());
-
-		emit(newSections[newMatchIdx], oldSections[oldMatchIdx].section_id);
-		oldCursor = oldMatchIdx + 1;
-		newCursor = newMatchIdx + 1;
-	}
-
-	const oldTail = oldSections.slice(oldCursor);
-	const newTail = newSections.slice(newCursor);
-	const tailPairCount = Math.min(oldTail.length, newTail.length);
-
-	for (let k = 0; k < tailPairCount; k += 1) emit(newTail[k], oldTail[k].section_id);
-	for (let k = tailPairCount; k < newTail.length; k += 1) emit(newTail[k], allocateFresh());
-
-	return output;
-}
-
 /** 解析上傳的 Markdown：去標題行、切段落、指派講者、轉 HTML，回傳 speakers 與 sectionPayloads */
 async function parseIncomingMarkdown(markdown: string) {
 	const markdownForParsing = stripMarkdownTitleLine(markdown);
@@ -509,31 +276,12 @@ async function parseIncomingMarkdown(markdown: string) {
 	};
 }
 
-/** 為已分配 section_id 的段落補上 previous_section_id / next_section_id 鏈結 */
-function withSectionLinks(sections: PatchAssignedSection[]): NormalizedSection[] {
-	return sections.map((section, idx) => ({
-		section_id: section.section_id,
-		previous_section_id: idx === 0 ? null : sections[idx - 1].section_id,
-		next_section_id: idx === sections.length - 1 ? null : sections[idx + 1].section_id,
-		section_speaker: section.speaker,
-		section_content: section.section_content,
-	}));
-}
-
 /** 演講內容或 .an/.md 更新後，刪除 R2 origin 並 purge Workers Cache.
  *  extraSectionIds: section IDs that may no longer exist in D1 (deleted/reassigned on PATCH/DELETE)
  *  but still need R2 + Workers Cache purge for /speech/:id pages.
  */
 async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string, extraSectionIds: Iterable<number> = []): Promise<boolean> {
 	const host = new URL(c.req.url).host;
-	const encodedFilename = encodeURIComponent(filename);
-	const r2Keys = [
-		r2AnKey(filename),
-		r2MdKey(filename),
-		`${CACHE_KEY_VERSION}/${host}/${filename}`,
-		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`,
-		r2OgSpeechKey(filename),
-	];
 	// pathPrefixes: request-path encoding only (percent-encoded). Raw Unicode prefixes can fail purge.
 	// List roots use tags only — never pathPrefix '/'.
 	const pathPrefixes = [speechRequestPath(filename)];
@@ -552,12 +300,10 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string, extr
 	}
 
 	for (const sectionId of sectionIds) {
-		r2Keys.push(`${CACHE_KEY_VERSION}/${host}/speech/${sectionId}`);
-		r2Keys.push(r2OgSectionKey(sectionId));
 		pathPrefixes.push(`/speech/${sectionId}`);
 	}
 
-	const purgeTags = [tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss];
+	const { r2Keys, tags: purgeTags } = planSpeechInvalidation(host, filename, [...sectionIds]);
 	// Both tiers must clear: R2 origin delete AND Workers Cache purge.
 	// If R2 delete fails but front purge succeeds, the next MISS re-poisons the front from stale R2.
 	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
@@ -573,20 +319,16 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string, extr
 /** 講者或演講-講者關聯更新後，刪除 R2 origin 並 purge Workers Cache */
 async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames: string[]): Promise<boolean> {
 	const host = new URL(c.req.url).host;
-	const r2Keys = new Set<string>([`${CACHE_KEY_VERSION}/${host}/speakers`]);
 	const pathPrefixes: string[] = [];
 
 	for (const routePathname of speakerRoutePathnames) {
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${routePathname}`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speaker/${encodeURIComponent(routePathname)}`);
 		// Request path is percent-encoded; skip raw Unicode prefixes.
 		pathPrefixes.push(speakerRequestPath(routePathname));
 	}
 
-	const purgeTags = speakerRoutePathnames.map((p) => tags.speaker(p));
-	purgeTags.push(tags.listSpeakers);
+	const { r2Keys, tags: purgeTags } = planSpeakerInvalidation(host, speakerRoutePathnames);
 
-	const r2Results = await Promise.all(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 	const r2Ok = r2Results.every(Boolean);
 	if (!r2Ok) {
 		console.error('[invalidate] speaker R2 origin delete incomplete', {
@@ -604,29 +346,9 @@ async function invalidateListPageCaches(
 	{ home, speeches, speakers }: { home: boolean; speeches: boolean; speakers: boolean },
 ): Promise<boolean> {
 	const host = new URL(c.req.url).host;
-	const r2Keys = new Set<string>();
+	const { r2Keys, tags: purgeTags } = planListInvalidation(host, home, speeches, speakers);
 
-	if (home) {
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/index.html`);
-	}
-	if (speeches) {
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speeches`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speeches/`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/rss.xml`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/feed.xml`);
-	}
-	if (speakers) {
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speakers`);
-		r2Keys.add(`${CACHE_KEY_VERSION}/${host}/speakers/`);
-	}
-
-	const purgeTags: string[] = [];
-	if (home) purgeTags.push(tags.listHome);
-	if (speeches) purgeTags.push(tags.listSpeeches, tags.listRss);
-	if (speakers) purgeTags.push(tags.listSpeakers);
-
-	const r2Results = await Promise.all(Array.from(r2Keys).map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
+	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
 	const r2Ok = r2Results.every(Boolean);
 	if (!r2Ok) {
 		console.error('[invalidate] list R2 origin delete incomplete', {

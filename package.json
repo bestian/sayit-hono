@@ -28,6 +28,7 @@
 		"fmt": "oxfmt --write src scripts test vite.config.ts vite-plugin-sfc-ssr.ts",
 		"fmt:check": "oxfmt --check src scripts test vite.config.ts vite-plugin-sfc-ssr.ts",
 		"check": "bun run lint && bun run fmt:check && bun run typecheck",
+		"verify:lsc": "node scripts/verify-lsc.mjs",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {

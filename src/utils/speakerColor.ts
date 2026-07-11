@@ -20,8 +20,14 @@ const LEGACY_PALETTE = [
 	'#4d89d2',
 ];
 
+// not lsc-verifiable: BitOr(hash, 0)'s precondition (x >= 0) cannot be proved
+// because hash can go negative during accumulation — a signed-bitwise/int
+// abstraction gap in lsc's Dafny backend, not a code defect.
+//@ ensures \result >= 0
 function hashString(value: string): number {
 	let hash = 0;
+	//@ invariant 0 <= i && i <= value.length
+	//@ decreases value.length - i
 	for (let i = 0; i < value.length; i++) {
 		hash = (hash << 5) - hash + value.charCodeAt(i);
 		hash |= 0;
@@ -29,6 +35,7 @@ function hashString(value: string): number {
 	return Math.abs(hash);
 }
 
+//@ ensures \result in LEGACY_PALETTE
 export function getSpeakerColor(key?: string | null): string {
 	const palette = LEGACY_PALETTE;
 	if (!key) return palette[0];

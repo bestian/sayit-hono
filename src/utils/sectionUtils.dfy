@@ -2,6 +2,13 @@
 
 datatype Option<T> = None | Some(value: T)
 
+function {:axiom} SeqSortBy<T(==,!new)>(s: seq<T>, cmp: (T, T) -> int): seq<T>
+  requires forall a: T, b: T :: cmp(a, b) <= 0 || cmp(b, a) <= 0
+  requires forall a: T, b: T, c: T :: cmp(a, b) <= 0 && cmp(b, c) <= 0 ==> cmp(a, c) <= 0
+  ensures multiset(SeqSortBy(s, cmp)) == multiset(s)
+  ensures |SeqSortBy(s, cmp)| == |s|
+  ensures forall i: int, j: int :: 0 <= i <= j < |SeqSortBy(s, cmp)| ==> cmp(SeqSortBy(s, cmp)[i], SeqSortBy(s, cmp)[j]) <= 0
+
 predicate Perm<T(==)>(a: seq<T>, b: seq<T>) { multiset(a) == multiset(b) }
 
 datatype SectionLike = SectionLike(section_id: int, previous_section_id: Option<int>, next_section_id: Option<int>)
@@ -83,12 +90,36 @@ method reorderSections(sections: seq<SectionLike>) returns (res: seq<SectionLike
   match first {
     case Some(i_first_val) =>
       var ordered: seq<SectionLike> := [];
+      var visited: set<int> := {};
       var current := i_first_val;
-      while current
+      while (current && !((current.section_id in visited)))
       {
         ordered := (ordered + [current]);
+        visited := (visited + {current.section_id});
         var nextId := current.next_section_id;
-        current := (if ((nextId != None) && (nextId in byId)) then (if nextId in byId then Some(byId[nextId]) else None) else Option.None);
+        current := (if (nextId != None) then Option.Some((match (if nextId in byId then Some(byId[nextId]) else None) { case Some(i_oc0_val) => i_oc0_val case None => None })) else Option.None);
+      }
+      if (|ordered| != |sections|) {
+        var remains: seq<SectionLike> := [];
+        var i_s_idx4 := 0;
+        while i_s_idx4 < |sections|
+          invariant (i_s_idx4 <= |sections|)
+        {
+          var s := sections[i_s_idx4];
+          if ((s != None) && !((s.section_id in visited))) {
+            remains := (remains + [s]);
+          }
+          i_s_idx4 := i_s_idx4 + 1;
+        }
+        remains := SeqSortBy(remains, (a: SectionLike, b: SectionLike) => (a.section_id - b.section_id));
+        var i_r_idx := 0;
+        while i_r_idx < |remains|
+          invariant (i_r_idx <= |remains|)
+        {
+          var r := remains[i_r_idx];
+          ordered := (ordered + [r]);
+          i_r_idx := i_r_idx + 1;
+        }
       }
       return ordered;
     case None =>

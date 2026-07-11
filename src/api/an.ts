@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
 import { ARTIFACT_CACHE_CONTROL, deleteR2Cache, r2AnKey, readR2Cache, writeR2Cache } from './cache';
 import { normalizeSections } from '../utils/sectionUtils';
+import { parseContent } from '../utils/textUtils';
 import type { ApiEnv } from './types';
 
 const SPEECH_API_PREFIX = '/api/an/';
@@ -11,16 +12,6 @@ const SPEECH_FILE_EXTENSION = '.an';
 export function isNumericAnKey(key: string): boolean {
 	const base = key.endsWith(SPEECH_FILE_EXTENSION) ? key.slice(0, -SPEECH_FILE_EXTENSION.length) : key;
 	return /^\d+$/.test(base);
-}
-
-function parseContent(raw: string | null | undefined): string {
-	if (!raw) return '';
-	try {
-		const parsed = JSON.parse(raw);
-		return typeof parsed === 'string' ? parsed : raw;
-	} catch {
-		return raw;
-	}
 }
 
 /** 僅跳脫未轉義的 & 為 &amp;，確保 XML 合法（不破壞既有實體） */

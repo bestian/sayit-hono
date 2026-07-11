@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { ApiEnv } from './types';
+import { parseContent } from '../utils/textUtils';
 import { CACHE_KEY_VERSION } from '../cacheKeyVersion';
 
 export type OgGenerators = {
@@ -13,16 +14,6 @@ export type OgGenerators = {
 };
 
 export type OgLoader = () => Promise<OgGenerators>;
-
-function parseContent(raw?: string | null): string {
-	if (!raw) return '';
-	try {
-		const parsed = JSON.parse(raw);
-		return typeof parsed === 'string' ? parsed : raw;
-	} catch {
-		return raw;
-	}
-}
 
 interface OgSectionResult {
 	filename: string;

@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { FEED_CACHE_CONTROL, buildR2HtmlKey, readR2Cache, tags, writeR2Cache } from './cache';
+import { toPlainText } from '../utils/textUtils';
 import type { ApiEnv } from './types';
 
 const SITE_URL = 'https://archive.tw';
@@ -29,46 +30,8 @@ type FeedItem = {
 	pubDate: string | null;
 };
 
-const NAMED_ENTITIES: Record<string, string> = {
-	amp: '&',
-	lt: '<',
-	gt: '>',
-	quot: '"',
-	apos: "'",
-	nbsp: ' ',
-};
-
 function escapeXml(value: string): string {
 	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-}
-
-function decodeHtmlEntities(value: string): string {
-	return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {
-		if (entity[0] === '#') {
-			const isHex = entity[1]?.toLowerCase() === 'x';
-			const raw = isHex ? entity.slice(2) : entity.slice(1);
-			const parsed = Number.parseInt(raw, isHex ? 16 : 10);
-			if (!Number.isFinite(parsed) || parsed < 0 || parsed > 0x10ffff) {
-				return match;
-			}
-			return String.fromCodePoint(parsed);
-		}
-
-		return NAMED_ENTITIES[entity] ?? match;
-	});
-}
-
-function toPlainText(html: string): string {
-	return decodeHtmlEntities(
-		html
-			.replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-			.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-			.replace(/<br\s*\/?>/gi, ' ')
-			.replace(/<\/(p|div|section|article|li|blockquote|h[1-6]|tr|td|th)>/gi, ' ')
-			.replace(/<[^>]+>/g, ' '),
-	)
-		.replace(/\s+/g, ' ')
-		.trim();
 }
 
 function summarizeHtml(html: string | null | undefined, maxLength = 280): string {

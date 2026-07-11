@@ -1,3 +1,4 @@
+import { toPlainText } from '../utils/textUtils';
 export type MetaEntry = {
 	property?: string;
 	name?: string;
@@ -39,13 +40,6 @@ function speechImageMeta(filename: string): MetaEntry[] {
 		{ property: 'og:image:height', content: '630' },
 		{ name: 'twitter:card', content: 'summary_large_image' },
 	];
-}
-
-function toPlainText(html: string): string {
-	return html
-		.replace(/<[^>]+>/g, ' ')
-		.replace(/\s+/g, ' ')
-		.trim();
 }
 
 export function headForHome(): HeadSpec {
