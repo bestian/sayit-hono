@@ -288,7 +288,7 @@ async function buildSearchIndex() {
 		if (!skipUpload) {
 			try {
 				uploadFileToR2Buckets('sections-dump.json', dumpPath, 'application/json; charset=utf-8');
-				console.log('[build-search] Sections dump uploaded to R2 (prod + preview)');
+				console.log(`[build-search] Sections dump uploaded to R2 (${R2_BUCKETS.join(', ')})`);
 			} catch (err) {
 				console.warn('[build-search] R2 dump upload failed:', err);
 			}
@@ -394,7 +394,7 @@ async function buildSearchIndex() {
 			uploadFileToR2Buckets(SEARCH_INDEX_BASELINE_KEY, outputPath, 'application/json; charset=utf-8');
 			uploadFileToR2Buckets(SEARCH_INDEX_BASELINE_BR_KEY, outputBrPath, 'application/octet-stream');
 			uploadFileToR2Buckets(SEARCH_INDEX_MANIFEST_KEY, runtimeManifestPath, 'application/json; charset=utf-8');
-			console.log('[build-search] Uploaded search baseline + manifest to R2 (prod + preview)');
+			console.log(`[build-search] Uploaded search baseline + manifest to R2 (${R2_BUCKETS.join(', ')})`);
 		} catch (err) {
 			uploadedToR2 = false;
 			console.error('[build-search] R2 upload failed:', err);
@@ -403,7 +403,7 @@ async function buildSearchIndex() {
 
 		try {
 			uploadFileToR2Buckets(SEARCH_STATS_KEY, statsPath, 'application/json; charset=utf-8');
-			console.log('[build-search] stats.json uploaded to R2 (prod + preview)');
+			console.log(`[build-search] stats.json uploaded to R2 (${R2_BUCKETS.join(', ')})`);
 		} catch (err) {
 			uploadedToR2 = false;
 			console.error('[build-search] stats.json R2 upload failed:', err);

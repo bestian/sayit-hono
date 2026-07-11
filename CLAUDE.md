@@ -216,6 +216,7 @@ bun run dev         # = vite dev（本地 workerd + 本地 D1/R2 持久化狀態
 - D1：`sayit-database-staging`。
 - R2 bucket：`sayit-speech-cache-staging`。
 - Worker 名稱：`sayit-hono-staging`。
-- 部署見上方「部署」一節；資料庫已用 repo 自帶的 `sql/init-*.sql` + `sql/fill-*.sql` + `sql/view_*.sql` 灌好種子資料（8000+ 講者、2000+ 演講），不需要對正式 D1 做任何讀寫即可重建。
+- 資料庫已用 repo 自帶的 `sql/init-*.sql` + `sql/fill-*.sql` + `sql/view_*.sql` 灌好種子資料：`speech_index`／`speakers` 是完整 metadata（2000+ 演講、8000+ 講者，來自 `raw_sample_data/` 一次性 scrape），但 `speech_content`（段落全文）只灌了 `sql/speech/*.sql` 這兩篇範例（`1999年全國司法改革會議`、`2025-11-10-柏林自由會議ai-的角色`）——其餘演講在 staging 上會 404（`speech_content` 查無資料是 renderSpeechPage 的正常回應，不是 bug）。測試 SSR 演講頁／PATCH upload_markdown 請用這兩篇之一，或先自己 POST 一篇。不需要對正式 D1 做任何讀寫即可重建。
+- upload_markdown 需要的 `AUDREYT_TRANSCRIPT_TOKEN`／`BESTIAN_TRANSCRIPT_TOKEN` secrets 預設不會隨部署建立（`wrangler secret list --env staging` 初始是空的）；要測 staging 上的認證寫入路徑，先 `echo <token> | npx wrangler secret put AUDREYT_TRANSCRIPT_TOKEN --env staging` 補一個（僅此環境，正式環境的 secret 另外管理，不要沿用同一組）。
 
 - 觀測：`observability.enabled = true`，請善用 Cloudflare Logs。
