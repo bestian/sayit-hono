@@ -23,7 +23,12 @@ export default defineConfig({
 		semi: true,
 		useTabs: true,
 		sortPackageJson: false,
-		ignorePatterns: ['**/*.vue'],
+		// public/static/speeches/css/speeches.css is a third-party vendored
+		// bundle (normalize.css + other libs) concatenated/minified onto a
+		// single 60KB+ line — never hand-authored/edited in place, and oxfmt's
+		// CSS parser panics on it. Same vendored-asset carve-out as the
+		// lint.ignorePatterns entries for public/static/speeches/js/* below.
+		ignorePatterns: ['**/*.vue', 'public/static/speeches/css/speeches.css'],
 	},
 	lint: {
 		plugins: ['typescript', 'unicorn', 'oxc'],

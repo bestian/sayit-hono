@@ -180,7 +180,7 @@ bun run dev         # = vite dev（本地 workerd + 本地 D1/R2 持久化狀態
 
 - 測試位於 `test/*.spec.ts`，由 `@cloudflare/vitest-pool-workers` 在 Workers 環境執行。實務上每個測試手動建構 `MockWorkerEnv`（見 `test/helpers/mockEnv.ts` 的 `createMockEnv(resolver, options?)` + `dispatch(path, env, init?)`）而非直接用 pool-workers 的 miniflare binding；bespoke SQL 比對邏輯留在各別 spec 檔，只有 D1/R2/ASSETS mock 外殼與 dispatch 樣板抽到共用 helper。純函式測試（`src/utils/*` 等無 Worker dispatch 者）不需要這個 helper，直接呼叫函式即可。
 - 設定檔：`vitest.config.mts` / `wrangler.vitest.jsonc` / `test/tsconfig.json`。
-- 期望 100% statement / line / function coverage（`vitest.config.mts` 的 `coverage.thresholds`，`perFile: true`）；branch coverage 刻意不設 100%（istanbul 對每個 `??`/`||`/`?.` 都算一個 branch，有些是防禦性、無法用型別合法輸入觸發的路徑）。新功能必須補測，不要降低覆蓋率門檻；也不要為了湊 100% 硬塞型別系統不允許的輸入（例如 `as any` 繞過型別去測不可達分支）——這類測試會被視為 coverage theater，應該移除或改測真正可達的情境。
+- 所有四項指標（statement、branch、function、line）都透過 `vitest.config.mts` 的 `coverage.thresholds` 強制要求每支檔案達到 100% 覆蓋率（`perFile: true`），這是透過真實測試達成的，而非放寬任何門檻。新功能必須補測，不要降低覆蓋率門檻；也不要為了湊 100% 硬塞型別系統不允許的輸入（例如 `as any` 繞過型別去測不可達分支）——這類測試會被視為 coverage theater，應該移除或改測真正可達的情境。
 - 跑單一測試：`npx vitest run test/<name>.spec.ts`。
 
 ### 形式驗證（LemmaScript）
