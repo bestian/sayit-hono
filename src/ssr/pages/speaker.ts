@@ -9,19 +9,7 @@ import { buildPaginationPages } from '../../utils/pagination';
 import Footer, { styles as FooterStyles } from '../../components/Footer.vue';
 import Navbar, { styles as NavbarStyles } from '../../components/Navbar.vue';
 import SingleSpeakerView, { styles as SingleSpeakerViewStyles } from '../../views/SingleSpeakerView.vue';
-
-type SpeakerRow = {
-	id: number;
-	route_pathname: string;
-	name: string;
-	photoURL: string | null;
-	appearances_count: number | null;
-	sections_count: number | null;
-	longest_section_id: number | null;
-	longest_section_content: string | null;
-	longest_section_filename: string | null;
-	longest_section_displayname: string | null;
-};
+import { getSpeakerDetail } from '../../db/speaker-detail';
 
 type SpeakerSectionRow = {
 	filename: string;
@@ -63,10 +51,8 @@ export async function renderSpeakerPage(c: SpeakerPageContext): Promise<Response
 	};
 	let sections: Section[];
 	try {
-		// 取得講者基本資料
-		const speakerRow = (await c.env.DB.prepare('SELECT * FROM speakers_view WHERE route_pathname = ?')
-			.bind(routePathname)
-			.first()) as SpeakerRow | null;
+		// 取得講者基本資料（indexed per-speaker queries; avoids speakers_view full scan）
+		const speakerRow = await getSpeakerDetail(c.env.DB, routePathname);
 
 		if (!speakerRow) {
 			return c.text('Not Found', 404);

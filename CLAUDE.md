@@ -168,7 +168,7 @@ bun run dev         # = vite dev（本地 workerd + 本地 D1/R2 持久化狀態
 ### D1 / SQL
 
 - Schema 與 view 定義在 `sql/` 下的 `init-*.sql`、`view_*.sql`、`add-*.sql`。
-- 主要表：`speech_index`（演講中繼）、`speech_content`（段落內容）、`speakers`（講者）、加上 view `speakers_view`、`view_sections`。
+- 主要表：`speech_index`（演講中繼）、`speech_content`（段落內容）、`speakers`（講者）、加上 view `speakers_view`、`view_sections`。講者詳情 runtime 走 `src/db/speaker-detail.ts`（indexed per-speaker），不查 `speakers_view`。
 - 查詢全部走 `c.env.DB.prepare(...).bind(...).first() / .all()`，請務必檢查 `result.success` 並丟出錯誤，避免回 200 但內容空白。
 
 ### R2 / 搜尋

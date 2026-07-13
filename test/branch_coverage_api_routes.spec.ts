@@ -111,10 +111,12 @@ describe('API route branch closure', () => {
 
 	it('covers speaker invalid counts, sparse rows and query errors', async () => {
 		const resolver = (sql: string) => {
-			if (sql.includes('speakers_view'))
-				return { success: true, results: [{ id: 1, route_pathname: 'x', name: 'X', photoURL: null, longest_section_id: 0 }] };
+			if (sql.includes('FROM speakers WHERE route_pathname = ?'))
+				return { success: true, results: [{ id: 1, route_pathname: 'x', name: 'X', photoURL: null }] };
+			if (sql.includes('WHERE name = ? AND photoURL IS NOT NULL')) return { success: true, results: [] };
 			if (sql.includes('COUNT(DISTINCT speech_filename)')) return { success: true, results: [{ count: 'nope' }] };
-			if (sql.includes('COUNT(DISTINCT section_id)')) return { success: true, results: [{ count: '-1' }] };
+			if (sql.includes('COUNT(*) AS count FROM speech_content')) return { success: true, results: [{ count: '-1' }] };
+			if (sql.includes('ORDER BY LENGTH(sc.section_content)')) return { success: true, results: [] };
 			return {
 				success: true,
 				results: [{ filename: 'f', section_id: 1, section_speaker: 'x', section_content: null, display_name: null }],
@@ -124,12 +126,13 @@ describe('API route branch closure', () => {
 		expect(res.res.status).toBe(200);
 		const body = (await res.res.json()) as { appearances_count: number; sections_count: number; longest_section: unknown };
 		expect(body.appearances_count).toBe(0);
-		expect(body.sections_count).toBe(1);
+		// helper clamps non-finite / negative COUNT results to 0 before the API layer
+		expect(body.sections_count).toBe(0);
 		expect(body.longest_section).toBeNull();
 		const err = await dispatch(
 			'/api/speaker_detail/x.json',
 			createMockEnv((sql) => {
-				if (sql.includes('speakers_view')) throw new Error('db');
+				if (sql.includes('FROM speakers WHERE route_pathname = ?')) throw new Error('db');
 				return { success: true, results: [] };
 			}),
 		);
@@ -182,7 +185,7 @@ describe('API route branch closure', () => {
 		const sparseSpeaker = await dispatch(
 			'/api/speaker_detail/x.json',
 			createMockEnv((sql) => {
-				if (sql.includes('speakers_view'))
+				if (sql.includes('FROM speakers WHERE route_pathname = ?'))
 					return {
 						success: true,
 						results: [
@@ -191,16 +194,25 @@ describe('API route branch closure', () => {
 								route_pathname: 'x',
 								name: 'X',
 								photoURL: null,
-								longest_section_id: 2,
-								longest_section_content: null,
-								longest_section_filename: null,
-								longest_section_nest_filename: null,
-								longest_section_nest_display_name: null,
-								longest_section_displayname: null,
 							},
 						],
 					};
+				if (sql.includes('WHERE name = ? AND photoURL IS NOT NULL')) return { success: true, results: [] };
 				if (sql.includes('COUNT')) return { success: true, results: [] };
+				if (sql.includes('ORDER BY LENGTH(sc.section_content)'))
+					return {
+						success: true,
+						results: [
+							{
+								section_id: 2,
+								section_content: null,
+								filename: null,
+								nest_filename: null,
+								nest_display_name: null,
+								display_name: null,
+							},
+						],
+					};
 				return { success: true, results: [] };
 			}),
 		);
