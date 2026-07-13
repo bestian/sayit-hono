@@ -63,7 +63,7 @@ describe('SSR /speeches', () => {
 
 describe('SSR /speaker/:route', () => {
 	const resolver: QueryResolver = (sql, args) => {
-		if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) {
+		if (sql.includes('FROM speakers WHERE route_pathname = ?')) {
 			if (args[0] === 'audrey-tang') {
 				return {
 					success: true,
@@ -73,17 +73,35 @@ describe('SSR /speaker/:route', () => {
 							route_pathname: 'audrey-tang',
 							name: 'Audrey Tang',
 							photoURL: null,
-							appearances_count: 5,
-							sections_count: 2,
-							longest_section_id: 99,
-							longest_section_content: '<p>long</p>',
-							longest_section_filename: '2026-demo',
-							longest_section_displayname: 'Demo',
 						},
 					],
 				};
 			}
 			return { success: true, results: [] };
+		}
+		if (sql.includes('WHERE name = ? AND photoURL IS NOT NULL')) {
+			return { success: true, results: [] };
+		}
+		if (sql.includes('COUNT(DISTINCT speech_filename)')) {
+			return { success: true, results: [{ count: 5 }] };
+		}
+		if (sql.includes('COUNT(*) AS count FROM speech_content')) {
+			return { success: true, results: [{ count: 2 }] };
+		}
+		if (sql.includes('ORDER BY LENGTH(sc.section_content)')) {
+			return {
+				success: true,
+				results: [
+					{
+						section_id: 99,
+						section_content: '<p>long</p>',
+						filename: '2026-demo',
+						nest_filename: null,
+						nest_display_name: null,
+						display_name: 'Demo',
+					},
+				],
+			};
 		}
 		if (sql.includes('FROM speech_content sc') && sql.includes('WHERE sc.section_speaker = ?')) {
 			return {
@@ -129,11 +147,10 @@ describe('SSR /speaker/:route', () => {
 
 	it('returns 500 when sections query fails', async () => {
 		const env = createMockEnv((sql, args) => {
-			if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) return resolver(sql, args);
-			if (sql.includes('FROM speech_content sc') && sql.includes('WHERE sc.section_speaker = ?')) {
+			if (sql.includes('ORDER BY sc.filename DESC') && sql.includes('WHERE sc.section_speaker = ?')) {
 				return { success: false, results: [] };
 			}
-			return { success: true, results: [] };
+			return resolver(sql, args);
 		});
 		const { res } = await dispatch('/speaker/audrey-tang', env);
 		expect(res.status).toBe(500);

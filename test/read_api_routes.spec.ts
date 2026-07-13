@@ -263,29 +263,38 @@ describe('GET /api/speech/*', () => {
 });
 
 describe('GET /api/speaker_detail/:route.json', () => {
-	const speakerRow = {
+	const speakerBase = {
 		id: 7,
 		route_pathname: 'audrey-tang',
 		name: 'Audrey Tang',
-		photoURL: null,
-		longest_section_id: 100,
-		longest_section_content: '<p>long</p>',
-		longest_section_filename: '2026-demo',
-		longest_section_nest_filename: null,
-		longest_section_nest_display_name: null,
-		longest_section_displayname: 'Demo',
+		photoURL: null as string | null,
 	};
 
-	function resolver(rowFound = true, failAll = false): QueryResolver {
+	const longestSection = {
+		section_id: 100,
+		section_content: '<p>long</p>',
+		filename: '2026-demo',
+		nest_filename: null,
+		nest_display_name: null,
+		display_name: 'Demo',
+	};
+
+	function resolver(rowFound = true, failAll = false, withLongest = true): QueryResolver {
 		return (sql, args) => {
-			if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) {
-				return { success: true, results: rowFound ? [speakerRow] : [] };
+			if (sql.includes('FROM speakers WHERE route_pathname = ?')) {
+				return { success: true, results: rowFound ? [speakerBase] : [] };
+			}
+			if (sql.includes('WHERE name = ? AND photoURL IS NOT NULL')) {
+				return { success: true, results: [] };
 			}
 			if (sql.includes('COUNT(DISTINCT speech_filename)')) {
 				return { success: true, results: [{ count: 4 }] };
 			}
-			if (sql.includes('COUNT(DISTINCT section_id)')) {
+			if (sql.includes('COUNT(*) AS count FROM speech_content')) {
 				return { success: true, results: [{ count: 2 }] };
+			}
+			if (sql.includes('ORDER BY LENGTH(sc.section_content)')) {
+				return { success: true, results: withLongest ? [longestSection] : [] };
 			}
 			if (sql.includes('FROM speech_content sc') && sql.includes('WHERE sc.section_speaker = ?')) {
 				if (failAll) return { success: false, results: [] };
@@ -323,15 +332,10 @@ describe('GET /api/speaker_detail/:route.json', () => {
 		expect(body.sections).toHaveLength(1);
 	});
 
-	it('returns longest_section null when the speaker has no longest_section_id', async () => {
-		const env = createMockEnv((sql, args) => {
-			if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) {
-				return { success: true, results: [{ ...speakerRow, longest_section_id: null }] };
-			}
-			return resolver(true)(sql, args);
-		});
+	it('returns longest_section null when the speaker has no longest section', async () => {
+		const env = createMockEnv(resolver(true, false, false));
 		const { res } = await dispatch('/api/speaker_detail/audrey-tang.json', env);
-		const body = (await res.json()) as any;
+		const body = (await res.json()) as { longest_section: unknown };
 		expect(body.longest_section).toBeNull();
 	});
 
@@ -356,7 +360,7 @@ describe('GET /api/speaker_detail/:route.json', () => {
 
 	it('returns 500 when an exception is thrown', async () => {
 		const env = createMockEnv((sql) => {
-			if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) throw new Error('nope');
+			if (sql.includes('FROM speakers WHERE route_pathname = ?')) throw new Error('nope');
 			return { success: true, results: [] };
 		});
 		const { res } = await dispatch('/api/speaker_detail/audrey-tang.json', env);

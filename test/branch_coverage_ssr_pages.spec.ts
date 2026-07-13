@@ -337,7 +337,7 @@ describe('2. Speaker Page Branches (speaker.ts)', () => {
 
 	it('renderSpeakerPage handles invalid page params and fallbacks', async () => {
 		const resolver: QueryResolver = (sql, _args) => {
-			if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) {
+			if (sql.includes('FROM speakers WHERE route_pathname = ?')) {
 				return {
 					success: true,
 					results: [
@@ -346,15 +346,21 @@ describe('2. Speaker Page Branches (speaker.ts)', () => {
 							route_pathname: 'audrey',
 							name: 'Audrey',
 							photoURL: null,
-							appearances_count: null, // null appearances count
-							sections_count: null, // null sections count
-							longest_section_id: null, // no longest row
-							longest_section_content: null,
-							longest_section_filename: null,
-							longest_section_displayname: null,
 						},
 					],
 				};
+			}
+			if (sql.includes('WHERE name = ? AND photoURL IS NOT NULL')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('COUNT(DISTINCT speech_filename)')) {
+				return { success: true, results: [{ count: null }] };
+			}
+			if (sql.includes('COUNT(*) AS count FROM speech_content')) {
+				return { success: true, results: [{ count: null }] };
+			}
+			if (sql.includes('ORDER BY LENGTH(sc.section_content)')) {
+				return { success: true, results: [] };
 			}
 			if (sql.includes('FROM speech_content sc')) {
 				return {
@@ -404,7 +410,7 @@ describe('2. Speaker Page Branches (speaker.ts)', () => {
 
 	it('renderSpeakerPage handles longest section values and Twitter scripts', async () => {
 		const resolver: QueryResolver = (sql, _args) => {
-			if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) {
+			if (sql.includes('FROM speakers WHERE route_pathname = ?')) {
 				return {
 					success: true,
 					results: [
@@ -413,12 +419,27 @@ describe('2. Speaker Page Branches (speaker.ts)', () => {
 							route_pathname: 'audrey',
 							name: 'Audrey',
 							photoURL: 'https://example.com/photo.png',
-							appearances_count: 10,
-							sections_count: 5,
-							longest_section_id: 99,
-							longest_section_content: null, // test fallback to ''
-							longest_section_filename: null, // test fallback to ''
-							longest_section_displayname: null, // test fallback to ''
+						},
+					],
+				};
+			}
+			if (sql.includes('COUNT(DISTINCT speech_filename)')) {
+				return { success: true, results: [{ count: 10 }] };
+			}
+			if (sql.includes('COUNT(*) AS count FROM speech_content')) {
+				return { success: true, results: [{ count: 5 }] };
+			}
+			if (sql.includes('ORDER BY LENGTH(sc.section_content)')) {
+				return {
+					success: true,
+					results: [
+						{
+							section_id: 99,
+							section_content: null, // test fallback to ''
+							filename: null, // test fallback to ''
+							nest_filename: null,
+							nest_display_name: null,
+							display_name: null, // test fallback to ''
 						},
 					],
 				};
@@ -452,7 +473,7 @@ describe('2. Speaker Page Branches (speaker.ts)', () => {
 
 	it('renderSpeakerPage omits the Twitter widgets script when no embed is present', async () => {
 		const resolver: QueryResolver = (sql) => {
-			if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) {
+			if (sql.includes('FROM speakers WHERE route_pathname = ?')) {
 				return {
 					success: true,
 					results: [
@@ -461,15 +482,21 @@ describe('2. Speaker Page Branches (speaker.ts)', () => {
 							route_pathname: 'audrey',
 							name: 'Audrey',
 							photoURL: null,
-							appearances_count: 1,
-							sections_count: 1,
-							longest_section_id: null,
-							longest_section_content: null,
-							longest_section_filename: null,
-							longest_section_displayname: null,
 						},
 					],
 				};
+			}
+			if (sql.includes('WHERE name = ? AND photoURL IS NOT NULL')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('COUNT(DISTINCT speech_filename)')) {
+				return { success: true, results: [{ count: 1 }] };
+			}
+			if (sql.includes('COUNT(*) AS count FROM speech_content')) {
+				return { success: true, results: [{ count: 1 }] };
+			}
+			if (sql.includes('ORDER BY LENGTH(sc.section_content)')) {
+				return { success: true, results: [] };
 			}
 			if (sql.includes('FROM speech_content sc')) {
 				return {
@@ -500,7 +527,7 @@ describe('2. Speaker Page Branches (speaker.ts)', () => {
 
 	it('renderSpeakerPage handles DB failures on sections query', async () => {
 		const resolver: QueryResolver = (sql, _args) => {
-			if (sql.includes('FROM speakers_view WHERE route_pathname = ?')) {
+			if (sql.includes('FROM speakers WHERE route_pathname = ?')) {
 				return {
 					success: true,
 					results: [
@@ -509,12 +536,21 @@ describe('2. Speaker Page Branches (speaker.ts)', () => {
 							route_pathname: 'audrey',
 							name: 'Audrey',
 							photoURL: null,
-							appearances_count: 5,
-							sections_count: 2,
-							longest_section_id: null,
 						},
 					],
 				};
+			}
+			if (sql.includes('WHERE name = ? AND photoURL IS NOT NULL')) {
+				return { success: true, results: [] };
+			}
+			if (sql.includes('COUNT(DISTINCT speech_filename)')) {
+				return { success: true, results: [{ count: 5 }] };
+			}
+			if (sql.includes('COUNT(*) AS count FROM speech_content')) {
+				return { success: true, results: [{ count: 2 }] };
+			}
+			if (sql.includes('ORDER BY LENGTH(sc.section_content)')) {
+				return { success: true, results: [] };
 			}
 			if (sql.includes('FROM speech_content sc')) {
 				return { success: false, results: [] };

@@ -1,5 +1,6 @@
 import { getCorsHeaders } from './cors';
 import { buildPaginationPages } from '../utils/pagination';
+import { getSpeakerDetail } from '../db/speaker-detail';
 
 /** Minimal shape `speakerDetail` actually uses off `c` — real `Context<ApiEnv>` satisfies this structurally, no cast needed at real call sites. */
 interface SpeakerDetailContext {
@@ -43,7 +44,7 @@ export async function speakerDetail(c: SpeakerDetailContext) {
 			return c.json({ error: 'Invalid speaker route pathname' }, 400, corsHeaders);
 		}
 
-		const speakerRow = await c.env.DB.prepare('SELECT * FROM speakers_view WHERE route_pathname = ?').bind(routePathname).first();
+		const speakerRow = await getSpeakerDetail(c.env.DB, routePathname);
 
 		if (!speakerRow) {
 			return c.json({ error: 'Speaker not found' }, 404, corsHeaders);
@@ -56,19 +57,9 @@ export async function speakerDetail(c: SpeakerDetailContext) {
 		const page = Number.isFinite(pageNumber) && pageNumber >= 1 ? Math.floor(pageNumber) : 1;
 		const offset = (page - 1) * pageSize;
 
-		const appearancesCountRow = await c.env.DB.prepare(
-			'SELECT COUNT(DISTINCT speech_filename) AS count FROM speech_speakers WHERE speaker_route_pathname = ?',
-		)
-			.bind(routePathname)
-			.first<{ count: number | string }>();
-		const appearancesCount = Number(appearancesCountRow?.count ?? 0);
-
-		const sectionsCountRow = await c.env.DB.prepare(
-			'SELECT COUNT(DISTINCT section_id) AS count FROM speech_content WHERE section_speaker = ?',
-		)
-			.bind(routePathname)
-			.first<{ count: number | string }>();
-		const sectionsCount = Number(sectionsCountRow?.count ?? 0);
+		// Prefer helper counts (already indexed); keep local aliases for response shape.
+		const appearancesCount = speakerRow.appearances_count;
+		const sectionsCount = speakerRow.sections_count;
 
 		const sectionsResult = await c.env.DB.prepare(
 			`SELECT
