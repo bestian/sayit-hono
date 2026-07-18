@@ -1,6 +1,7 @@
 import { defineConfig, lazyPlugins } from 'vite-plus';
 import { cloudflare } from '@cloudflare/vite-plugin';
 import { sfcSsrPlugin } from './vite-plugin-sfc-ssr';
+import { localD1SeedPlugin } from './vite-plugin-local-d1-seed';
 
 // SSR-only app: no client hydration, no vue-router, no App.vue. Every page is
 // rendered server-side via @vue/server-renderer's renderToString inside the
@@ -15,6 +16,7 @@ export default defineConfig({
 		'scripts/**/*.ts': 'vp check --fix',
 		'vite.config.ts': 'vp check --fix',
 		'vite-plugin-sfc-ssr.ts': 'vp check --fix',
+		'vite-plugin-local-d1-seed.ts': 'vp check --fix',
 		'test/**/*.ts': 'vp fmt --write',
 	},
 	fmt: {
@@ -62,7 +64,8 @@ export default defineConfig({
 			},
 		],
 	},
-	plugins: lazyPlugins(() => [cloudflare(), sfcSsrPlugin()]),
+	plugins: lazyPlugins(() => [localD1SeedPlugin(), cloudflare(), sfcSsrPlugin()]),
+	server: { open: '/speeches/' },
 	// satori references process / process.env, which don't exist in Workers.
 	// Previously lived in wrangler.jsonc's `define` — the Vite build path
 	// ignores that (Vite owns `define` once the Cloudflare Vite plugin is in
