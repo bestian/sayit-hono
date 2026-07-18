@@ -1,6 +1,7 @@
 # LemmaScript-generated Dafny artifacts (regenerable via `npx lsc gen`)
 *.dfy
 *.dfy.gen
+docs/
 
 # Pagefind search index (built from transcript .md files)
 www/pagefind/
