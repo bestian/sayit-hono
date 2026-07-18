@@ -74,7 +74,7 @@ async function main(): Promise<void> {
 	const token = process.env.CLOUDFLARE_API_TOKEN;
 	if (!accountId) {
 		console.error('Missing CLOUDFLARE_ACCOUNT_ID (wrangler.jsonc has no account_id).');
-		console.error('Run: npx wrangler whoami — use Account ID, or export CLOUDFLARE_ACCOUNT_ID.');
+		console.error('Run: bunx wrangler whoami — use Account ID, or export CLOUDFLARE_ACCOUNT_ID.');
 		process.exit(2);
 	}
 	if (!token) {

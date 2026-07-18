@@ -61,8 +61,10 @@ async function uploadFile(index: number): Promise<boolean> {
 		const metaRaw = await import('node:fs').then((fs) => fs.readFileSync(path.join(tmpDir, `${index}.meta`), 'utf-8'));
 		const { cacheKey } = JSON.parse(metaRaw);
 		const filePath = path.join(tmpDir, `${index}.html`);
+		// bunx (not npx): raw child_process would let npm enforce package.json
+		// devEngines.runtime and abort with EBADDEVENGINES on a mismatched node.
 		await execAsync(
-			`npx wrangler r2 object put "${PROD_BUCKET}/${cacheKey}" --file "${filePath}" --content-type "text/html; charset=utf-8" --remote`,
+			`bunx wrangler r2 object put "${PROD_BUCKET}/${cacheKey}" --file "${filePath}" --content-type "text/html; charset=utf-8" --remote`,
 		);
 		return true;
 	} catch {

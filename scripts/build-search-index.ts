@@ -97,7 +97,10 @@ function uploadFileToR2Buckets(key: string, filePath: string, contentType: strin
 	for (const bucket of R2_BUCKETS) assertNotProd(bucket);
 	const MAX_RETRIES = 3;
 	for (const bucket of R2_BUCKETS) {
-		const cmd = `npx wrangler r2 object put ${bucket}/${key} --file "${filePath}" --content-type "${contentType}" --remote`;
+		// bunx (not npx): raw child_process bypasses `bun run`'s npx->bun x
+		// rewrite, so npx would enforce package.json devEngines.runtime and
+		// abort with EBADDEVENGINES when the CI node version differs.
+		const cmd = `bunx wrangler r2 object put ${bucket}/${key} --file "${filePath}" --content-type "${contentType}" --remote`;
 		for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
 			try {
 				execSync(cmd, { stdio: 'inherit' });
