@@ -128,7 +128,9 @@ function uploadR2(cacheKey: string, filePath: string, dryRun: boolean): void {
 		return;
 	}
 	assertNotProd(PROD_BUCKET);
-	execSync(`npx wrangler r2 object put "${PROD_BUCKET}/${cacheKey}" --file "${filePath}" --content-type image/png --remote`, {
+	// bunx (not npx): raw child_process would let npm enforce package.json
+	// devEngines.runtime and abort with EBADDEVENGINES on a mismatched node.
+	execSync(`bunx wrangler r2 object put "${PROD_BUCKET}/${cacheKey}" --file "${filePath}" --content-type image/png --remote`, {
 		stdio: 'inherit',
 	});
 }
