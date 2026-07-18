@@ -46,5 +46,8 @@ jobs:
       - name: Build (production Worker bundle via Vite)
         run: bun run build
 
+      # bunx (not npx): raw npx lets npm enforce package.json devEngines.runtime
+      # and abort with EBADDEVENGINES on the runner's node. `bun run` rewrites
+      # npx->bun x, but this step invokes wrangler directly, so use bunx.
       - name: Validate deploy config (dry run — no network mutation)
-        run: npx wrangler deploy --dry-run
+        run: bunx wrangler deploy --dry-run
