@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { getSpeakerDetail, type SpeakerDetailDb } from '../src/db/speaker-detail';
 
 type Row = Record<string, unknown>;
