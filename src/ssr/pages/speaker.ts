@@ -112,7 +112,8 @@ export async function renderSpeakerPage(c: SpeakerPageContext): Promise<Response
 				}
 			: null;
 
-		const totalSections = (typeof speakerRow.sections_count === 'number' ? speakerRow.sections_count : null) ?? sections.length;
+		// getSpeakerDetail already clamps sections_count to a finite, non-negative number.
+		const totalSections = speakerRow.sections_count;
 		const totalPages = Math.max(1, Math.ceil(totalSections / pageSize));
 		const paginationPages = buildPaginationPages(page, totalPages);
 
@@ -121,7 +122,7 @@ export async function renderSpeakerPage(c: SpeakerPageContext): Promise<Response
 			route_pathname: speakerRow.route_pathname,
 			name: speakerRow.name,
 			photoURL: speakerRow.photoURL,
-			appearances_count: speakerRow.appearances_count ?? 0,
+			appearances_count: speakerRow.appearances_count,
 			sections_count: totalSections,
 			page,
 			page_size: pageSize,
