@@ -108,7 +108,8 @@ export async function speakerDetail(c: SpeakerDetailContext) {
 				}
 			: null;
 
-		const totalSections = Number.isFinite(sectionsCount) && sectionsCount >= 0 ? sectionsCount : sections.length;
+		// getSpeakerDetail already clamps counts to finite, non-negative numbers.
+		const totalSections = sectionsCount;
 		const totalPages = Math.max(1, Math.ceil(totalSections / pageSize));
 		const paginationPages = buildPaginationPages(page, totalPages);
 
@@ -117,7 +118,7 @@ export async function speakerDetail(c: SpeakerDetailContext) {
 			route_pathname: speakerRow.route_pathname,
 			name: speakerRow.name,
 			photoURL: speakerRow.photoURL,
-			appearances_count: Number.isFinite(appearancesCount) && appearancesCount >= 0 ? appearancesCount : 0,
+			appearances_count: appearancesCount,
 			sections_count: totalSections,
 			sections,
 			longest_section: longestSection,
