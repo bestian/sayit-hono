@@ -82,10 +82,7 @@ export async function getSpeakerDetail(db: SpeakerDetailDb, routePathname: strin
 			.prepare('SELECT COUNT(DISTINCT speech_filename) AS count FROM speech_speakers WHERE speaker_route_pathname = ?')
 			.bind(routePathname)
 			.first<CountRow>(),
-		db
-			.prepare('SELECT COUNT(*) AS count FROM speech_content WHERE section_speaker = ?')
-			.bind(routePathname)
-			.first<CountRow>(),
+		db.prepare('SELECT COUNT(*) AS count FROM speech_content WHERE section_speaker = ?').bind(routePathname).first<CountRow>(),
 		db
 			.prepare(
 				`SELECT sc.section_id, sc.section_content, sc.filename, sc.nest_filename, sc.nest_display_name, si.display_name
