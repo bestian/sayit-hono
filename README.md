@@ -14,7 +14,7 @@ bun run dev
 ```
 本專案 package manager 統一用 **bun**（lockfile 為 `bun.lock`）；唯一例外是 `wrangler` 仍走 `npx wrangler …`，因為 bun runtime 已知會讓 `wrangler deploy` 在 async upload 完成前提早 exit。
 
-`bun run dev`（即 `vp dev`）啟動 `vite dev`（本地 workerd + 本地 D1/R2 持久化狀態，不連正式 Cloudflare 資源），並在 `speech_index`、`speakers` 資料表缺少或為空時自動初始化/填入這兩個本地索引；開啟瀏覽器時會直接進入 `/speeches/`。`.vue` 存檔即生效，不需要任何編譯指令。`bun run dev:staging` 只切換 binding 名稱，仍使用本地資料，除非另行設定 remote binding，並不代表讀取真實 staging 資料。
+`bun run dev`（即 `vp dev`）啟動 `vite dev`（本地 workerd + 本地 D1/R2 持久化狀態，不連正式 Cloudflare 資源），並在 `speech_content`、`speech_index`、`speakers` 資料表缺少或不完整（包括為空）時自動初始化/填入本地樣本；開啟瀏覽器時會直接進入 `/speeches/`。Ask widget 會將 `/capacity` 與 `/au/*` 代理到 `127.0.0.1:8787`（可用 `SAYIT_ASK_PORT=<port>` 改用其他整數埠）：第一次 `vp dev` 若 sibling Wrangler 存在會啟動一次 detached 的本地 Ask singleton，後續重啟會重用既有 listener；若已有手動服務則直接重用。要停止本工具啟動的 Ask，執行 `bun run dev:ask:stop`。缺少 sibling、埠被占用、啟動失敗或超時時只顯示警告並維持 SayIt dev，不會呼叫 production Ask。`.vue` 存檔即生效，不需要任何編譯指令。`bun run dev:staging` 只切換 binding 名稱，仍使用本地資料，除非另行設定 remote binding，並不代表讀取真實 staging...
 `vp test` 使用內嵌的 `@cloudflare/vitest-pool-workers` Miniflare/workerd runtime，不需要啟動 `wrangler dev`、Cloudflare credentials 或任何外部本機服務。
 
 ## 清理快取(暫時)

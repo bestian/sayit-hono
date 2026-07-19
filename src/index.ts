@@ -1,3 +1,5 @@
+declare const __LOCAL_D1_SEED__: boolean;
+
 import { Hono, type Context } from 'hono';
 import { speechIndex } from './api/speech_index';
 import { handleOptions } from './api/cors';
@@ -34,6 +36,14 @@ import { renderSectionPage, renderNestedSpeechPage, renderSpeechPage } from './s
 import { renderSpeakerPage } from './ssr/pages/speaker';
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
+// The dynamic import is intentionally compile-time gated so production builds do not include dev-only SQL.
+if (typeof __LOCAL_D1_SEED__ !== 'undefined' && __LOCAL_D1_SEED__) {
+	app.use('*', async (c, next) => {
+		const { ensureLocalIndexes } = await import('./db/local-dev-seed');
+		await ensureLocalIndexes(c.env.DB);
+		await next();
+	});
+}
 
 function normalizeSpeakerPageSearch(url: URL): string {
 	const rawPage = url.searchParams.get('page');
@@ -227,7 +237,12 @@ app.get('/stats.json', async (c) => {
 	const response = await serveBucketJson(c, SEARCH_STATS_KEY, {
 		cacheControl: 'public, max-age=300, s-maxage=300',
 	});
-	return response ?? c.text('Not found', 404);
+	if (response) return response;
+	if (typeof __LOCAL_D1_SEED__ !== 'undefined' && __LOCAL_D1_SEED__) {
+		const { readCanonicalSearchStats } = await import('./search/runtime');
+		return c.json(await readCanonicalSearchStats(c.env.DB), 200, { 'Cache-Control': 'no-store' });
+	}
+	return c.text('Not found', 404);
 });
 
 app.get('/sections-dump.json', async (c) => {

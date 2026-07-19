@@ -1,8 +1,14 @@
 import { defineConfig, lazyPlugins } from 'vite-plus';
 import { cloudflare } from '@cloudflare/vite-plugin';
 import { sfcSsrPlugin } from './vite-plugin-sfc-ssr';
-import { localD1SeedPlugin } from './vite-plugin-local-d1-seed';
-
+import localAsk from './vite-plugin-local-ask';
+const askPort = (() => {
+	const value = process.env.SAYIT_ASK_PORT;
+	if (value === undefined) return 8787;
+	const port = Number(value);
+	if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('SAYIT_ASK_PORT must be an integer from 1 to 65535');
+	return port;
+})();
 // SSR-only app: no client hydration, no vue-router, no App.vue. Every page is
 // rendered server-side via @vue/server-renderer's renderToString inside the
 // Worker (src/ssr/render.ts). sfcSsrPlugin() compiles src/views/*.vue and
@@ -10,13 +16,13 @@ import { localD1SeedPlugin } from './vite-plugin-local-d1-seed';
 // why this app can't use the stock @vitejs/plugin-vue (no browser CSS asset
 // pipeline exists to attach scoped styles to; every view inlines its own
 // compiled `styles` string into the response HTML instead).
-export default defineConfig({
+export default defineConfig(({ command, isPreview }) => ({
 	staged: {
 		'src/**/*.{ts,vue}': 'vp check --fix',
 		'scripts/**/*.ts': 'vp check --fix',
 		'vite.config.ts': 'vp check --fix',
 		'vite-plugin-sfc-ssr.ts': 'vp check --fix',
-		'vite-plugin-local-d1-seed.ts': 'vp check --fix',
+		'vite-plugin-local-ask.ts': 'vp check --fix',
 		'test/**/*.ts': 'vp fmt --write',
 	},
 	fmt: {
@@ -64,17 +70,26 @@ export default defineConfig({
 			},
 		],
 	},
-	plugins: lazyPlugins(() => [localD1SeedPlugin(), cloudflare(), sfcSsrPlugin()]),
-	server: { open: '/speeches/' },
+	plugins: lazyPlugins(() =>
+		command === 'serve' && !isPreview ? [localAsk(askPort), cloudflare(), sfcSsrPlugin()] : [cloudflare(), sfcSsrPlugin()],
+	),
+	server: {
+		open: '/speeches/',
+		proxy: {
+			'/capacity': `http://127.0.0.1:${askPort}`,
+			'/au': `http://127.0.0.1:${askPort}`,
+		},
+	},
 	// satori references process / process.env, which don't exist in Workers.
 	// Previously lived in wrangler.jsonc's `define` — the Vite build path
 	// ignores that (Vite owns `define` once the Cloudflare Vite plugin is in
 	// play), so it moves here verbatim.
 	define: {
+		__LOCAL_D1_SEED__: String(command === 'serve' && !isPreview),
 		'process.env.NODE_ENV': '"production"',
 		'process.env.SATORI_STANDALONE': 'undefined',
 		'process.env.JEST_WORKER_ID': 'undefined',
 		'process.env': '{}',
 		process: '{"env":{}}',
 	},
-});
+}));

@@ -92,7 +92,7 @@
 				var override = params.get('ask_base');
 				if (override) return override.replace(/\/$/, '');
 			} catch { /* ignore */ }
-			return 'http://127.0.0.1:8787';
+			return window.location.origin;
 		}
 		return 'https://ask.archive.tw';
 	}
@@ -789,11 +789,23 @@
 
 	function initAsk() {
 		if (!askAnswer || !window.fetch) return Promise.resolve();
-
-		var capacityPromise = fetch(ASK_BASE_URL + '/capacity', { headers: { Accept: 'application/json' } }).then(function (response) {
-			if (!response.ok) throw new Error('capacity unavailable');
-			return response.json();
-		}).then(function (data) {
+		var deadline = Date.now() + 15000;
+		function wait(ms) {
+			return new Promise(function (resolve) { setTimeout(resolve, ms); });
+		}
+		function probeCapacity() {
+			return fetch(ASK_BASE_URL + '/capacity', { headers: { Accept: 'application/json' } }).then(function (response) {
+				if (response.ok) return response.json();
+				if (response.status >= 400 && response.status < 500 && response.status !== 429) return null;
+				var retryAfter = response.status === 429 ? parseRetryAfter(response) * 1000 : 500;
+				if (Date.now() + retryAfter >= deadline) return null;
+				return wait(Math.max(retryAfter, 250)).then(probeCapacity);
+			}).catch(function () {
+				if (Date.now() + 500 >= deadline) return null;
+				return wait(500).then(probeCapacity);
+			});
+		}
+		var capacityPromise = probeCapacity().then(function (data) {
 			if (!data || data.status !== 'available') return;
 			askAvailable = true;
 			if (askPanel) askPanel.hidden = false;

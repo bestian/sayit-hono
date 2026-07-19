@@ -22,6 +22,23 @@ type CountRow = {
 	count: number | string | null;
 };
 
+export async function readCanonicalSearchStats(db: { prepare(sql: string): { first<T>(): Promise<T | null> } }): Promise<{
+	speeches: number;
+	speakers: number;
+	sections: number;
+}> {
+	const [sectionsRow, speakersRow, speechesRow] = await Promise.all([
+		db.prepare('SELECT COUNT(*) AS count FROM speech_index').first<CountRow>(),
+		db.prepare('SELECT COUNT(*) AS count FROM speakers').first<CountRow>(),
+		db.prepare('SELECT COUNT(*) AS count FROM speech_content').first<CountRow>(),
+	]);
+	return {
+		speeches: Number(speechesRow?.count ?? 0),
+		speakers: Number(speakersRow?.count ?? 0),
+		sections: Number(sectionsRow?.count ?? 0),
+	};
+}
+
 function normalizeManifest(raw: SearchOverlayManifest | null): SearchOverlayManifest {
 	if (!raw || raw.v !== SEARCH_INDEX_MANIFEST_VERSION) {
 		return createEmptySearchOverlayManifest();
@@ -84,18 +101,7 @@ export async function markSpeechDeletedInSearch(bucket: R2Bucket, filename: stri
 }
 
 export async function syncSearchStats(c: Context<ApiEnv>): Promise<void> {
-	const [sectionsRow, speakersRow, speechesRow] = await Promise.all([
-		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speech_index').first<CountRow>(),
-		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speakers').first<CountRow>(),
-		c.env.DB.prepare('SELECT COUNT(*) AS count FROM speech_content').first<CountRow>(),
-	]);
-
-	const stats = {
-		speeches: Number(speechesRow?.count ?? 0),
-		speakers: Number(speakersRow?.count ?? 0),
-		sections: Number(sectionsRow?.count ?? 0),
-	};
-
+	const stats = await readCanonicalSearchStats(c.env.DB);
 	await writeJsonObject(c.env.SPEECH_CACHE, SEARCH_STATS_KEY, stats, SEARCH_STATS_CACHE_CONTROL);
 }
 
