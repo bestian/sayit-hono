@@ -158,6 +158,7 @@ async function bakeOne(
 	writeFileSync(localPath, png);
 
 	if (opts.outDir) {
+		mkdirSync(opts.outDir, { recursive: true });
 		const dest = join(opts.outDir, `${filename}.png`);
 		writeFileSync(dest, png);
 		console.log(`wrote ${dest}`);
@@ -249,6 +250,7 @@ Committed src/cacheKeyVersion.ts is fallback only when /version is unreachable.`
 	// Per-file temp cleanup in bakeOne; do not rmSync whole .og-bake-tmp mid --all (resume-friendly).
 
 	console.log(`done: ${ok}/${filenames.length}`);
+	if (ok !== filenames.length) process.exitCode = 1;
 }
 
 main().catch((err: unknown) => {
