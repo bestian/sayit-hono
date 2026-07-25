@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { handleOgImage, handleOgSpeechImage, type OgGenerators, type OgLoader } from '../src/api/og_routes';
-import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
+import { CACHE_KEY_VERSION, r2LanyangOgSpeechKey } from '../src/api/cache';
 import type { Context } from 'hono';
 import type { ApiEnv } from '../src/api/types';
 
@@ -334,7 +334,24 @@ describe('handleOgImage', () => {
 		expect(res.status).toBe(404);
 	});
 
-	it('returns cached PNG when SPEECH_CACHE has it', async () => {
+	it('prefers a stable Lanyang PNG over a versioned runtime fallback', async () => {
+		const stableKey = r2LanyangOgSpeechKey('2026-demo');
+		const runtimeKey = `${CACHE_KEY_VERSION}/og/2026-demo.png`;
+		const { ctx } = makeContext({
+			url: 'https://example.com/og/2026-demo.png',
+			resolver: resolver(),
+			r2: {
+				[stableKey]: { body: new Uint8Array([1, 2]), contentType: 'image/png' },
+				[runtimeKey]: { body: new Uint8Array([3, 4]), contentType: 'image/png' },
+			},
+		});
+		const res = await handleOgImage(ctx, createFakeGenerators());
+		expect(res.status).toBe(200);
+		expect([...new Uint8Array(await res.arrayBuffer())]).toEqual([1, 2]);
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=86400, s-maxage=86400');
+	});
+
+	it('serves a versioned runtime fallback with a short cache lifetime', async () => {
 		const cacheKey = `${CACHE_KEY_VERSION}/og/2026-demo.png`;
 		const { ctx } = makeContext({
 			url: 'https://example.com/og/2026-demo.png',
@@ -343,6 +360,7 @@ describe('handleOgImage', () => {
 		});
 		const res = await handleOgImage(ctx, createFakeGenerators());
 		expect(res.status).toBe(200);
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=300, s-maxage=300');
 	});
 
 	it('returns 404 when speech meta is missing', async () => {
@@ -364,6 +382,8 @@ describe('handleOgImage', () => {
 		expect(res.status).toBe(200);
 		expect(generator).toHaveBeenCalledWith(ctx.env, '2026-demo', 'Demo Speech', ['Audrey', 'Bestian']);
 		expect(puts[0].key).toBe(`${CACHE_KEY_VERSION}/og/2026-demo.png`);
+		expect(res.headers.get('Cache-Control')).toBe('public, max-age=300, s-maxage=300');
+		expect(puts[0].opts?.httpMetadata?.cacheControl).toBe('public, max-age=300, s-maxage=300');
 	});
 
 	it('proceeds with empty speaker list when speakers query throws', async () => {

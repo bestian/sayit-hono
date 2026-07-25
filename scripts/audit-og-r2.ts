@@ -1,18 +1,16 @@
 #!/usr/bin/env bun
 /**
- * Paginated R2 audit: speech OG keys vs speech_index.json.
+ * Paginated R2 audit: licensed Lanyang speech OG keys vs speech_index.json.
  * Uses Cloudflare R2 List Objects API (not wrangler — no object list).
  *
  * GET /accounts/{account_id}/r2/buckets/{bucket}/objects
- *   ?prefix=v-{sha}/og/&per_page=1000&cursor=… until !result_info.is_truncated
+ *   ?prefix=og/lanyang/&per_page=1000&cursor=… until !result_info.is_truncated
  *
- * Expected keys: ${CACHE_KEY_VERSION}/og/${filename}.png
- * Actual speech keys: same prefix, .png, NOT …/og/speech/…
+ * Expected keys: og/lanyang/${filename}.png
  *
  * Env: CLOUDFLARE_ACCOUNT_ID (or R2_ACCOUNT_ID), CLOUDFLARE_API_TOKEN
- * Usage: bun run scripts/audit-og-r2.ts (uses live /version unless CACHE_KEY_VERSION set)
+ * Usage: bun run scripts/audit-og-r2.ts
  */
-import { resolveCacheKeyVersion } from './lib/archive-cache-version';
 
 const BUCKET = process.env.OG_R2_BUCKET ?? 'sayit-speech-cache';
 const API_BASE = process.env.ARCHIVE_API_BASE ?? 'https://archive.tw';
@@ -25,10 +23,6 @@ type ListObjectsResponse = {
 	success?: boolean;
 	errors?: Array<{ message: string }>;
 };
-
-async function resolveCacheVersion(): Promise<string> {
-	return resolveCacheKeyVersion('v-unknown');
-}
 
 async function fetchSpeechIndex(): Promise<SpeechRow[]> {
 	const res = await fetch(`${API_BASE}/api/speech_index.json`);
@@ -61,10 +55,9 @@ async function listAllObjectKeys(accountId: string, token: string, prefix: strin
 	return keys;
 }
 
-function isSpeechOgKey(key: string, version: string): boolean {
-	const prefix = `${version}/og/`;
+function isLanyangSpeechOgKey(key: string): boolean {
+	const prefix = 'og/lanyang/';
 	if (!key.startsWith(prefix) || !key.endsWith('.png')) return false;
-	if (key.startsWith(`${version}/og/speech/`)) return false;
 	const rest = key.slice(prefix.length);
 	return rest.length > 0 && !rest.includes('/');
 }
@@ -82,17 +75,14 @@ async function main(): Promise<void> {
 		process.exit(2);
 	}
 
-	const version = await resolveCacheVersion();
-	const prefix = `${version}/og/`;
+	const prefix = 'og/lanyang/';
 	const index = await fetchSpeechIndex();
-	const expectedKeys = new Set(index.map((r) => `${version}/og/${r.filename}.png`));
+	const expectedKeys = new Set(index.map((r) => `${prefix}${r.filename}.png`));
 
-	console.log(`CACHE_KEY_VERSION=${version}`);
-	console.log(`speech_index expected keys: ${expectedKeys.size}`);
+	console.log(`speech_index expected Lanyang keys: ${expectedKeys.size}`);
 
 	const allKeys = await listAllObjectKeys(accountId, token, prefix);
-	const speechKeys = allKeys.filter((k) => isSpeechOgKey(k, version));
-	const quoteKeys = allKeys.filter((k) => k.startsWith(`${version}/og/speech/`));
+	const speechKeys = allKeys.filter(isLanyangSpeechOgKey);
 	const actualSpeechKeys = new Set(speechKeys);
 
 	const missing: string[] = [];
@@ -101,8 +91,7 @@ async function main(): Promise<void> {
 	for (const k of actualSpeechKeys) if (!expectedKeys.has(k)) extra.push(k);
 
 	console.log(`R2 list prefix ${prefix}: ${allKeys.length} keys (paginated)`);
-	console.log(`  speech page PNGs: ${speechKeys.length}`);
-	console.log(`  quote og/speech/* (excluded from diff): ${quoteKeys.length}`);
+	console.log(`  Lanyang speech page PNGs: ${speechKeys.length}`);
 	console.log(`missing expected keys: ${missing.length}`);
 	console.log(`extra speech keys not in index: ${extra.length}`);
 
