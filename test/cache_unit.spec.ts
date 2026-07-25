@@ -199,6 +199,27 @@ describe('purgeWorkersCache reliability', () => {
 		await expect(purgeWorkersCache({ tags: ['list:home'] })).resolves.toBe(true);
 	});
 
+	it('splits large path-prefix invalidations into Cloudflare-valid batches', async () => {
+		const pathPrefixes = Array.from({ length: 158 }, (_, index) => `/speech/${index + 1}`);
+
+		await expect(purgeWorkersCache({ pathPrefixes })).resolves.toBe(true);
+
+		expect(purgeMock).toHaveBeenCalledTimes(2);
+		expect(purgeMock).toHaveBeenNthCalledWith(1, { pathPrefixes: pathPrefixes.slice(0, 100) });
+		expect(purgeMock).toHaveBeenNthCalledWith(2, { pathPrefixes: pathPrefixes.slice(100) });
+	});
+
+	it('fails the invalidation when a later bounded batch cannot purge', async () => {
+		const tags = Array.from({ length: 101 }, (_, index) => `speech:${index + 1}`);
+		purgeMock.mockResolvedValueOnce({ success: true, errors: [] }).mockResolvedValue({ success: false, errors: [] });
+
+		await expect(purgeWorkersCache({ tags })).resolves.toBe(false);
+
+		expect(purgeMock).toHaveBeenCalledTimes(4);
+		expect(purgeMock).toHaveBeenNthCalledWith(1, { tags: tags.slice(0, 100) });
+		expect(purgeMock).toHaveBeenLastCalledWith({ tags: tags.slice(100) });
+	});
+
 	it('returns false after repeated explicit purge failures', async () => {
 		// Persists (not `Once`) so every retry attempt inside purgeWorkersCache sees the failure.
 		purgeMock.mockResolvedValue({ success: false, errors: [] });
