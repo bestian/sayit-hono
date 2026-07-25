@@ -27,6 +27,10 @@ const R2_BUCKETS = (process.env.SEARCH_R2_BUCKETS ?? 'sayit-speech-cache,sayit-s
 	.filter(Boolean);
 const SEARCH_BUILD_FORMAT_VERSION = 2;
 const SEARCH_BUILD_FORMAT_VERSION_KEY = '__search_build_format_version';
+const NON_TRANSCRIPT_MARKDOWN: Record<string, true> = {
+	'AGENTS.md': true,
+	'README.md': true,
+};
 
 type SectionsDump = Record<string, ApiSection[]>;
 
@@ -142,7 +146,7 @@ async function buildSearchIndex() {
 	console.log(`[build-search] Reading .md files from: ${transcriptDir}`);
 
 	const entries = await readdir(transcriptDir);
-	const mdFiles = entries.filter((f) => f.endsWith('.md') && !f.startsWith('.'));
+	const mdFiles = entries.filter((f) => f.endsWith('.md') && !f.startsWith('.') && !Object.hasOwn(NON_TRANSCRIPT_MARKDOWN, f));
 	console.log(`[build-search] Found ${mdFiles.length} markdown files`);
 
 	console.log(`[build-search] Fetching speech index from ${apiUrl}`);
