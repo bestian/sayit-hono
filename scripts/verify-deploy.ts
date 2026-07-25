@@ -4,7 +4,9 @@
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 
 const url = process.env.VERIFY_URL ?? 'https://archive.tw/version';
-const maxAttempts = 6;
+// Cloudflare can keep serving the preceding Worker version briefly after a
+// successful deploy. Wait a full minute before calling that a silent no-op.
+const maxAttempts = 31;
 const delayMs = 2000;
 
 async function fetchVersion(): Promise<string | null> {
