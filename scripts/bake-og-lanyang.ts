@@ -194,7 +194,11 @@ Committed src/cacheKeyVersion.ts is fallback only when /version is unreachable.`
 	}
 
 	if (!lanyangFontsInstalled()) {
-		console.warn('[lanyang-og] jf Lanyang fonts not under ~/Library/Fonts — noop (Worker Noto fallback until licensed bake)');
+		console.warn('[lanyang-og] jf Lanyang fonts are unavailable to this process — noop (Worker Noto fallback until licensed bake)');
+		if (process.env.REQUIRE_LANYANG_FONTS === '1') {
+			console.error('[lanyang-og] REQUIRE_LANYANG_FONTS=1 requires the licensed fonts before baking.');
+			process.exit(1);
+		}
 		process.exit(0);
 	}
 
