@@ -29,6 +29,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3, baseDelayMs =
 }
 /** 辨識「講者標題行」：開頭 1～6 個 #、結尾為 : 或 ： */
 const speakerLineRegExp = /^#{1,6}\s*(.+?)\s*[:：]\s*$/;
+const sectionHeadingLineRegExp = /^ {0,3}##(?!#)\s+/;
 
 /** 將使用者輸入的檔名正規化（小寫、去 .md、全形冒號→連字號、最多 50 字） */
 function transformFilename(input: string): string {
@@ -116,6 +117,7 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 	// Phase 1：逐行處理 — 偵測 speaker 行（替換為空行）、剝除 '> ' 前綴、記錄每行是否為 quote
 	const processed: string[] = [];
 	const lineIsQuote: boolean[] = [];
+	const sectionHeadingLines = new Set<number>();
 
 	for (let i = 0; i < rawLines.length; i++) {
 		const raw = rawLines[i];
@@ -129,6 +131,11 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 			processed.push(''); // speaker 行變空行，不進入任何段落
 			lineIsQuote.push(false);
 			continue;
+		}
+
+		if (sectionHeadingLineRegExp.test(raw)) {
+			speakers.push({ lineIndex: i, speakerSlug: null });
+			sectionHeadingLines.add(i);
 		}
 
 		processed.push(text);
@@ -156,6 +163,18 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 
 	for (let i = 0; i < processed.length; i++) {
 		const line = processed[i];
+		if (sectionHeadingLines.has(i)) {
+			if (buf.length > 0) {
+				flush();
+			}
+			sections.push({
+				markdown: line.trim(),
+				isFromQuote: false,
+				startLine: i,
+			});
+			continue;
+		}
+
 		if (line.trim() === '') {
 			// 遇到空行就切段
 			if (buf.length > 0) {

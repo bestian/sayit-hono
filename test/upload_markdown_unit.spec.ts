@@ -821,6 +821,78 @@ describe('parseMarkdownSections edge branches', () => {
 		const speakerInserts = boundStmts(env).filter((s) => s.sql.includes('INSERT INTO speakers'));
 		expect(speakerInserts).toHaveLength(0);
 	});
+
+	it('stores a non-speaker H2 separately and clears inherited speaker attribution', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(300, args);
+			return { success: true, results: [] };
+		});
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: 'panel-heading',
+				markdown: [
+					'# Panel',
+					'### Shani Evenstein Sigalov:',
+					'Opening',
+					'## Bookend I — Jimmy Wales: three challenges',
+					'Context without an attributed speaker',
+					'### Jimmy Wales:',
+					'Answer',
+				].join('\n'),
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const sectionInsert = boundStmts(env).find((statement) => statement.sql.startsWith('INSERT INTO speech_content'));
+		expect(sectionInsert).toBeDefined();
+		const args = sectionInsert!.args;
+		expect(args[6]).toBe('Shani%20Evenstein%20Sigalov');
+		expect(args[14]).toBeNull();
+		expect(args[15]).toContain('<h2>Bookend I — Jimmy Wales: three challenges</h2>');
+		expect(args[22]).toBeNull();
+		expect(args[30]).toBe('Jimmy%20Wales');
+	});
+
+	it('keeps a leading non-speaker H2 standalone', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(350, args);
+			return { success: true, results: [] };
+		});
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: 'leading-heading', markdown: '# Panel\n## Overview\nUnattributed context' }),
+		});
+
+		expect(res.status).toBe(200);
+		const sectionInsert = boundStmts(env).find((statement) => statement.sql.startsWith('INSERT INTO speech_content'));
+		expect(sectionInsert).toBeDefined();
+		expect(sectionInsert!.args[6]).toBeNull();
+		expect(sectionInsert!.args[7]).toContain('<h2>Overview</h2>');
+		expect(sectionInsert!.args[14]).toBeNull();
+	});
+
+	it('continues treating colon-terminated H2 labels as speakers', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(400, args);
+			return { success: true, results: [] };
+		});
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: 'legacy-h2-speaker', markdown: '# Legacy\n## Legacy Speaker：\nHello' }),
+		});
+
+		expect(res.status).toBe(200);
+		const sectionInsert = boundStmts(env).find((statement) => statement.sql.startsWith('INSERT INTO speech_content'));
+		expect(sectionInsert).toBeDefined();
+		expect(sectionInsert!.args[6]).toBe('Legacy%20Speaker');
+	});
 });
 
 // ---------------------------------------------------------------------------
