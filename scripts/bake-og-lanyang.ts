@@ -61,7 +61,11 @@ function parseArgs(argv: string[]): {
 
 	const fnIdx = argv.indexOf('--filename');
 	if (fnIdx >= 0) {
-		const filenames = argv.slice(fnIdx + 1).filter((a) => !a.startsWith('--'));
+		// Stop at the next flag: everything after it belongs to that flag, so a
+		// trailing `--out-dir DIR` would otherwise be baked as a filename.
+		const rest = argv.slice(fnIdx + 1);
+		const nextFlag = rest.findIndex((a) => a.startsWith('--'));
+		const filenames = nextFlag === -1 ? rest : rest.slice(0, nextFlag);
 		return { mode: 'filename', filenames, dryRun, outDir, transcriptRoot, startAfter };
 	}
 
