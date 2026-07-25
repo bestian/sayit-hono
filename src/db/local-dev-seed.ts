@@ -8,6 +8,10 @@ import initSpeakers from '../../sql/init-speakers.sql?raw';
 import fillSpeakers from '../../sql/fill-speakers.sql?raw';
 
 type TableSpec = { table: string; init: string; fills: string[] };
+interface LocalSeedDatabase {
+	prepare(query: string): { first<T = unknown>(): Promise<T | null> };
+	exec(query: string): Promise<unknown>;
+}
 const tables: TableSpec[] = [
 	{ table: 'speech_speakers', init: initSpeechSpeakers, fills: [] },
 	{ table: 'speech_content', init: initSpeechContent, fills: [fillSpeechContentA, fillSpeechContentB] },
@@ -16,7 +20,7 @@ const tables: TableSpec[] = [
 ];
 
 let seedPromise: Promise<void> | undefined;
-function statements(sql: string): string[] {
+export function splitSqlStatements(sql: string): string[] {
 	const result: string[] = [];
 	let current = '';
 	for (const line of sql.split(/\r?\n/)) {
@@ -39,23 +43,24 @@ function statements(sql: string): string[] {
 	return result;
 }
 
-async function execSql(db: D1Database, sql: string): Promise<void> {
-	const sqlStatements = statements(sql);
+async function execSql(db: LocalSeedDatabase, sql: string): Promise<void> {
+	const sqlStatements = splitSqlStatements(sql);
 	for (let index = 0; index < sqlStatements.length; index += 75) await db.exec(sqlStatements.slice(index, index + 75).join('\n'));
 }
 function safeInit(sql: string): string {
-	return statements(sql)
+	return splitSqlStatements(sql)
 		.filter((statement) => !/^DROP TABLE IF EXISTS\b/i.test(statement))
 		.join('\n');
 }
-async function seed(db: D1Database): Promise<void> {
+async function seed(db: LocalSeedDatabase): Promise<void> {
 	for (const spec of tables) {
 		let count = 0;
 		let missing = false;
 		const expected = spec.fills.reduce(
 			(total, fill) =>
 				total +
-				statements(fill).filter((statement) => new RegExp(`^INSERT(?: OR IGNORE)? INTO ${spec.table}\\b`, 'i').test(statement)).length,
+				splitSqlStatements(fill).filter((statement) => new RegExp(`^INSERT(?: OR IGNORE)? INTO ${spec.table}\\b`, 'i').test(statement))
+					.length,
 			0,
 		);
 		try {
@@ -73,7 +78,7 @@ async function seed(db: D1Database): Promise<void> {
 		} else console.log(`[local-d1] ${spec.table}: populated (${count}/${expected}); skipping`);
 	}
 }
-export function ensureLocalIndexes(db: D1Database): Promise<void> {
+export function ensureLocalIndexes(db: LocalSeedDatabase): Promise<void> {
 	seedPromise ??= seed(db);
 	return seedPromise;
 }
