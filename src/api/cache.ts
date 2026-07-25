@@ -47,9 +47,14 @@ export function r2MdKey(filename: string): string {
 	return `md/${filename}`;
 }
 
-/** Versioned R2 key for speech OG PNG. */
+/** Versioned R2 key for a runtime fallback speech OG PNG. */
 export function r2OgSpeechKey(filename: string): string {
 	return `${CACHE_KEY_VERSION}/og/${filename}.png`;
+}
+
+/** Stable R2 key for a licensed Lanyang speech OG PNG. */
+export function r2LanyangOgSpeechKey(filename: string): string {
+	return `og/lanyang/${filename}.png`;
 }
 
 /** Versioned R2 key for section OG PNG. */

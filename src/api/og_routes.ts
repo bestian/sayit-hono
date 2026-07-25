@@ -2,6 +2,9 @@ import type { Context } from 'hono';
 import type { ApiEnv } from './types';
 import { parseContent } from '../utils/textUtils';
 import { CACHE_KEY_VERSION } from '../cacheKeyVersion';
+import { OG_CACHE_CONTROL, r2LanyangOgSpeechKey, r2OgSpeechKey } from './cache';
+
+const OG_FALLBACK_CACHE_CONTROL = 'public, max-age=300, s-maxage=300';
 
 export type OgGenerators = {
 	generateQuoteOgImage: (
@@ -148,13 +151,24 @@ export async function handleOgImage(c: Context<ApiEnv>, loader: OgLoader) {
 	const filename = decodeURIComponent(raw);
 	if (!filename) return c.text('Not Found', 404);
 
-	const cacheKey = `${CACHE_KEY_VERSION}/og/${filename}.png`;
+	const lanyangCached = await c.env.SPEECH_CACHE.get(r2LanyangOgSpeechKey(filename));
+	if (lanyangCached) {
+		return new Response(lanyangCached.body, {
+			headers: {
+				'Content-Type': 'image/png',
+				'Cache-Control': OG_CACHE_CONTROL,
+				'Cache-Tag': `speech:${encodeURIComponent(filename)}`,
+			},
+		});
+	}
+
+	const cacheKey = r2OgSpeechKey(filename);
 	const cached = await c.env.SPEECH_CACHE.get(cacheKey);
 	if (cached) {
 		return new Response(cached.body, {
 			headers: {
 				'Content-Type': 'image/png',
-				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+				'Cache-Control': OG_FALLBACK_CACHE_CONTROL,
 				'Cache-Tag': `speech:${encodeURIComponent(filename)}`,
 			},
 		});
@@ -185,12 +199,12 @@ export async function handleOgImage(c: Context<ApiEnv>, loader: OgLoader) {
 		const { generateOgImage } = await loader();
 		const png = await generateOgImage(c.env, filename, speechMeta.display_name, speakers);
 		await c.env.SPEECH_CACHE.put(cacheKey, png, {
-			httpMetadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
+			httpMetadata: { contentType: 'image/png', cacheControl: OG_FALLBACK_CACHE_CONTROL },
 		});
 		return new Response(png, {
 			headers: {
 				'Content-Type': 'image/png',
-				'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+				'Cache-Control': OG_FALLBACK_CACHE_CONTROL,
 				'Cache-Tag': `speech:${encodeURIComponent(filename)}`,
 			},
 		});

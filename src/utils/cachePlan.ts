@@ -13,7 +13,7 @@
  *
  * This module produces ONLY the string keys and tag values — no I/O.
  */
-import { CACHE_KEY_VERSION, r2AnKey, r2MdKey, r2OgSpeechKey, r2OgSectionKey, tags } from '../api/cache';
+import { CACHE_KEY_VERSION, r2AnKey, r2LanyangOgSpeechKey, r2MdKey, r2OgSpeechKey, r2OgSectionKey, tags } from '../api/cache';
 
 /**
  * Description of what changed — drives which R2 origin keys and Workers Cache
@@ -37,7 +37,7 @@ export interface CacheInvalidationOutput {
  *
  * Faithfully mirrors `invalidateSpeechCaches` from `upload_markdown.ts`:
  * - R2 keys: `an/{filename}`, `md/{filename}`, raw HTML key, percent-encoded HTML
- *   key, OG speech PNG, + 2 keys per section ID (HTML + OG PNG).
+ *   key, versioned runtime OG speech PNG, stable Lanyang OG speech PNG, + 2 keys per section ID (HTML + OG PNG).
  * - Tags: `speech:{filename}`, `list:home`, `list:speeches`, `list:rss`.
  * - R2 keys are NOT deduplicated (array, matching original); `sectionIds` ARE
  *   deduplicated and finite-filtered (Set, matching original).
@@ -54,6 +54,7 @@ export function planSpeechInvalidation(host: string, filename: string, sectionId
 		`${CACHE_KEY_VERSION}/${host}/${filename}`,
 		`${CACHE_KEY_VERSION}/${host}/${encodedFilename}`,
 		r2OgSpeechKey(filename),
+		r2LanyangOgSpeechKey(filename),
 	];
 
 	const filteredSectionIds = new Set<number>();

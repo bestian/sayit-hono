@@ -8,6 +8,7 @@ import {
 	r2MdKey,
 	r2OgSectionKey,
 	r2OgSpeechKey,
+	r2LanyangOgSpeechKey,
 	readR2Cache,
 	speechRequestPath,
 	speakerRequestPath,
@@ -150,9 +151,10 @@ describe('cache key taxonomy helpers', () => {
 		);
 	});
 
-	it('keeps stable an/md keys and versioned OG keys separate', () => {
+	it('keeps stable artifacts and versioned runtime OG keys separate', () => {
 		expect(r2AnKey('demo')).toBe('an/demo');
 		expect(r2MdKey('demo')).toBe('md/demo');
+		expect(r2LanyangOgSpeechKey('demo')).toBe('og/lanyang/demo.png');
 		expect(r2OgSpeechKey('demo')).toBe(`${CACHE_KEY_VERSION}/og/demo.png`);
 		expect(r2OgSectionKey(42)).toBe(`${CACHE_KEY_VERSION}/og/speech/42.png`);
 	});

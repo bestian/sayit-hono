@@ -149,6 +149,7 @@ async function bakeOne(
 
 	const speakers = await fetchSpeakers(filename);
 	const png = await renderLanyangSpeechPng(filename, meta.display_name, speakers);
+	const stableCacheKey = `og/lanyang/${filename}.png`;
 	const cacheKey = `${cacheKeyVersion}/og/${filename}.png`;
 
 	const tmp = join(import.meta.dirname, '..', '.og-bake-tmp');
@@ -163,6 +164,7 @@ async function bakeOne(
 	}
 
 	try {
+		uploadR2(stableCacheKey, localPath, opts.dryRun);
 		uploadR2(cacheKey, localPath, opts.dryRun);
 	} finally {
 		try {
@@ -171,7 +173,7 @@ async function bakeOne(
 			// ignore
 		}
 	}
-	console.log(`baked ${filename} → ${cacheKey} (${png.length} bytes, speakers=${speakers.join('|') || '—'})`);
+	console.log(`baked ${filename} → ${stableCacheKey}, ${cacheKey} (${png.length} bytes, speakers=${speakers.join('|') || '—'})`);
 	return true;
 }
 
@@ -185,7 +187,7 @@ async function main(): Promise<void> {
   bun run scripts/bake-og-lanyang.ts --all [--start-after <filename>]
   --dry-run  --out-dir DIR
 
-Speech OG only: R2 key \${CACHE_KEY_VERSION}/og/<filename>.png (not /og/speech/*.png).
+Speech OG keys: og/lanyang/<filename>.png (stable, preferred by /og) plus \${CACHE_KEY_VERSION}/og/<filename>.png (versioned compatibility).
 Default CACHE_KEY_VERSION: live GET https://archive.tw/version (override with env CACHE_KEY_VERSION).
 Committed src/cacheKeyVersion.ts is fallback only when /version is unreachable.`);
 		process.exit(args.mode === 'help' ? 0 : 1);

@@ -6,12 +6,12 @@ import {
 	planListInvalidation,
 	type CacheInvalidationInput,
 } from '../src/utils/cachePlan';
-import { CACHE_KEY_VERSION, r2AnKey, r2MdKey, r2OgSpeechKey, r2OgSectionKey, tags } from '../src/api/cache';
+import { CACHE_KEY_VERSION, r2AnKey, r2LanyangOgSpeechKey, r2MdKey, r2OgSpeechKey, r2OgSectionKey, tags } from '../src/api/cache';
 
 const HOST = 'sayit.example.com';
 
 describe('planSpeechInvalidation', () => {
-	it('produces the base 5 R2 keys + 4 tags with no section IDs', () => {
+	it('produces the base 6 R2 keys + 4 tags with no section IDs', () => {
 		const filename = 'my-speech';
 		const out = planSpeechInvalidation(HOST, filename, []);
 
@@ -21,6 +21,7 @@ describe('planSpeechInvalidation', () => {
 			`${CACHE_KEY_VERSION}/${HOST}/${filename}`,
 			`${CACHE_KEY_VERSION}/${HOST}/${encodeURIComponent(filename)}`,
 			r2OgSpeechKey(filename),
+			r2LanyangOgSpeechKey(filename),
 		]);
 		expect(out.tags).toEqual([tags.speech(filename), tags.listHome, tags.listSpeeches, tags.listRss]);
 	});
@@ -32,7 +33,7 @@ describe('planSpeechInvalidation', () => {
 		expect(out.r2Keys).toContain(r2OgSectionKey(10));
 		expect(out.r2Keys).toContain(`${CACHE_KEY_VERSION}/${HOST}/speech/20`);
 		expect(out.r2Keys).toContain(r2OgSectionKey(20));
-		expect(out.r2Keys).toHaveLength(5 + 4);
+		expect(out.r2Keys).toHaveLength(6 + 4);
 	});
 
 	it('deduplicates and finite-filters section IDs (matching original Set behavior)', () => {
@@ -42,7 +43,7 @@ describe('planSpeechInvalidation', () => {
 		expect(out.r2Keys).toContain(`${CACHE_KEY_VERSION}/${HOST}/speech/10`);
 		expect(out.r2Keys).toContain(`${CACHE_KEY_VERSION}/${HOST}/speech/20`);
 		expect(out.r2Keys).toContain(`${CACHE_KEY_VERSION}/${HOST}/speech/30`);
-		expect(out.r2Keys).toHaveLength(5 + 6);
+		expect(out.r2Keys).toHaveLength(6 + 6);
 	});
 
 	it('percent-encodes the HTML key but not the raw key (matching original)', () => {
