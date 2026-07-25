@@ -161,16 +161,25 @@ export type PurgeOptions =
 	| { pathPrefixes: string[]; tags?: string[] }
 	| { purgeEverything: true };
 
-/**
- * Purge front-of-Worker Workers Cache.
- * pathPrefixes are true prefixes — never pass '/' for "home only"; use tags for exact list pages.
- * Prefer tags-only or pathPrefixes-only calls; combining is allowed but a bad prefix must not
- * block tags — callers should split when prefixes may be untrusted.
- *
- * Returns true only if purge succeeds. Retries because HTML uses long SWR (86400):
- * a silent purge miss can serve stale content for up to a day.
- */
-export async function purgeWorkersCache(options: PurgeOptions): Promise<boolean> {
+// Cloudflare limits a tag/path-prefix purge request to 100 operations.
+const MAX_PURGE_OPERATIONS = 100;
+
+function chunkPurgeValues(values: string[]): string[][] {
+	return Array.from({ length: Math.ceil(values.length / MAX_PURGE_OPERATIONS) }, (_, index) =>
+		values.slice(index * MAX_PURGE_OPERATIONS, (index + 1) * MAX_PURGE_OPERATIONS),
+	);
+}
+
+function splitPurgeOptions(options: PurgeOptions): PurgeOptions[] {
+	if ('purgeEverything' in options) return [options];
+
+	return [
+		...chunkPurgeValues(options.tags ?? []).map((tags) => ({ tags })),
+		...chunkPurgeValues(options.pathPrefixes ?? []).map((pathPrefixes) => ({ pathPrefixes })),
+	];
+}
+
+async function purgeWorkersCacheBatch(options: PurgeOptions): Promise<boolean> {
 	const maxAttempts = 3;
 	let lastError: unknown;
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -178,8 +187,7 @@ export async function purgeWorkersCache(options: PurgeOptions): Promise<boolean>
 			console.log('[workers cache] purging', { attempt, options });
 			const result = await cache.purge(options);
 			console.log('[workers cache] purge result', result);
-			// Explicit failure only. Missing/undefined result counts as success (API may return void).
-			if (result && typeof result === 'object' && 'success' in result && (result as { success?: boolean }).success === false) {
+			if (!result.success) {
 				console.error('[workers cache] purge reported failure', result);
 				lastError = result;
 				continue;
@@ -192,6 +200,23 @@ export async function purgeWorkersCache(options: PurgeOptions): Promise<boolean>
 	}
 	console.error('[workers cache] purge giving up', lastError);
 	return false;
+}
+
+/**
+ * Purge front-of-Worker Workers Cache.
+ * pathPrefixes are true prefixes — never pass '/' for "home only"; use tags for exact list roots.
+ * A large mutation can affect more than 100 sections, so split tags and path prefixes
+ * into valid bounded requests. Stop on the first failed batch: callers must still see
+ * incomplete invalidation rather than report a false success.
+ *
+ * Returns true only if every purge succeeds. Retries because HTML uses long SWR (86400):
+ * a silent purge miss can serve stale content for up to a day.
+ */
+export async function purgeWorkersCache(options: PurgeOptions): Promise<boolean> {
+	for (const batch of splitPurgeOptions(options)) {
+		if (!(await purgeWorkersCacheBatch(batch))) return false;
+	}
+	return true;
 }
 
 /** Canonical request path for a speech filename (percent-encoded; no raw Unicode). */
