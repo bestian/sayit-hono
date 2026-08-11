@@ -30,6 +30,15 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3, baseDelayMs =
 /** 辨識「講者標題行」：開頭 1～6 個 #、結尾為 : 或 ： */
 const speakerLineRegExp = /^#{1,6}\s*(.+?)\s*[:：]\s*$/;
 const sectionHeadingLineRegExp = /^ {0,3}##(?!#)\s+/;
+/**
+ * 舞台指示／編註引用：'>' 之後緊接半形或全形左括號，例如 '> (laughter)'、'> （與會者皆無意見）'。
+ * 只有這種引用才會脫離講者、獨立成為無講者段落；其餘引用（如詩句）留在講者名下並保留 blockquote。
+ */
+const stageDirectionQuoteRegExp = /^>\s*[(（]/;
+/** 引用行：行首 '>'，其後空白可有可無（'> 詩句'、'>(laughter)' 皆算） */
+const quoteLineRegExp = /^>/;
+/** 去除行首 '>' 與其後至多一個空白，保留其餘縮排 */
+const quoteMarkerRegExp = /^>[ \t]?/;
 
 /** 將使用者輸入的檔名正規化（小寫、去 .md、全形冒號→連字號、最多 50 字） */
 function transformFilename(input: string): string {
@@ -109,27 +118,35 @@ function stripScripts(html: string) {
 	return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 }
 
-/** 解析 Markdown：分出段落（sections）與講者標記（speakers），quote 行（> ）會標記 isFromQuote */
+/**
+ * 解析 Markdown：分出段落（sections）與講者標記（speakers）。
+ * 整段皆為 '> ' 且首行符合 {@link stageDirectionQuoteRegExp} 時標記 isFromQuote（脫離講者）；
+ * 其餘引用段落保留 '> ' 前綴，交由 marked 轉成 blockquote，並照常繼承講者。
+ */
 function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; speakers: SpeakerMark[] } {
 	const rawLines = markdown.split('\n');
 	const speakers: SpeakerMark[] = [];
 
-	// Phase 1：逐行處理 — 偵測 speaker 行（替換為空行）、剝除 '> ' 前綴、記錄每行是否為 quote
+	// Phase 1：逐行處理 — 偵測 speaker 行（替換為空行）、記錄引用狀態與去除前綴後的文字
 	const processed: string[] = [];
+	const outputLines: string[] = [];
 	const lineIsQuote: boolean[] = [];
+	const lineIsStageDirection: boolean[] = [];
 	const sectionHeadingLines = new Set<number>();
 
 	for (let i = 0; i < rawLines.length; i++) {
 		const raw = rawLines[i];
-		const isQuote = raw.startsWith('> ');
-		const text = isQuote ? raw.slice(2) : raw;
+		const isQuote = quoteLineRegExp.test(raw);
+		const text = isQuote ? raw.replace(quoteMarkerRegExp, '') : raw;
 		const trimmed = text.trim();
 
 		const speakerMatch = speakerLineRegExp.exec(trimmed);
 		if (speakerMatch) {
 			speakers.push({ lineIndex: i, speakerSlug: normalizeSpeakerName(speakerMatch[1]) });
 			processed.push(''); // speaker 行變空行，不進入任何段落
+			outputLines.push('');
 			lineIsQuote.push(false);
+			lineIsStageDirection.push(false);
 			continue;
 		}
 
@@ -139,22 +156,30 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 		}
 
 		processed.push(text);
+		// 引用行保留原始 '> ' 前綴，讓非舞台指示的引用（詩句等）仍能轉成 blockquote
+		outputLines.push(isQuote ? raw : text);
 		lineIsQuote.push(isQuote);
+		lineIsStageDirection.push(isQuote && stageDirectionQuoteRegExp.test(raw));
 	}
 
 	// Phase 2：以「任一空行」為分界，切成段落（對應 split(/\n{2,}/)）
 	const sections: ParsedSection[] = [];
-	let buf: string[] = [];
+	let buf: number[] = [];
 	let sectionStartLine = 0;
 	let hasNonQuoteLine = false;
 
 	const flush = () => {
 		// buf only ever holds lines that already passed the non-blank-after-trim
 		// check below, so the joined+trimmed content is always non-empty here.
-		const content = buf.join('\n').trim();
+		// 只有「整段皆為引用」且首行是括號開頭時，才脫離講者成為獨立段落。
+		const isStageDirection = !hasNonQuoteLine && lineIsStageDirection[buf[0]];
+		const content = buf
+			.map((idx) => (isStageDirection ? processed[idx] : outputLines[idx]))
+			.join('\n')
+			.trim();
 		sections.push({
 			markdown: content,
-			isFromQuote: !hasNonQuoteLine, // 所有行皆來自 '> ' 時才算 quote 段落
+			isFromQuote: isStageDirection,
 			startLine: sectionStartLine,
 		});
 		buf = [];
@@ -187,7 +212,7 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 			if (!lineIsQuote[i]) {
 				hasNonQuoteLine = true;
 			}
-			buf.push(line);
+			buf.push(i);
 		}
 	}
 	if (buf.length > 0) {
@@ -197,7 +222,7 @@ function parseMarkdownSections(markdown: string): { sections: ParsedSection[]; s
 	return { sections, speakers };
 }
 
-/** 為每個段落指派講者：取「該段落 startLine 之前、最近一筆」講者標記；quote 段落不指派 */
+/** 為每個段落指派講者：取「該段落 startLine 之前、最近一筆」講者標記；舞台指示段落不指派 */
 function assignSpeakersToSections(parsed: ParsedSection[], speakerMarks: SpeakerMark[]): Array<ParsedSection & { speaker: string | null }> {
 	return parsed.map((section) => {
 		if (section.isFromQuote) {

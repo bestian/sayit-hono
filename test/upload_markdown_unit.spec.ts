@@ -788,7 +788,7 @@ describe('reserveSectionIds atomic reservation', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseMarkdownSections edge branches', () => {
-	it('quote-only section gets speaker=null', async () => {
+	it('keeps the speaker and renders a blockquote for a non-parenthetical quote (poetry)', async () => {
 		const env = createMockEnv((sql, args) => {
 			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
 			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(100, args);
@@ -797,13 +797,27 @@ describe('parseMarkdownSections edge branches', () => {
 		const { res } = await dispatch('/api/upload_markdown', env, {
 			method: 'POST',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
-			body: JSON.stringify({ filename: 'quote-demo', markdown: '# Quote Demo\n> a blockquote line\n> second quoted line' }),
+			body: JSON.stringify({
+				filename: 'poem-demo',
+				markdown: [
+					'# Poem Demo',
+					'### Audrey Tang:',
+					'It is called Holding Pattern.',
+					'',
+					'> The runway is falling away.',
+					'> No flight yet flies itself alone.',
+				].join('\n'),
+			}),
 		});
 		expect(res.status).toBe(200);
-		const inserts = boundStmts(env).filter((s) => s.sql.startsWith('INSERT INTO speech_content'));
-		expect(inserts.length).toBeGreaterThan(0);
-		const hasQuoteSpeakerNull = inserts.some((ins) => ins.args[6] === null);
-		expect(hasQuoteSpeakerNull).toBe(true);
+		const sectionInsert = boundStmts(env).find((statement) => statement.sql.startsWith('INSERT INTO speech_content'));
+		expect(sectionInsert).toBeDefined();
+		const args = sectionInsert!.args;
+		expect(args[6]).toBe('Audrey%20Tang');
+		// The quoted stanza stays attributed and keeps its blockquote instead of breaking out.
+		expect(args[14]).toBe('Audrey%20Tang');
+		expect(args[15]).toContain('<blockquote>');
+		expect(args[15]).toContain('The runway is falling away.');
 	});
 
 	it('drops empty speaker names (heading `## : ` with no name)', async () => {
@@ -892,6 +906,89 @@ describe('parseMarkdownSections edge branches', () => {
 		const sectionInsert = boundStmts(env).find((statement) => statement.sql.startsWith('INSERT INTO speech_content'));
 		expect(sectionInsert).toBeDefined();
 		expect(sectionInsert!.args[6]).toBe('Legacy%20Speaker');
+	});
+
+	it('breaks a parenthetical stage direction out of the speaker', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(450, args);
+			return { success: true, results: [] };
+		});
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: 'stage-direction',
+				markdown: ['# Stage', '### Audrey Tang:', 'Opening remark.', '', '> (laughter)', '', 'Closing remark.'].join('\n'),
+			}),
+		});
+		expect(res.status).toBe(200);
+		const sectionInsert = boundStmts(env).find((statement) => statement.sql.startsWith('INSERT INTO speech_content'));
+		expect(sectionInsert).toBeDefined();
+		const args = sectionInsert!.args;
+		expect(args[6]).toBe('Audrey%20Tang');
+		expect(args[14]).toBeNull();
+		expect(args[15]).toContain('(laughter)');
+		expect(args[15]).not.toContain('<blockquote>');
+		// Attribution resumes after the stage direction.
+		expect(args[22]).toBe('Audrey%20Tang');
+	});
+
+	it('treats a full-width parenthetical stage direction the same way', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(500, args);
+			return { success: true, results: [] };
+		});
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: 'stage-direction-cjk',
+				markdown: ['# 會議', '### 唐鳳：', '開場。', '', '> （與會者皆無意見）'].join('\n'),
+			}),
+		});
+		expect(res.status).toBe(200);
+		const sectionInsert = boundStmts(env).find((statement) => statement.sql.startsWith('INSERT INTO speech_content'));
+		expect(sectionInsert).toBeDefined();
+		const args = sectionInsert!.args;
+		expect(args[6]).toBe(encodeURIComponent('唐鳳-3'));
+		expect(args[14]).toBeNull();
+		expect(args[15]).toContain('與會者皆無意見');
+		expect(args[15]).not.toContain('<blockquote>');
+	});
+
+	it('applies the same rules when the quote marker has no space after it', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename FROM speech_index WHERE filename = ?')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(550, args);
+			return { success: true, results: [] };
+		});
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: 'tight-quote-markers',
+				markdown: ['# Tight', '### Audrey Tang:', 'Opening remark.', '', '>(laughter)', '', '>A line of verse.', '', '>（註）'].join('\n'),
+			}),
+		});
+		expect(res.status).toBe(200);
+		const sectionInsert = boundStmts(env).find((statement) => statement.sql.startsWith('INSERT INTO speech_content'));
+		expect(sectionInsert).toBeDefined();
+		const args = sectionInsert!.args;
+		expect(args[6]).toBe('Audrey%20Tang');
+		// '>(laughter)' is a stage direction even without the space.
+		expect(args[14]).toBeNull();
+		expect(args[15]).toContain('(laughter)');
+		expect(args[15]).not.toContain('<blockquote>');
+		// '>A line of verse.' is not parenthetical, so it stays with the speaker as a blockquote.
+		expect(args[22]).toBe('Audrey%20Tang');
+		expect(args[23]).toContain('<blockquote>');
+		expect(args[23]).toContain('A line of verse.');
+		// Full-width parenthesis with no space is a stage direction too.
+		expect(args[30]).toBeNull();
+		expect(args[31]).toContain('註');
+		expect(args[31]).not.toContain('<blockquote>');
 	});
 });
 
