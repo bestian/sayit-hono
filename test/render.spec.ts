@@ -92,6 +92,23 @@ describe('SSR layout', () => {
 		expect(html).not.toContain('ask.archive.tw/privacy');
 	});
 
+	it('renders bilingual civic.ai footer notice with CC0 attribution', async () => {
+		const html = await renderHtml(HomeView, {
+			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer },
+		});
+
+		expect(html).toContain('id="cc"');
+		expect(html).toContain('This site is co-maintained by Audrey Tang and Bestian Tang');
+		expect(html).toContain('Creative Commons CC0 license');
+		expect(html).toContain('For more information on Civic AI and 6-Pack of Care');
+		expect(html).toContain('href="https://civic.ai/"');
+		expect(html).toContain('本站由 唐鳳 與 唐宗浩 共同維運');
+		expect(html).toContain('創用 CC0');
+		expect(html).toContain('仁工智慧');
+		expect(html).toContain('關懷六力');
+	});
+
 	it('renders the search results page Ask UI above regular results', async () => {
 		const html = await renderHtml(SearchResultView, {
 			styles: [SearchResultViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),

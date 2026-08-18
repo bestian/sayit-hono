@@ -4,8 +4,8 @@
 			<div class="row">
 				<div class="columns small-12 large-9" style="padding: 0">
 					<p style="font-size: 1em; font-weight: bold; display: flex; margin-inline-end: auto;" id="cc">
-						<span lang="zh">本站由 唐鳳 與 唐宗浩 共同維運，除另有標示外，內容以創用 CC0 授權條款釋出</span>
-						<span lang="en">This site is co-maintained by Audrey Tang and Bestian Tang. Unless otherwise indicated, the content is released under the terms of the Creative Commons CC0 license.</span>
+						<span lang="zh">本站由 唐鳳 與 唐宗浩 共同維運，除另有標示外，內容以創用 CC0 授權條款釋出。欲進一步了解仁工智慧與關懷六力，請造訪 <a href="https://civic.ai/">https://civic.ai/</a></span>
+						<span lang="en">This site is co-maintained by Audrey Tang and Bestian Tang. Unless otherwise indicated, the content is released under the terms of the Creative Commons CC0 license. For more information on Civic AI and 6-Pack of Care, please visit <a href="https://civic.ai/">https://civic.ai/</a></span>
 					</p>
 					<p class="sayit-footer-ask-notice" style="font-size: 0.95em; font-weight: normal; margin-top: 0.5em;">
 						<span lang="zh">在搜尋框提問即表示您同意 <a href="/privacy">隱私權政策</a> 與 <a href="/terms">使用條款</a>。</span>
@@ -27,6 +27,7 @@
 </script>
 
 <style scoped>
+#cc a,
 .sayit-footer-ask-notice a {
 	text-decoration: underline;
 }
