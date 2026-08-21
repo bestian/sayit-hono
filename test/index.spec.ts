@@ -1,5 +1,5 @@
 import { createExecutionContext } from 'cloudflare:test';
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import worker from '../src/index';
 
@@ -234,8 +234,8 @@ describe('Worker routes', () => {
 		expect(res.status).toBe(200);
 		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		const html = await res.text();
-		expect(html).toContain('<title> Privacy Policy :: SayIt </title>');
-		expect(html).toContain('content="Privacy policy for AI questions on SayIt."');
+		expect(html).toContain('<title>Privacy Policy — SayIt</title>');
+		expect(html).toContain('content="How Ask archive handles questions, security data, and personal information."');
 		expect(html).toContain('id="privacy-zh"');
 		expect(html).toContain('We do not sell or exchange your personal data');
 		expect(html).toContain('href="/terms"');
@@ -247,8 +247,8 @@ describe('Worker routes', () => {
 		expect(res.status).toBe(200);
 		expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=86400');
 		const html = await res.text();
-		expect(html).toContain('<title> Terms of Use :: SayIt </title>');
-		expect(html).toContain('content="Terms of use for AI questions on SayIt."');
+		expect(html).toContain('<title>Terms of Use — SayIt</title>');
+		expect(html).toContain('content="Terms for searching the public record and using AI synthesis on SayIt."');
 		expect(html).toContain('id="terms-zh"');
 		expect(html).toContain('Content provided in AI replies is licensed under Creative Commons Attribution-ShareAlike');
 		expect(html).toContain('href="/privacy"');
@@ -424,5 +424,72 @@ describe('Worker routes', () => {
 			});
 			expect(res.status).toBe(403);
 		});
+	});
+
+	it('proxies production preview statistics and media without forwarding credentials', async () => {
+		const env = { ...createEnv(), PROD_DATA_ORIGIN: 'https://archive.tw' };
+		const upstreamRequests: Request[] = [];
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+			const upstreamRequest = new Request(input, init);
+			upstreamRequests.push(upstreamRequest);
+			const pathname = new URL(upstreamRequest.url).pathname;
+			if (pathname.startsWith('/media/')) {
+				return new Response('image-bytes', {
+					headers: { 'Content-Type': 'image/jpeg', 'Set-Cookie': 'private=1' },
+				});
+			}
+			return Response.json({ speeches: 406288, speakers: 8231, sections: 2089 }, { headers: { 'Set-Cookie': 'private=1' } });
+		});
+
+		try {
+			const stats = await request('/stats.json?fresh=1', env, {
+				headers: {
+					Accept: 'application/json',
+					'Accept-Encoding': 'br',
+					Authorization: 'Bearer private',
+					Cookie: 'session=private',
+				},
+			});
+			expect(stats.res.status).toBe(200);
+			expect(await stats.res.json()).toEqual({ speeches: 406288, speakers: 8231, sections: 2089 });
+			expect(stats.res.headers.get('X-SayIt-Data-Origin')).toBe('production-preview');
+			expect(stats.res.headers.get('Set-Cookie')).toBeNull();
+
+			const manifest = await request('/search-index-manifest.json', env);
+			expect(manifest.res.status).toBe(200);
+			expect(manifest.res.headers.get('X-SayIt-Data-Origin')).toBe('production-preview');
+
+			const media = await request('/media/speakers/a.jpg', env);
+			expect(media.res.status).toBe(200);
+			expect(new TextDecoder().decode(await media.res.arrayBuffer())).toBe('image-bytes');
+			expect(media.res.headers.get('X-SayIt-Data-Origin')).toBe('production-preview');
+
+			expect(upstreamRequests[0].url).toBe('https://archive.tw/stats.json?fresh=1');
+			expect(upstreamRequests[0].headers.get('Accept')).toBe('application/json');
+			expect(upstreamRequests[0].headers.get('Accept-Encoding')).toBe('br');
+			expect(upstreamRequests[0].headers.get('Authorization')).toBeNull();
+			expect(upstreamRequests[0].headers.get('Cookie')).toBeNull();
+		} finally {
+			fetchSpy.mockRestore();
+		}
+	});
+
+	it('falls through when the production preview is unavailable', async () => {
+		const env = { ...createEnv(), PROD_DATA_ORIGIN: 'https://archive.tw' };
+		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockRejectedValueOnce(new Error('offline'))
+			.mockResolvedValueOnce(new Response('missing', { status: 404 }));
+
+		try {
+			const failedSearch = await request('/search-index.json', env);
+			expect(failedSearch.res.status).toBe(404);
+			const missingMedia = await request('/media/missing.jpg', env);
+			expect(missingMedia.res.status).toBe(404);
+		} finally {
+			fetchSpy.mockRestore();
+			consoleSpy.mockRestore();
+		}
 	});
 });

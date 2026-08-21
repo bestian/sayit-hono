@@ -21,11 +21,7 @@ describe('renderHtml branches', () => {
 		const html = await renderHtml(Empty, {
 			head: {
 				title: 'HeadTitle',
-				meta: [
-					{ property: 'og:title', content: 'Property Meta' },
-					{ name: 'twitter:card', content: 'summary' },
-					{ content: 'ignored' } as any,
-				],
+				meta: [{ property: 'og:title', content: 'Property Meta' }, { name: 'twitter:card', content: 'summary' }, { content: 'ignored' }],
 				links: [
 					{ rel: 'alternate', href: 'https://archive.tw/en', hreflang: 'en' },
 					{ rel: 'alternate', href: 'https://archive.tw/zh' },
@@ -39,9 +35,13 @@ describe('renderHtml branches', () => {
 		expect(html).toContain('<link rel="alternate" href="https://archive.tw/zh">');
 	});
 
-	it('omits inline <style> block when styles are blank', async () => {
-		const html = await renderHtml(Empty, { styles: '   ' });
-		expect(html).not.toMatch(/<style>\s*<\/style>/);
+	it('omits a route-specific style block when route styles are blank', async () => {
+		const blank = await renderHtml(Empty, { styles: '   ' });
+		const styled = await renderHtml(Empty, { styles: 'body { color: red; }' });
+		const blankStyleBlocks = blank.match(/<style>/g)?.length ?? 0;
+		const styledStyleBlocks = styled.match(/<style>/g)?.length ?? 0;
+		expect(styledStyleBlocks).toBe(blankStyleBlocks + 1);
+		expect(styled).toContain('<style>body { color: red; }</style>');
 	});
 
 	it('includes extra scripts when provided', async () => {

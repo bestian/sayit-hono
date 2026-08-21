@@ -169,11 +169,10 @@ async function fetchProductionPreview(c: Context<{ Bindings: WorkerEnv }>, pathn
 	try {
 		const sourceUrl = new URL(pathname, origin);
 		sourceUrl.search = new URL(c.req.url).search;
-		const headers = new Headers();
-		const accept = c.req.header('Accept');
-		const acceptEncoding = c.req.header('Accept-Encoding');
-		if (accept) headers.set('Accept', accept);
-		if (acceptEncoding) headers.set('Accept-Encoding', acceptEncoding);
+		const headers = new Headers(c.req.raw.headers);
+		headers.delete('Authorization');
+		headers.delete('Cookie');
+		headers.delete('Host');
 		const response = await fetch(sourceUrl, { headers });
 		if (!response.ok) return null;
 

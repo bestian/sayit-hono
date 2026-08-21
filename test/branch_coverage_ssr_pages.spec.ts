@@ -700,10 +700,10 @@ describe('3. Speech Page Branches (speech.ts)', () => {
 			const res = await testApp.fetch(new Request('https://example.com/speech/202'), env);
 			expect(res.status).toBe(200);
 			const html = await res.text();
-			expect(html).toContain('View Section :: SayIt');
+			expect(html).toContain('Turn 202 — SayIt');
 		}
 
-		// 8b. Null content and null (not just empty) display_name also fall back to "View Section"
+		// 8b. Null content and display_name fall back to the stable turn title.
 		{
 			const resolverNullTitle: QueryResolver = (sql) => {
 				if (sql.includes('FROM speech_content a') && sql.includes('WHERE a.section_id = ?')) {
@@ -732,7 +732,7 @@ describe('3. Speech Page Branches (speech.ts)', () => {
 			const res = await testApp.fetch(new Request('https://example.com/speech/204'), env);
 			expect(res.status).toBe(200);
 			const html = await res.text();
-			expect(html).toContain('View Section :: SayIt');
+			expect(html).toContain('Turn 204 — SayIt');
 		}
 
 		// 9. Plain text over 80 chars truncates the title snippet with an ellipsis
@@ -765,7 +765,8 @@ describe('3. Speech Page Branches (speech.ts)', () => {
 			const res = await testApp.fetch(new Request('https://example.com/speech/303'), env);
 			expect(res.status).toBe(200);
 			const html = await res.text();
-			expect(html).toContain('...” :: SayIt');
+			expect(html).toContain('…');
+			expect(html).toContain('— Turn 303 — SayIt');
 		}
 	});
 
