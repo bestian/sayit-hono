@@ -2387,6 +2387,10 @@ mark,
 	color: var(--index-strong);
 }
 
+.site-nav-mobile:not([open]) .site-nav-mobile__panel {
+	display: none;
+}
+
 /* Inline nav returns for landscape/tablet; the <48rem hide lives in the
    max-width: 68.749rem block upstream. */
 @media (min-width: 45.001rem) and (max-width: 68.749rem) {
