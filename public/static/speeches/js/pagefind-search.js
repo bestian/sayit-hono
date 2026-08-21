@@ -7,45 +7,52 @@
 	var speechList = document.getElementById('sayit-speech-list');
 	var askPanel = document.getElementById('sayit-ask');
 	var askSubmit = document.getElementById('sayit-ask-submit');
-		var askStatus = document.getElementById('sayit-ask-status');
+	var askStatus = document.getElementById('sayit-ask-status');
 	var askAnswer = document.getElementById('sayit-ask-answer');
 	var lastAskMarkdown = '';
 	var askCopyResetTimer = null;
+	var askGeneratedAt = null;
 	if (!input) return;
 
 	var isZh = document.documentElement.classList.contains('lang-zh');
 	var ASK_STRINGS = {
 		zh: {
-			searchPlaceholder: '搜尋對話內容…',
-			searchAriaLabel: '搜尋對話',
-			submit: '💬 提問',
-			submitting: '💬 提問中…',
-			cooldown: function (seconds) { return '💬 ' + seconds + ' 秒後可再提問'; },
-			searching: '檢索逐字稿中…',
-			sourcesHeading: '出處',
+			searchPlaceholder: '輸入原話或講者…',
+			searchAriaLabel: '搜尋原話、講者或對話',
+			submit: '向典藏提問',
+			submitting: '產生附來源的綜整…',
+			cooldown: function (seconds) { return seconds + ' 秒後可再提問'; },
+			searching: '正在查找逐字稿並整理來源…',
+			synthesisLabel: 'AI 綜整，不是逐字稿',
+			provenance: '根據公開逐字稿典藏產生',
+			unsourcedAnswer: '無法產生附有來源的回答。請改用原文搜尋。',
+			sourcesHeading: '公開紀錄中的來源',
 			copyMarkdown: '複製 Markdown',
 			copiedMarkdown: '已複製',
 			copyFailed: '無法複製，請手動選取文字',
 			questionTooLong: '問題太長，請縮短到 100 字以內。',
 			fetchError: '提問服務暫時無法使用，請稍後再試。',
 			networkError: '連線發生錯誤，請稍後再試。',
-			consentRequired: '請先同意隱私權政策和使用條款，再按 Enter 提問；一般搜尋結果仍會顯示。',
+			consentRequired: '請先同意隱私權政策和使用條款；原文搜尋仍可使用。',
 		},
 		en: {
-			searchPlaceholder: 'Search speeches…',
-			searchAriaLabel: 'Search speeches',
-			submit: '💬 Ask',
-			submitting: '💬 Asking…',
-			cooldown: function (seconds) { return '💬 Ask again in ' + seconds + ' s'; },
-			searching: 'Searching the transcripts…',
-			sourcesHeading: 'Sources',
+			searchPlaceholder: 'Try a phrase or speaker’s name…',
+			searchAriaLabel: 'Search exact words, speakers, or sections',
+			submit: 'Ask archive',
+			submitting: 'Generating a sourced synthesis…',
+			cooldown: function (seconds) { return 'Ask again in ' + seconds + ' s'; },
+			searching: 'Searching the transcripts and assembling sources…',
+			synthesisLabel: 'AI synthesis, not the transcript',
+			provenance: 'Generated from the public transcript archive',
+			unsourcedAnswer: 'No sourced answer could be assembled. Search the record instead.',
+			sourcesHeading: 'Sources in the public record',
 			copyMarkdown: 'Copy Markdown',
 			copiedMarkdown: 'Copied',
 			copyFailed: 'Could not copy. Select the answer and copy manually.',
 			questionTooLong: 'Your question is too long. Please shorten it to 100 characters or fewer.',
 			fetchError: 'The ask service is temporarily unavailable. Please try again later.',
 			networkError: 'Connection error. Please try again later.',
-			consentRequired: 'Please agree to the Privacy Policy and Terms of Use first to ask AI; regular search results will still show.',
+			consentRequired: 'Please agree to the Privacy Policy and Terms of Use; exact search remains available.',
 		},
 	};
 	var askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
@@ -61,11 +68,24 @@
 
 	var searchSubmitButtons = document.querySelectorAll('.sayit-search__submit');
 	for (var si = 0; si < searchSubmitButtons.length; si++) {
-		searchSubmitButtons[si].addEventListener('click', function () {
+		searchSubmitButtons[si].addEventListener('click', function (event) {
+			event.preventDefault();
+			submitSearch(input.value);
+		});
+		searchSubmitButtons[si].hidden = false;
+	}
+	var searchForm = input.closest('form');
+	if (searchForm) {
+		searchForm.addEventListener('submit', function (event) {
+			event.preventDefault();
 			submitSearch(input.value);
 		});
 	}
-	for (var sb = 0; sb < searchSubmitButtons.length; sb++) searchSubmitButtons[sb].hidden = false;
+	if (askSubmit) {
+		askSubmit.addEventListener('click', function () {
+			void runAsk(input.value);
+		});
+	}
 
 	window.addEventListener('sayit-lang-change', refreshSearchI18n);
 
@@ -487,15 +507,37 @@
 		if (!askAnswer) return;
 		bindAskCopyButton();
 		askAnswer.hidden = false;
+
+		var generatedLabel = askT.provenance;
+		if (askGeneratedAt) {
+			try {
+				generatedLabel += ' · ' + new Intl.DateTimeFormat(isZh ? 'zh-TW' : 'en', {
+					dateStyle: 'medium',
+					timeStyle: 'short'
+				}).format(askGeneratedAt);
+			} catch { /* date formatting is non-essential */ }
+		}
+		var header =
+			'<header class="homepage-ask-answer__header">' +
+			'<p class="homepage-ask-answer__label">' + escapeHtml(askT.synthesisLabel) + '</p>' +
+			'<p class="homepage-ask-answer__provenance">' + escapeHtml(generatedLabel) + '</p>' +
+			'</header>';
+
 		if (error) {
 			lastAskMarkdown = '';
-			askAnswer.innerHTML = '<p class="homepage-ask-answer__error">' + sanitizeHtml(escapeHtml(error)) + '</p>';
+			askAnswer.innerHTML = header + '<p class="homepage-ask-answer__error">' + sanitizeHtml(escapeHtml(error)) + '</p>';
 			return;
 		}
 
 		lastAskMarkdown = raw || '';
 		var parsed = parseAskAnswer(raw);
-		var html = '';
+		if (!loading && parsed.sources.length === 0) {
+			lastAskMarkdown = '';
+			askAnswer.innerHTML = header + '<p class="homepage-ask-answer__error">' + escapeHtml(askT.unsourcedAnswer) + '</p>';
+			return;
+		}
+
+		var html = header;
 		if ((raw || '').trim()) {
 			html += '<div class="homepage-ask-answer__toolbar"><button type="button" class="homepage-ask-answer__copy" data-sayit-ask-copy aria-label="' + escapeHtml(askT.copyMarkdown) + '">' + escapeHtml(askT.copyMarkdown) + '</button></div>';
 		}
@@ -512,7 +554,7 @@
 			html += '<div class="homepage-ask-answer__sources"><h3>' + escapeHtml(askT.sourcesHeading) + '</h3><ol>';
 			for (var i = 0; i < parsed.sources.length; i++) {
 				var source = parsed.sources[i];
-				html += '<li value="' + source.index + '"><a href="' + escapeHtml(source.href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(source.label) + '</a></li>';
+				html += '<li value="' + source.index + '"><a href="' + escapeHtml(source.href) + '">' + escapeHtml(source.label) + '</a></li>';
 			}
 			html += '</ol></div>';
 		}
@@ -728,6 +770,7 @@
 
 	function runAsk(question) {
 		var query = (question || '').trim();
+		askGeneratedAt = new Date();
 		if (!askAvailable || !query || askLoading || askCooldownRemaining > 0) return Promise.resolve();
 		if (query.length > 100) {
 			renderAskAnswer('', false, askT.questionTooLong);
@@ -809,7 +852,10 @@
 			if (!data || data.status !== 'available') return;
 			askAvailable = true;
 			if (askPanel) askPanel.hidden = false;
-			for (var sb = 0; sb < searchSubmitButtons.length; sb++) searchSubmitButtons[sb].hidden = false;
+			if (askSubmit) {
+				askSubmit.hidden = false;
+				askSubmit.removeAttribute('aria-hidden');
+			}
 			updateAskControls();
 		}).catch(function () {
 			askAvailable = false;
@@ -820,7 +866,9 @@
 			for (var i = 0; i < samples.length; i++) {
 				samples[i].addEventListener('click', function (event) {
 					var question = event.currentTarget.getAttribute('data-sayit-ask-question') || '';
-					submitSearch(question);
+					input.value = question;
+					updateAskControls();
+					void runAsk(question);
 				});
 			}
 		}
@@ -832,31 +880,18 @@
 		var q = (query || '').trim();
 		if (!q) return;
 
-		var onSearchResults = window.location.pathname === '/search/';
-
-		if (askAnswer && askAvailable && q.length <= 100 && !askLoading && askCooldownRemaining <= 0) {
-			void runAiFirstSearch(q, onSearchResults);
-			return;
-		}
-
-		if (askAnswer) {
-			if (onSearchResults) return;
-			hideAskAnswer();
-			doSearch(q);
-			return;
-		}
-
-		if (!results) return;
 		hideAskAnswer();
+		if (window.location.pathname === '/search/') {
+			window.location.assign('/search/?q=' + encodeURIComponent(q));
+			return;
+		}
+		if (!results) {
+			window.location.assign('/search/?q=' + encodeURIComponent(q));
+			return;
+		}
 		doSearch(q);
 	}
 
-	function runAiFirstSearch(query, skipRegularResults) {
-		hideResults();
-		return runAsk(query).then(function () {
-			if (!skipRegularResults) doSearch(query);
-		});
-	}
 
 	input.addEventListener('input', function () {
 		clearTimeout(debounceTimer);
@@ -910,11 +945,10 @@
 	});
 
 	void initAsk().finally(function () {
-		if (!results || window.location.pathname !== '/search/') return;
+		if (window.location.pathname !== '/search/') return;
 		var initialQuery = new URLSearchParams(window.location.search).get('q') || '';
 		if (!initialQuery.trim()) return;
 		input.value = initialQuery;
 		updateAskControls();
-		submitSearch(initialQuery);
 	});
 })();

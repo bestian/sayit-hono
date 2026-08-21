@@ -1,31 +1,19 @@
 <template>
 	<div class="page">
-		<Navbar>
-			<div id="sayit-search" class="sayit-search" role="search">
-				<div class="sayit-search__row">
-					<div class="sayit-search__input-wrap">
-						<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
-						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
-					</div>
-					<button type="button" class="sayit-search__submit" aria-label="Search">
-						<span aria-hidden="true">✨</span>
-					</button>
-				</div>
+		<Navbar />
+		<main id="main-content">
+			<div class="sayit-ask-overlay">
+				<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
 			</div>
-		</Navbar>
-		<div class="sayit-ask-overlay">
-		<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
-		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden aria-hidden="true"></button>
-		</div>
 		<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
 		<div class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit">
-					<h1 class="search-title-with-result"><span lang="zh">搜尋</span><span lang="en">Search</span> / <strong>{{ query }}</strong></h1>
+					<h1 class="search-title-with-result"><span lang="zh">搜尋原文</span><span lang="en">Search the record</span> / <strong>{{ query }}</strong></h1>
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">
-							<input type="search" class="site-search__input" placeholder="Search" name="q" :value="query" />
-							<button type="submit" class="site-search__submit" aria-label="Search"><span aria-hidden="true">✨</span></button>
+							<input type="search" class="site-search__input" placeholder="Search exact words, speakers, or sections" name="q" :value="query" />
+							<button type="submit" class="site-search__submit"><span lang="zh">搜尋</span><span lang="en">Search</span></button>
 						</div>
 					</form>
 					<div class="page-content__row ">
@@ -133,6 +121,7 @@
 				</div>
 			</div>
 		</div>
+		</main>
 		<Footer />
 	</div>
 </template>

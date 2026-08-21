@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vite-plus/test';
 import { getSpeakerColor, speakerColorPalette } from '../src/utils/speakerColor';
 
 describe('getSpeakerColor', () => {
-	it('exports the legacy palette', () => {
+	it('exports the restrained Turnline palette', () => {
 		expect(speakerColorPalette.length).toBeGreaterThan(0);
 		for (const color of speakerColorPalette) {
 			expect(color).toMatch(/^#[0-9a-f]{6}$/i);

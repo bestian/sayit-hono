@@ -162,6 +162,35 @@ async function serveBucketJson(
 	return new Response(object.body, { headers });
 }
 
+async function fetchProductionPreview(c: Context<{ Bindings: WorkerEnv }>, pathname: string): Promise<Response | null> {
+	const origin = c.env.PROD_DATA_ORIGIN;
+	if (!origin) return null;
+
+	try {
+		const sourceUrl = new URL(pathname, origin);
+		sourceUrl.search = new URL(c.req.url).search;
+		const headers = new Headers();
+		const accept = c.req.header('Accept');
+		const acceptEncoding = c.req.header('Accept-Encoding');
+		if (accept) headers.set('Accept', accept);
+		if (acceptEncoding) headers.set('Accept-Encoding', acceptEncoding);
+		const response = await fetch(sourceUrl, { headers });
+		if (!response.ok) return null;
+
+		const responseHeaders = new Headers(response.headers);
+		responseHeaders.delete('Set-Cookie');
+		responseHeaders.set('X-SayIt-Data-Origin', 'production-preview');
+		return new Response(response.body, {
+			status: response.status,
+			statusText: response.statusText,
+			headers: responseHeaders,
+		});
+	} catch (error) {
+		console.error('[production preview] fetch failed', pathname, error);
+		return null;
+	}
+}
+
 /** 向 Cloudflare 靜態資源 (ASSETS) 要求檔案，使用請求 URL */
 async function serveAsset(c: Context<{ Bindings: WorkerEnv }>): Promise<Response> {
 	const url = new URL(c.req.url);
@@ -196,6 +225,10 @@ async function staticFirstMiddleware(c: Context<{ Bindings: WorkerEnv }>, next: 
 	}
 	const res = await serveAsset(c);
 	if (res && res.status >= 200 && res.status < 400) return res;
+	if (pathname.startsWith('/media/')) {
+		const productionAsset = await fetchProductionPreview(c, pathname);
+		if (productionAsset) return productionAsset;
+	}
 	return next();
 }
 
@@ -213,7 +246,8 @@ app.get('/search-index.json', async (c) => {
 		if (compressed) return compressed;
 	}
 	const response = await serveBucketJson(c, SEARCH_INDEX_BASELINE_KEY, { cacheControl });
-	return response ?? c.text('Not found', 404);
+	if (response) return response;
+	return (await fetchProductionPreview(c, '/search-index.json')) ?? c.text('Not found', 404);
 });
 
 app.get('/search-index-manifest.json', async (c) => {
@@ -221,6 +255,8 @@ app.get('/search-index-manifest.json', async (c) => {
 		cacheControl: 'public, max-age=60, s-maxage=60',
 	});
 	if (response) return response;
+	const productionManifest = await fetchProductionPreview(c, '/search-index-manifest.json');
+	if (productionManifest) return productionManifest;
 	return c.json(createEmptySearchOverlayManifest(), 200, {
 		'Cache-Control': 'public, max-age=60, s-maxage=60',
 	});
@@ -230,7 +266,7 @@ app.get('/search-updates/:path{[^/]+\\.json}', async (c) => {
 	const response = await serveBucketJson(c, `${SEARCH_UPDATES_PREFIX}/${c.req.param('path')}`, {
 		cacheControl: 'public, max-age=3600, s-maxage=86400',
 	});
-	return response ?? c.text('Not found', 404);
+	return response ?? (await fetchProductionPreview(c, `/search-updates/${c.req.param('path')}`)) ?? c.text('Not found', 404);
 });
 
 app.get('/stats.json', async (c) => {
@@ -238,6 +274,8 @@ app.get('/stats.json', async (c) => {
 		cacheControl: 'public, max-age=300, s-maxage=300',
 	});
 	if (response) return response;
+	const productionStats = await fetchProductionPreview(c, '/stats.json');
+	if (productionStats) return productionStats;
 	if (typeof __LOCAL_D1_SEED__ !== 'undefined' && __LOCAL_D1_SEED__) {
 		const { readCanonicalSearchStats } = await import('./search/runtime');
 		return c.json(await readCanonicalSearchStats(c.env.DB), 200, { 'Cache-Control': 'no-store' });
@@ -247,7 +285,7 @@ app.get('/stats.json', async (c) => {
 
 app.get('/sections-dump.json', async (c) => {
 	const obj = await c.env.SPEECH_CACHE.get('sections-dump.json');
-	if (!obj) return c.text('Not found', 404);
+	if (!obj) return (await fetchProductionPreview(c, '/sections-dump.json')) ?? c.text('Not found', 404);
 	return new Response(obj.body, {
 		headers: {
 			'Content-Type': 'application/json; charset=utf-8',

@@ -40,28 +40,15 @@ const sortedSpeeches = computed(() => {
 
 <template>
 	<div class="page">
-		<Navbar>
-			<!-- Pagefind search widget in navbar -->
-			<div id="sayit-search" class="sayit-search" role="search">
-				<div class="sayit-search__row">
-					<div class="sayit-search__input-wrap">
-						<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
-						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
-					</div>
-					<button type="button" class="sayit-search__submit" aria-label="Search">
-						<span aria-hidden="true">✨</span>
-					</button>
-				</div>
+		<Navbar />
+		<main id="main-content" class="full-page">
+			<div class="sayit-ask-overlay">
+				<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
 			</div>
-		</Navbar>
-		<div class="sayit-ask-overlay">
-		<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
-		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden></button>
-		<div class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit">
 					<div class="page-header">
-						<h1><span lang="zh">對話</span><span lang="en">Speeches</span></h1>
+						<h1><span lang="zh">對話紀錄</span><span lang="en">Recorded conversations</span></h1>
 					</div>
 					<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden>
 					</div>
@@ -77,11 +64,7 @@ const sortedSpeeches = computed(() => {
 					</ul>
 				</div>
 			</div>
-		</div>
+		</main>
 		<Footer />
 	</div>
 </template>
-
-<style scoped>
-</style>
-

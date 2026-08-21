@@ -156,10 +156,6 @@ const getSpeechUrl = (filename: string, sectionId: number) => {
   return `/${encodeURIComponent(filename)}#s${sectionId}`
 }
 
-// 生成演講頁面連結
-const getSpeechPageUrl = (sectionId: number) => {
-  return `/speech/${sectionId}`
-}
 
 // 生成演講名稱連結（不含 hash）
 const getSpeechNameUrl = (filename: string) => {
@@ -238,24 +234,12 @@ const formatLongestSectionSummary = (summary: string) => {
 <template>
 
 	<div class="page">
-		<Navbar>
-			<div id="sayit-search" class="sayit-search" role="search">
-				<div class="sayit-search__row">
-					<div class="sayit-search__input-wrap">
-						<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
-						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
-					</div>
-					<button type="button" class="sayit-search__submit" aria-label="Search">
-						<span aria-hidden="true">✨</span>
-					</button>
-				</div>
+		<Navbar />
+		<main id="main-content">
+			<div class="sayit-ask-overlay">
+				<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
 			</div>
-		</Navbar>
-		<div class="sayit-ask-overlay">
-		<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
-		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden aria-hidden="true"></button>
-		</div>
-		<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
+			<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
 		<div class="full-page" v-if="speaker">
 			<div class="full-page__row">
 				<div class="full-page__unit">
@@ -313,7 +297,7 @@ const formatLongestSectionSummary = (summary: string) => {
 					<div class="speaker-page__speeches-collection">
 						<div class="full-page__row nested-row">
 							<div class="speaker-page__speeches-title">
-								<h2><span lang="zh">發言</span><span lang="en">Speeches</span></h2>
+								<h2><span lang="zh">發言紀錄</span><span lang="en">Recorded turns</span></h2>
 							</div>
 							<div class="speaker-page__add-speech">
 							</div>
@@ -321,15 +305,13 @@ const formatLongestSectionSummary = (summary: string) => {
 								<form class="site-search site-search" action="/search/" method="get">
 									<input type="hidden" name="p" :value="speaker.id">
 									<div class="search-wrapper">
-										<input type="search" class="site-search__input" placeholder="Search this person's speeches" name="q">
-										<button type="submit" class="site-search__submit" aria-label="Search"><span aria-hidden="true">✨</span></button>
+										<input type="search" class="site-search__input" placeholder="Search this speaker’s words" name="q">
+										<button type="submit" class="site-search__submit"><span lang="zh">搜尋</span><span lang="en">Search</span></button>
 									</div>
 								</form>
 							</div>
 						</div>
-						<ul class="unstyled js-masonry"
-							data-masonry-options='{"columnWidth":".speech","itemSelector":".speech","gutter":".gutter-sizer"}'>
-							<li class="gutter-sizer"></li>
+						<ul class="unstyled speaker-appearances">
 							<li v-if="!hasSections" class="speech">
 								<span lang="zh">{{ displayName }} 尚無紀錄的發言。</span><span lang="en">{{ displayName }} has no recorded speeches yet.</span>
 							</li>
@@ -357,14 +339,6 @@ const formatLongestSectionSummary = (summary: string) => {
 											<p>{{ section.summary }}</p>
 										</div>
 									</a>
-									<div class="speech__links">
-										<a :title="`Link in context`" :href="getSpeechUrl(section.filename, section.section_id)">
-											<i class="speech-icon icon-link-in-context"></i><span lang="zh">前後文</span><span lang="en">Link in context</span>
-										</a>
-										<a :title="`Link`" :href="getSpeechPageUrl(section.section_id)">
-											<i class="speech-icon icon-link"></i><span lang="zh">連結</span><span lang="en">Link</span>
-										</a>
-									</div>
 								</div>
 							</li>
 						</ul>
@@ -407,12 +381,7 @@ const formatLongestSectionSummary = (summary: string) => {
 				</div>
 			</div>
 		</div>
+		</main>
 		<Footer />
 	</div>
 </template>
-
-<style scoped>
-	.button.pagination__page-number {
-		margin: auto .2rem;
-	}
-</style>

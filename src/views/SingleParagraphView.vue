@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { getSpeakerColor } from '../utils/speakerColor'
 import { parseContent, toPlainText } from '../utils/textUtils'
 
@@ -42,6 +43,9 @@ const previousTextPreview = props.section?.previous_content
 const nextTextPreview = props.section?.next_content
 	? toPlainText(parseContent(props.section.next_content)).slice(0, 30)
 	: '';
+const recordLanguage = computed(() =>
+	/[\u3400-\u9fff]/u.test(toPlainText(parsedContent)) ? 'zh-Hant' : 'en'
+)
 
 const getSpeakerUrl = (route_pathname: string | null) => (route_pathname ? `/speaker/${route_pathname}` : '#');
 const getSpeechUrl = (filename: string) => `/${encodeURIComponent(filename)}`;
@@ -51,30 +55,17 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 
 <template>
 	<div class="page">
-		<Navbar>
-			<div id="sayit-search" class="sayit-search" role="search">
-				<div class="sayit-search__row">
-					<div class="sayit-search__input-wrap">
-						<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
-						<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
-					</div>
-					<button type="button" class="sayit-search__submit" aria-label="Search">
-						<span aria-hidden="true">✨</span>
-					</button>
-				</div>
+		<Navbar />
+		<main id="main-content">
+			<div class="sayit-ask-overlay">
+				<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
 			</div>
-		</Navbar>
-		<div class="sayit-ask-overlay">
-		<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
-		<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden aria-hidden="true"></button>
-		</div>
-		<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
-		<div class="full-page" v-if="section">
-			<div class="full-page__row">
-				<div class="full-page__unit">
-					<div class="single-speech-layout">
-						<div class="single-speech-layout__speech-column">
-							<div class="speech speech-single-speech">
+			<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
+			<div class="full-page" v-if="section">
+				<div class="full-page__row">
+					<div class="full-page__unit">
+						<div class="single-speech-layout">
+							<article class="speech speech-single-speech" :style="{ '--speaker-color': speakerColor }">
 								<a
 									v-if="section.section_speaker"
 									class="speech-single-speech__speaker-portrait"
@@ -84,79 +75,81 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 										:src="section.photoURL || '/static/speeches/i/a.png'"
 										:style="avatarStyle"
 										:alt="section.name || ''"
-										class="speaker-portrait speaker-portrait--left round-image speaker-portrait--large"
-									/>
+										class="speaker-portrait speaker-portrait--large"
+									>
 								</a>
-								<div class="speech__meta-data">
-									<span class="speech__meta-data__speech-type"><span lang="zh">發言</span><span lang="en">Speech</span></span>
-									<span v-if="section.section_speaker && section.name">
-										<span lang="en">by</span>
+								<header class="speech__meta-data">
+									<p class="homepage-search__kicker">
+										<span lang="zh">可引用的發言段落</span><span lang="en">Citable transcript turn</span>
+									</p>
+									<h1>#{{ section.section_id }}</h1>
+									<p v-if="section.section_speaker && section.name">
+										<span lang="zh">講者：</span><span lang="en">Speaker: </span>
 										<span class="speech__meta-data__speaker-name">
 											<a :href="getSpeakerUrl(section.section_speaker)">{{ section.name }}</a>
 										</span>
-									</span>
-								</div>
-								<div class="speech__content speech__content-single-speech" v-html="parsedContent"></div>
-								<ul class="breadcrumbs" v-if="section.filename">
-									<li>
-										<a :href="getSpeechUrl(section.filename)">
-											{{ section.display_name }}
-										</a>
-									</li>
-								</ul>
-								<div class="speech__links" v-if="section.filename && section.section_id">
+									</p>
+								</header>
+								<div
+									class="speech__content speech__content-single-speech record-copy"
+									:lang="recordLanguage"
+									v-html="parsedContent"
+								></div>
+								<nav class="speech__links" aria-label="Turn actions">
 									<a :href="getContextUrl(section.filename, section.section_id)">
-										<i class="speech-icon icon-link-in-context"></i><span lang="zh">顯示前後文</span><span lang="en">Show context</span>
+										<template v-if="recordLanguage === 'zh-Hant'">查看前後文</template>
+										<template v-else>View context</template>
 									</a>
-								</div>
-							</div>
-							<div class="speech-navigation">
-								<div class="speech-navigation__column speech-navigation__column--one">
-									<a
-										v-if="section.previous_section_id"
-										:href="getParagraphUrl(section.previous_section_id)"
-										class="button speech-navigation__button"
+									<button
+										type="button"
+										class="button button--secondary"
+										data-sayit-share
+										:data-share-url="getContextUrl(section.filename, section.section_id)"
+										:data-share-title="section.display_name"
 									>
-										<template v-if="previousTextPreview">
-											← {{ previousTextPreview }}...
-										</template>
-										<template v-else>
-											← （...
-										</template>
-									</a>
-									<a
-										v-if="section.next_section_id"
-										:href="getParagraphUrl(section.next_section_id)"
-										class="button speech-navigation__button"
-									>
-										<template v-if="nextTextPreview">
-											{{ nextTextPreview }}... →
-										</template>
-										<template v-else>
-											（... →
-										</template>
-									</a>
-								</div>
-								<div class="speech-navigation__column speech-navigation__column--two">
-									<div
-										class="ui-instructions"
-										id="keyboard-shortcuts"
-										:data-prev-url="section.previous_section_id ? getParagraphUrl(section.previous_section_id) : ''"
-										:data-next-url="section.next_section_id ? getParagraphUrl(section.next_section_id) : ''"
-									>
-										<h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2>
-										<p>
-											<span class="key-descriptor">j</span> <span lang="zh">下一段</span><span lang="en">next speech</span>
-											<span class="key-descriptor">k</span> <span lang="zh">上一段</span><span lang="en">previous speech</span>
-										</p>
-									</div>
-								</div>
+										<template v-if="recordLanguage === 'zh-Hant'">分享此段</template>
+										<template v-else>Share turn</template>
+									</button>
+								</nav>
+								<nav class="breadcrumbs" v-if="section.filename" aria-label="Source record">
+									<a :href="getSpeechUrl(section.filename)">{{ section.display_name }}</a>
+								</nav>
+							</article>
+							<nav class="speech-navigation" aria-label="Adjacent turns">
+								<a
+									v-if="section.previous_section_id"
+									:href="getParagraphUrl(section.previous_section_id)"
+									class="button speech-navigation__button"
+								>
+									<template v-if="previousTextPreview">← {{ previousTextPreview }}…</template>
+									<template v-else>← <span lang="zh">上一段</span><span lang="en">Previous turn</span></template>
+								</a>
+								<a
+									v-if="section.next_section_id"
+									:href="getParagraphUrl(section.next_section_id)"
+									class="button speech-navigation__button"
+								>
+									<template v-if="nextTextPreview">{{ nextTextPreview }}… →</template>
+									<template v-else><span lang="zh">下一段</span><span lang="en">Next turn</span> →</template>
+								</a>
+							</nav>
+							<div
+								class="ui-instructions"
+								id="keyboard-shortcuts"
+								:data-prev-url="section.previous_section_id ? getParagraphUrl(section.previous_section_id) : ''"
+								:data-next-url="section.next_section_id ? getParagraphUrl(section.next_section_id) : ''"
+							>
+								<h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2>
+								<p>
+									<span class="key-descriptor">j</span> <span lang="zh">下一段</span><span lang="en">next turn</span>
+									<span class="key-descriptor">k</span> <span lang="zh">上一段</span><span lang="en">previous turn</span>
+								</p>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
+		</main>
 		<Footer />
 	</div>
 </template>

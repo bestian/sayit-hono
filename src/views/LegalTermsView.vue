@@ -1,11 +1,11 @@
 <template>
 	<div class="page">
 		<Navbar />
-		<div class="full-page">
+		<main id="main-content" class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit legal-page">
 					<h1><span lang="zh">使用條款</span><span lang="en">Terms of Use</span></h1>
-					<section class="legal-page__section" aria-labelledby="terms-zh">
+					<section class="legal-page__section" lang="zh" aria-labelledby="terms-zh">
 						<h2 id="terms-zh"><span lang="zh">華語</span></h2>
 						<div lang="zh">
 							<p>我們歡迎您以好奇、善意與負責任的方式使用本站的 AI 提問與搜尋功能，探索唐鳳的公開談話、引用有出處的內容，並與更多人分享公共知識。</p>
@@ -18,7 +18,7 @@
 							<p>如有惡意使用、誤導性使用或其他不當使用情事，我們保留法律追訴權。</p>
 						</div>
 					</section>
-					<section class="legal-page__section legal-page__section--alt" aria-labelledby="terms-en">
+					<section class="legal-page__section legal-page__section--alt" lang="en" aria-labelledby="terms-en">
 						<h2 id="terms-en"><span lang="en">English</span></h2>
 						<div lang="en">
 							<p>We welcome you to use this site’s AI question and search features with curiosity, goodwill, and responsibility: explore Audrey Tang's public talks, cite sourced content, and share public knowledge with others.</p>
@@ -38,44 +38,7 @@
 					</nav>
 				</div>
 			</div>
-		</div>
+		</main>
 		<Footer />
 	</div>
 </template>
-
-<script setup lang="ts">
-</script>
-
-<style scoped>
-.legal-page {
-	max-width: 760px;
-	padding: 2rem 0 3rem;
-	line-height: 1.7;
-}
-.legal-page h1 {
-	margin: 0 0 1.5rem;
-	font-size: clamp(1.75rem, 4vw, 2.5rem);
-}
-.legal-page__section h2 {
-	margin: 2rem 0 0.75rem;
-	font-size: 1.25rem;
-}
-.legal-page__section p {
-	margin: 0 0 1rem;
-}
-.legal-page__section--alt {
-	padding-top: 1.75rem;
-	border-top: 1px solid rgba(0, 0, 0, 0.12);
-}
-.legal-page__nav {
-	margin-top: 2rem;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 1rem;
-}
-@media (prefers-color-scheme: dark) {
-	.legal-page__section--alt {
-		border-color: rgba(255, 255, 255, 0.15);
-	}
-}
-</style>

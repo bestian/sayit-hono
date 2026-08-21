@@ -70,9 +70,15 @@ export default defineConfig(({ command, isPreview }) => ({
 			},
 		],
 	},
-	plugins: lazyPlugins(() =>
-		command === 'serve' && !isPreview ? [localAsk(askPort), cloudflare(), sfcSsrPlugin()] : [cloudflare(), sfcSsrPlugin()],
-	),
+	plugins: lazyPlugins(() => {
+		const workerPlugins = [
+			cloudflare({
+				persistState: process.env.CLOUDFLARE_ENV === 'prod-data' ? { path: '.wrangler/prod-data-preview' } : true,
+			}),
+			sfcSsrPlugin(),
+		];
+		return command === 'serve' && !isPreview ? [localAsk(askPort), ...workerPlugins] : workerPlugins;
+	}),
 	server: {
 		open: '/speeches/',
 		proxy: {

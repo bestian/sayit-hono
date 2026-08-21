@@ -9,3 +9,8 @@ declare module '*.vue' {
 	export const styles: string;
 	export default component;
 }
+
+declare module '*?raw' {
+	const content: string;
+	export default content;
+}

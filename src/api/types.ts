@@ -5,5 +5,6 @@ export type ApiEnv = {
 		SPEECH_CACHE: R2Bucket;
 		AUDREYT_TRANSCRIPT_TOKEN?: string;
 		BESTIAN_TRANSCRIPT_TOKEN?: string;
+		PROD_DATA_ORIGIN?: string;
 	};
 };
