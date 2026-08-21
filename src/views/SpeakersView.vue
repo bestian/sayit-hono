@@ -22,16 +22,16 @@ const colorStyle = (route: string, name?: string) => {
 <template>
 	<div class="page">
 		<Navbar />
-		<div class="full-page">
+		<main id="main-content" class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit">
 					<div class="page-header">
-						<h1><span lang="zh">所有講者</span><span lang="en">All Speakers</span></h1>
+						<h1><span lang="zh">講者索引</span><span lang="en">Speaker index</span></h1>
 					</div>
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
 						<div class="search-wrapper">
-							<input type="search" class="site-search__input" placeholder="Search" name="q" />
-							<button type="submit" class="site-search__submit" aria-label="Search"><span aria-hidden="true">✨</span></button>
+							<input type="search" class="site-search__input" placeholder="Search speakers or exact words" name="q" />
+							<button type="submit" class="site-search__submit"><span lang="zh">搜尋</span><span lang="en">Search</span></button>
 						</div>
 					</form>
 					<ul class="speaker-list">
@@ -49,7 +49,7 @@ const colorStyle = (route: string, name?: string) => {
 					</ul>
 				</div>
 			</div>
-		</div>
+		</main>
 		<Footer />
 	</div>
 </template>

@@ -15,33 +15,33 @@ describe('heads nullish / edge branches', () => {
 	});
 
 	it('headForSingleSpeech handles missing displayName gracefully', () => {
-		const head = headForSingleSpeech(null as any, 'f');
-		expect(head.title).toContain('View Section');
+		const head = headForSingleSpeech(null, 'f');
+		expect(head.title).toContain('Untitled record');
 	});
 
 	it('headForSpeaker handles empty routePathname', () => {
 		const head = headForSpeaker('');
-		expect(head.title).toContain('View Speaker');
+		expect(head.title).toContain('Unknown speaker');
 	});
 
 	it('headForSpeaker handles null routePathname', () => {
-		const head = headForSpeaker(null as any);
-		expect(head.title).toContain('View Speaker');
+		const head = headForSpeaker(null);
+		expect(head.title).toContain('Unknown speaker');
 	});
 
 	it('headForSpeechContent accepts null title and empty html', () => {
-		const head = headForSpeechContent(null as any, 1, '');
-		expect(head.title).toContain(':: SayIt');
-		expect(head.meta?.some((m) => m.property === 'og:description')).toBe(false);
+		const head = headForSpeechContent(null, 1, '');
+		expect(head.title).toContain('Turn 1');
+		expect(head.meta?.some((m) => m.property === 'og:description')).toBe(true);
 	});
 
 	it('headForNestedSpeech handles null displayName', () => {
-		const head = headForNestedSpeech(null as any, 'f');
-		expect(head.title).toContain('View Section');
+		const head = headForNestedSpeech(null, 'f');
+		expect(head.title).toContain('Untitled record');
 	});
 
 	it('headForNestedSpeechDetail handles null nestDisplayName', () => {
-		const head = headForNestedSpeechDetail(null as any, 'f');
-		expect(head.title).toContain('View Section');
+		const head = headForNestedSpeechDetail(null, 'f', 'child');
+		expect(head.title).toContain('Untitled record');
 	});
 });

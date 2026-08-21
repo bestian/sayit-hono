@@ -145,7 +145,7 @@ export async function renderSpeakerPage(c: SpeakerPageContext): Promise<Response
 		styles,
 		components: { Navbar, Footer },
 		props: { initialSpeaker: speaker, routePathname: speaker.route_pathname },
-		scripts: ['<script src="/static/speeches/js/masonry.pkgd.min.js"></script>', PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
+		scripts: [PAGEFIND_SCRIPT, twitterScript].filter(Boolean).join('\n'),
 	});
 
 	const response = withCacheHeaders(c.html(html), DEFAULT_HTML_CACHE_CONTROL, [tags.speaker(routePathname)]);

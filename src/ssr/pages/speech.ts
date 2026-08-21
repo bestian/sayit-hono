@@ -273,9 +273,9 @@ export async function renderNestedSpeechPage(c: NestedSpeechPageContext): Promis
 	}));
 	const alternate = await loadAlternateInfo(c, filename);
 	const styles = [SingleNestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
-	const head = headForNestedSpeechDetail(nestDisplayName, filename);
+	const head = headForNestedSpeechDetail(nestDisplayName, filename, nestFilename);
 	if (alternate) {
-		head.links = [{ rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+		head.links = [...(head.links ?? []), { rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 	}
 
 	const hasSiblingNav = siblings.length > 0;
@@ -420,7 +420,7 @@ export async function renderSpeechPage(c: SpeechPageContext): Promise<Response> 
 		const styles = [NestedSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 		const head = headForNestedSpeech(speechMeta.display_name ?? filename, filename);
 		if (alternate) {
-			head.links = [{ rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+			head.links = [...(head.links ?? []), { rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 		}
 
 		const html = await renderHtml(NestedSpeechView, {
@@ -496,7 +496,7 @@ export async function renderSpeechPage(c: SpeechPageContext): Promise<Response> 
 	const styles = [SingleSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n');
 	const head = headForSingleSpeech(displayName, filename);
 	if (alternate) {
-		head.links = [{ rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
+		head.links = [...(head.links ?? []), { rel: 'alternate', href: `https://archive.tw${alternate.url}`, hreflang: alternate.hreflang }];
 	}
 
 	const twitterScript = hasTwitterEmbed(sections.map((s: Section) => s.section_content)) ? TWITTER_WIDGETS_SCRIPT : '';

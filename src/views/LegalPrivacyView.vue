@@ -1,11 +1,11 @@
 <template>
 	<div class="page">
 		<Navbar />
-		<div class="full-page">
+		<main id="main-content" class="full-page">
 			<div class="full-page__row">
 				<div class="full-page__unit legal-page">
 					<h1><span lang="zh">隱私權政策</span><span lang="en">Privacy Policy</span></h1>
-					<section class="legal-page__section" aria-labelledby="privacy-zh">
+					<section class="legal-page__section" lang="zh" aria-labelledby="privacy-zh">
 						<h2 id="privacy-zh"><span lang="zh">華語</span></h2>
 						<div lang="zh">
 							<p>我們希望本站 AI 提問功能能成為友善、開放、可持續的公共知識入口，讓更多人安心提問、分享與學習。</p>
@@ -16,7 +16,7 @@
 							<p>本服務依 Cloudflare Workers 等基礎設施的運作機制接收必要的請求資訊。除為提供服務、維護安全、防止濫用或依法所需外，我們不會主動蒐集或留存其他可識別您的個人資料。</p>
 						</div>
 					</section>
-					<section class="legal-page__section legal-page__section--alt" aria-labelledby="privacy-en">
+					<section class="legal-page__section legal-page__section--alt" lang="en" aria-labelledby="privacy-en">
 						<h2 id="privacy-en"><span lang="en">English</span></h2>
 						<div lang="en">
 							<p>We hope the AI question feature on this site can serve as a friendly, open, and sustainable public knowledge gateway where people can ask, share, and learn with confidence.</p>
@@ -34,44 +34,7 @@
 					</nav>
 				</div>
 			</div>
-		</div>
+		</main>
 		<Footer />
 	</div>
 </template>
-
-<script setup lang="ts">
-</script>
-
-<style scoped>
-.legal-page {
-	max-width: 760px;
-	padding: 2rem 0 3rem;
-	line-height: 1.7;
-}
-.legal-page h1 {
-	margin: 0 0 1.5rem;
-	font-size: clamp(1.75rem, 4vw, 2.5rem);
-}
-.legal-page__section h2 {
-	margin: 2rem 0 0.75rem;
-	font-size: 1.25rem;
-}
-.legal-page__section p {
-	margin: 0 0 1rem;
-}
-.legal-page__section--alt {
-	padding-top: 1.75rem;
-	border-top: 1px solid rgba(0, 0, 0, 0.12);
-}
-.legal-page__nav {
-	margin-top: 2rem;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 1rem;
-}
-@media (prefers-color-scheme: dark) {
-	.legal-page__section--alt {
-		border-color: rgba(255, 255, 255, 0.15);
-	}
-}
-</style>

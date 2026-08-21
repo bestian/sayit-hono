@@ -1,468 +1,81 @@
 <template>
-	<header class="full-page__row navbar">
-		<div class="full-page__unit">
-			<ul class="inline-list left">
-				<li>
-					<a href="/"><span lang="zh">首頁</span><span lang="en">Home</span></a>
-				</li>
-				<li>
-					<a href="/speakers"><span lang="zh">講者</span><span lang="en">Speakers</span></a>
-				</li>
-				<li>
-					<a href="/speeches"><span lang="zh">對話</span><span lang="en">Speeches</span></a>
-				</li>
-			</ul>
-				<div class="navbar__right">
-					<slot />
-					<button
-						type="button"
-						class="sayit-share-button"
-						data-sayit-share
-						aria-controls="sayit-share-feedback"
-					>
-						<span lang="zh">分享</span><span lang="en">Share</span>
-					</button>
-				</div>
+	<header class="site-header">
+		<a class="skip-link" href="#main-content">
+			<span lang="zh">跳到主要內容</span><span lang="en">Skip to main content</span>
+		</a>
+		<div class="site-header__inner">
+			<a class="site-brand" href="/" aria-label="SayIt home">
+				<span>SayIt</span>
+				<span class="site-brand__descriptor">
+					<span lang="zh">公開發言紀錄</span><span lang="en">Public speech archive</span>
+				</span>
+			</a>
+			<nav class="site-nav" aria-label="Primary navigation">
+				<a href="/speakers/"><span lang="zh">講者</span><span lang="en">Speakers</span></a>
+				<a href="/speeches/"><span lang="zh">對話</span><span lang="en">Speeches</span></a>
+			</nav>
+			<div class="site-header__actions">
+				<slot />
+				<form
+					v-if="showSearch"
+					id="sayit-search"
+					class="sayit-search"
+					role="search"
+					action="/search/"
+					method="get"
+				>
+					<div class="sayit-search__row">
+						<div class="sayit-search__input-wrap">
+							<input
+								id="sayit-search-input"
+								name="q"
+								type="search"
+								class="sayit-search__input"
+								autocomplete="off"
+								spellcheck="false"
+								aria-label="Search exact words, speakers, or sections"
+							>
+							<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
+						</div>
+						<button type="submit" class="sayit-search__submit">
+							<span lang="zh">搜尋</span><span lang="en">Search</span>
+						</button>
+					</div>
+				</form>
+				<button
+					v-if="showSearch"
+					type="button"
+					id="sayit-ask-submit"
+					class="homepage-ask__submit"
+					hidden
+					aria-hidden="true"
+				>
+					<span lang="zh">向典藏提問</span><span lang="en">Ask archive</span>
+				</button>
+				<button
+					type="button"
+					id="sayit-site-lang-toggle"
+					class="sayit-site-lang-toggle"
+					aria-label="Switch interface language"
+				>
+					<span lang="zh">English</span><span lang="en">華文</span>
+				</button>
+				<button
+					type="button"
+					class="sayit-share-button"
+					data-sayit-share
+					aria-controls="sayit-share-feedback"
+				>
+					<span lang="zh">分享此頁</span><span lang="en">Share page</span>
+				</button>
 			</div>
-			<div id="sayit-share-feedback" class="sayit-share-toast" aria-live="polite" aria-atomic="true" hidden></div>
-		</header>
+		</div>
+		<div id="sayit-share-feedback" class="sayit-share-toast" aria-live="polite" aria-atomic="true" hidden></div>
+	</header>
 </template>
 
-<style>
-/* Navbar layout for search slot */
-.navbar .full-page__unit {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-}
-
-.navbar__right {
-	margin-left: auto;
-	flex-shrink: 1;
-	min-width: 0;
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	flex-wrap: wrap;
-	gap: 0.5rem;
-}
-
-/* Search widget styles (shared across all pages with search) */
-.sayit-search {
-	flex: 1 1 12rem;
-	min-width: 10rem;
-	max-width: 20rem;
-	margin: 0;
-}
-
-.navbar__right .sayit-search__row {
-	align-items: center;
-}
-
-.navbar__right .sayit-search {
-	display: flex;
-	align-items: center;
-}
-
-.navbar__right > .sayit-search,
-.navbar__right > .sayit-lang-switch,
-.navbar__right > #sayit-site-lang-toggle,
-.navbar__right > .sayit-share-button {
-	align-self: center;
-}
-
-.navbar__right .sayit-search__input,
-.navbar__right .sayit-search__submit,
-.navbar__right .sayit-lang-switch,
-.navbar__right .sayit-share-button {
-	box-sizing: border-box;
-	margin: 0;
-	min-height: 2.375rem;
-	height: 2.375rem;
-}
-
-.navbar__right .sayit-lang-switch,
-.navbar__right #sayit-site-lang-toggle,
-.navbar__right .sayit-share-button {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	padding: 0 0.95em;
-	line-height: 1.2;
-}
-
-.navbar__right .sayit-search__submit {
-	width: 2.375rem;
-	padding: 0;
-	flex-shrink: 0;
-}
-
-.navbar__right .sayit-search__input {
-	padding-top: 0;
-	padding-bottom: 0;
-	line-height: 1.35;
-}
-
-
-@media (max-width: 580px) {
-	.sayit-search {
-		width: 100%;
-		margin-top: 0.4em;
-	}
-
-	.navbar__right {
-		width: 100%;
-	}
-}
-
-.sayit-search__input-wrap {
-	position: relative;
-	max-width: 100%;
-}
-
-.sayit-search__input {
-	display: block;
-	width: 100%;
-	padding: 0.45em 0.8em;
-	padding-right: 2.4em;
-	font-family: 'Noto Sans TC', sans-serif;
-	font-size: 0.9em;
-	font-weight: 400;
-	line-height: 1.5;
-	color: #2c2c2c;
-	background: #fafaf8;
-	border: 1.5px solid #d4d0c8;
-	border-radius: 6px;
-	outline: none;
-	transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-	box-sizing: border-box;
-	-webkit-appearance: none;
-}
-
-.sayit-search__input::placeholder {
-	color: #9e998e;
-	font-weight: 300;
-}
-
-.sayit-search__input:focus {
-	border-color: #8b7e6a;
-	background: #fff;
-	box-shadow: 0 0 0 3px rgba(139, 126, 106, 0.1);
-}
-
-.sayit-search__input::-webkit-search-decoration,
-.sayit-search__input::-webkit-search-cancel-button {
-	-webkit-appearance: none;
-}
-
-
-.sayit-search__shortcut {
-	position: absolute;
-	right: 0.8em;
-	top: 38%;
-	transform: translateY(-50%);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 1.6em;
-	height: 1.6em;
-	font-family: monospace, 'Noto Sans TC', sans-serif;
-	font-size: 0.8em;
-	font-weight: 500;
-	color: #a09888;
-	background: #eeedea;
-	border: 1px solid #d8d4cc;
-	border-radius: 4px;
-	pointer-events: none;
-	transition: opacity 0.25s ease;
-}
-
-.full-page__row.navbar .sayit-search__shortcut {
-	top: 50% !important;
-}
-
-@media (hover: none) {
-	.sayit-search__shortcut {
-		display: none;
-	}
-}
-
-.sayit-search__results {
-	margin-top: 0.4em;
-	overflow: hidden;
-	max-width: 71.25em;
-	margin-left: auto;
-	margin-right: auto;
-	padding-left: .75em;
-	padding-right: .75em;
-}
-
-.sayit-search__results[hidden] {
-	display: none;
-}
-
-.sayit-search__results-inner {
-	animation: sayit-fade-in 0.2s ease;
-}
-
-.sayit-search__status {
-	padding: 0.7em 0;
-	font-size: 0.85em;
-	color: #9e998e;
-	font-weight: 300;
-	letter-spacing: 0.01em;
-}
-
-.sayit-search__result-group {
-	padding: 0.85em 0.5em;
-	margin: 0 -0.5em;
-	border-bottom: 1px solid #eeedea;
-	border-radius: 4px;
-}
-
-.sayit-search__result-group:last-child {
-	border-bottom: none;
-}
-
-.sayit-search__result-title {
-	display: block;
-	font-size: 1em;
-	font-weight: 500;
-	color: #2c2c2c;
-	line-height: 1.45;
-	margin: 0;
-	word-break: break-word;
-	text-decoration: none;
-}
-
-.sayit-search__result-title:hover {
-	color: #3a7d5c;
-}
-
-.sayit-search__result-meta {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.5em;
-	margin-top: 0.2em;
-	font-size: 0.8em;
-	color: #a09888;
-	font-weight: 400;
-}
-
-.sayit-search__result-section {
-	display: block;
-	text-decoration: none;
-	color: inherit;
-	margin-top: 0.35em;
-	padding: 0.3em 0.6em;
-	border-left: 2px solid #e0ddd6;
-	border-radius: 0 3px 3px 0;
-	transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.sayit-search__result-section:hover {
-	border-left-color: #3a7d5c;
-	background: #f5f4f0;
-}
-
-.sayit-search__result-speaker {
-	display: block;
-	font-size: 0.78em;
-	color: #a09888;
-	font-weight: 400;
-	margin-bottom: 0.1em;
-}
-
-.sayit-search__result-excerpt {
-	font-size: 0.88em;
-	line-height: 1.65;
-	color: #5a5650;
-	font-weight: 400;
-	word-break: break-word;
-	overflow-wrap: break-word;
-}
-
-.sayit-search__result-excerpt mark {
-	background: rgba(201, 180, 120, 0.3);
-	color: inherit;
-	padding: 0.05em 0.15em;
-	border-radius: 2px;
-	font-weight: 500;
-}
-
-.sayit-search__sub-results {
-	margin-top: 0.35em;
-	display: flex;
-	flex-direction: column;
-	gap: 0.3em;
-}
-
-.sayit-search__sub-result {
-	display: block;
-	text-decoration: none;
-	color: inherit;
-	padding: 0.3em 0.5em;
-	border-left: 2px solid #e0ddd6;
-	border-radius: 0 3px 3px 0;
-	transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.sayit-search__sub-result:hover {
-	border-left-color: #8b7e6a;
-	background: #faf9f6;
-}
-
-.sayit-search__sub-result-excerpt {
-	font-size: 0.85em;
-	line-height: 1.6;
-	color: #5a5650;
-	word-break: break-word;
-	overflow-wrap: break-word;
-}
-
-.sayit-search__sub-result-excerpt mark {
-	background: rgba(201, 180, 120, 0.3);
-	color: inherit;
-	padding: 0.05em 0.15em;
-	border-radius: 2px;
-	font-weight: 500;
-}
-
-.sayit-search__loading {
-	display: flex;
-	align-items: center;
-	gap: 0.6em;
-	padding: 0.8em 0;
-	font-size: 0.85em;
-	color: #9e998e;
-	font-weight: 300;
-}
-
-.sayit-search__spinner {
-	width: 0.9em;
-	height: 0.9em;
-	border: 1.5px solid #e0ddd6;
-	border-top-color: #8b7e6a;
-	border-radius: 50%;
-	animation: sayit-spin 0.6s linear infinite;
-}
-
-button.sayit-search__more {
-	/* Reset Foundation button styles */
-	display: block;
-	width: 100%;
-	margin: 1em 0 0.25em;
-	padding: 0.7em 1.5em;
-	font-family: 'Noto Sans TC', sans-serif;
-	font-size: 0.85em;
-	font-weight: 400;
-	letter-spacing: 0.02em;
-	color: #6b6357;
-	background: transparent;
-	border: 1.5px solid #d4d0c8;
-	border-radius: 6px;
-	cursor: pointer;
-	text-align: center;
-	text-decoration: none;
-	transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
-	-webkit-appearance: none;
-	appearance: none;
-}
-
-button.sayit-search__more:hover,
-button.sayit-search__more:focus {
-	color: #3a7d5c;
-	border-color: #3a7d5c;
-	background: rgba(58, 125, 92, 0.04);
-	text-decoration: none;
-}
-
-button.sayit-search__more:active {
-	background: rgba(58, 125, 92, 0.08);
-}
-
-.sayit-share-button {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	box-sizing: border-box;
-	margin: 0;
-	padding: 0.45em 0.95em;
-	font-family: 'Noto Sans TC', sans-serif;
-	font-size: 0.9em;
-	font-weight: 500;
-	line-height: 1.5;
-	color: var(--sayit-share-text, #2c2c2c);
-	background: var(--sayit-share-bg, #f5f2eb);
-	border: 1.5px solid var(--sayit-share-border, #d4d0c8);
-	border-radius: 999px;
-	box-shadow: 0 1px 2px rgba(44, 44, 44, 0.06);
-	cursor: pointer;
-	transition:
-		border-color 0.2s ease,
-		box-shadow 0.2s ease,
-		background 0.2s ease,
-		color 0.2s ease,
-		transform 0.2s ease;
-	-webkit-appearance: none;
-}
-
-.sayit-share-button:hover,
-.sayit-share-button:focus-visible {
-	color: var(--sayit-share-text, #2c2c2c);
-	background: var(--sayit-share-bg-hover, #fff);
-	border-color: var(--sayit-share-border-strong, #8b7e6a);
-	box-shadow: 0 0 0 3px rgba(139, 126, 106, 0.1);
-	outline: none;
-}
-
-.sayit-share-button:active {
-	transform: translateY(1px);
-}
-
-.sayit-share-toast {
-	position: fixed;
-	left: 50%;
-	bottom: 1.25rem;
-	z-index: 1100;
-	padding: 0.75rem 1rem;
-	border-radius: 999px;
-	font-family: 'Noto Sans TC', sans-serif;
-	font-size: 0.9rem;
-	line-height: 1.4;
-	color: var(--sayit-share-toast-text, #fffaf4);
-	background: var(--sayit-share-toast-bg, rgba(34, 29, 24, 0.94));
-	box-shadow: 0 16px 32px rgba(34, 29, 24, 0.16);
-	transform: translate(-50%, 8px);
-	opacity: 0;
-	pointer-events: none;
-	transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.sayit-share-toast.is-visible {
-	opacity: 1;
-	transform: translate(-50%, 0);
-}
-
-@keyframes sayit-spin {
-	to { transform: rotate(360deg); }
-}
-
-@keyframes sayit-fade-in {
-	from { opacity: 0; transform: translateY(-4px); }
-	to { opacity: 1; transform: translateY(0); }
-}
-
-@media (max-width: 640px) {
-	.sayit-search__input {
-		font-size: 16px;
-	}
-}
-
-.navbar .navbar__right button,
-.navbar .navbar__right input.sayit-search__input {
-	margin: 0 !important;
-}
-
-</style>
+<script setup lang="ts">
+withDefaults(defineProps<{ showSearch?: boolean }>(), {
+	showSearch: true,
+});
+</script>

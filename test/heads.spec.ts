@@ -16,42 +16,48 @@ import {
 describe('heads', () => {
 	it('headForHome includes base OG tags', () => {
 		const head = headForHome();
-		expect(head.title).toContain('Home');
+		expect(head.title).toBe('SayIt — Public speech archive');
 		const properties = head.meta?.map((m) => m.property);
 		expect(properties).toEqual(expect.arrayContaining(['og:title', 'og:description', 'og:image']));
 	});
 
 	it('headForPrivacy/headForTerms expose legal page titles and descriptions', () => {
 		const privacy = headForPrivacy();
-		expect(privacy.title).toBe(' Privacy Policy :: SayIt ');
+		expect(privacy.title).toBe('Privacy Policy — SayIt');
 		expect(privacy.meta).toEqual(
 			expect.arrayContaining([
-				{ property: 'og:title', content: 'Privacy Policy' },
-				{ property: 'og:description', content: 'Privacy policy for AI questions on SayIt.' },
+				{ property: 'og:title', content: 'Privacy Policy — SayIt' },
+				{
+					property: 'og:description',
+					content: 'How Ask archive handles questions, security data, and personal information.',
+				},
 			]),
 		);
 		expect(privacy.meta?.some((m) => m.property === 'og:image')).toBe(true);
 
 		const terms = headForTerms();
-		expect(terms.title).toBe(' Terms of Use :: SayIt ');
+		expect(terms.title).toBe('Terms of Use — SayIt');
 		expect(terms.meta).toEqual(
 			expect.arrayContaining([
-				{ property: 'og:title', content: 'Terms of Use' },
-				{ property: 'og:description', content: 'Terms of use for AI questions on SayIt.' },
+				{ property: 'og:title', content: 'Terms of Use — SayIt' },
+				{
+					property: 'og:description',
+					content: 'Terms for searching the public record and using AI synthesis on SayIt.',
+				},
 			]),
 		);
 		expect(terms.meta?.some((m) => m.property === 'og:image')).toBe(true);
 	});
 
 	it('headForSpeakers/headForSpeeches return stable titles', () => {
-		expect(headForSpeakers().title).toContain('All Speakers');
-		expect(headForSpeeches().title).toContain('Speeches');
+		expect(headForSpeakers().title).toBe('Speaker index — SayIt');
+		expect(headForSpeeches().title).toBe('Recorded conversations — SayIt');
 	});
 
 	it('headForSearch uses fallback title when query is empty', () => {
 		expect(headForSearch('').title).toContain('Search');
 		expect(headForSearch('').title).not.toContain(': ::');
-		expect(headForSearch('foo').title).toContain('Search: foo');
+		expect(headForSearch('foo').title).toBe('foo — Search the record — SayIt');
 	});
 
 	it('headForSingleSpeech points og:image to the per-speech PNG', () => {
@@ -72,12 +78,12 @@ describe('heads', () => {
 		expect(withHtml.meta?.some((m) => m.property === 'og:description' && m.content === 'Hello world')).toBe(true);
 
 		const withoutHtml = headForSpeechContent('”Hi”', 42);
-		expect(withoutHtml.meta?.some((m) => m.property === 'og:description')).toBe(false);
+		expect(withoutHtml.meta?.some((m) => m.property === 'og:description')).toBe(true);
 	});
 
 	it('headForNestedSpeech and headForNestedSpeechDetail wire og:image to the parent filename', () => {
 		const nest = headForNestedSpeech('Parent', '2026-02-parent');
-		const detail = headForNestedSpeechDetail('Child', '2026-02-parent');
+		const detail = headForNestedSpeechDetail('Child', '2026-02-parent', 'child');
 		const nestImage = nest.meta?.find((m) => m.property === 'og:image');
 		const detailImage = detail.meta?.find((m) => m.property === 'og:image');
 		expect(nestImage?.content).toBe('https://archive.tw/og/2026-02-parent.png');

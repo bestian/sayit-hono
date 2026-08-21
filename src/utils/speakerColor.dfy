@@ -20,9 +20,9 @@ function JSRem(a: int, b: int): int
 
 function MathAbs(x: int): nat { if x >= 0 then x else -x }
 
-const LEGACY_PALETTE: seq<string> := ["#9c4f2d", "#9bcd6c", "#e10dec", "#434202", "#60396c", "#5fd36d", "#0a13a1", "#457127", "#619b7f", "#639d67", "#6f13dd", "#88547b", "#eb5d10", "#f0990a", "#c512b2", "#d47733", "#b17656", "#4d89d2"]
+const SPEAKER_PALETTE: seq<string> := ["#1d6775", "#355d8c", "#6b508a", "#8a4b66", "#975143", "#7a6224", "#42704c", "#4e6670"]
 
-const speakerColorPalette: seq<string> := LEGACY_PALETTE
+const speakerColorPalette: seq<string> := SPEAKER_PALETTE
 
 method hashString(value: string) returns (res: int)
   ensures (res >= 0)
@@ -39,9 +39,9 @@ method hashString(value: string) returns (res: int)
 }
 
 method getSpeakerColor(key: Option<string>) returns (res: string)
-  ensures (res in LEGACY_PALETTE)
+  ensures (res in SPEAKER_PALETTE)
 {
-  var palette := LEGACY_PALETTE;
+  var palette := SPEAKER_PALETTE;
   match key {
     case Some(i_key_val) =>
       if (|i_key_val| > 0) {

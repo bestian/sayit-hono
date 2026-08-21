@@ -94,6 +94,35 @@
 				"process.env": "{}",
 				"process": "{\"env\":{}}"
 			}
+		},
+		/**
+		 * Local UI preview synchronized from archive.tw's public read APIs.
+		 * D1 and R2 stay isolated locally; this environment never writes production.
+		 * Start only through `bun run dev:prod-data`; never deploy this env.
+		 */
+		"prod-data": {
+			"name": "sayit-hono-prod-data-preview",
+			"compatibility_date": "2026-07-07",
+			"cache": {
+				"enabled": true
+			},
+			"vars": {
+				"PROD_DATA_ORIGIN": "https://archive.tw"
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "sayit-database",
+					"database_id": "309347b7-de29-4d0f-b755-55d2638defc9"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "SPEECH_CACHE",
+					"bucket_name": "sayit-speech-cache-preview"
+				}
+			],
+			"assets": { "directory": "./public/", "binding": "ASSETS" }
 		}
 	},
 	/**

@@ -43,6 +43,14 @@
 
 	const displaySections = computed(() => props.sections ?? []);
 
+	const recordLanguage = computed(() => {
+		const sample = displaySections.value
+			.slice(0, 8)
+			.map((section) => section.section_content)
+			.join(' ');
+		return /[\u3400-\u9fff]/u.test(sample) ? 'zh-Hant' : 'en';
+	});
+
 	const formattedTitle = computed(() => {
 		if (props.displayName) return props.displayName;
 		const firstSection = displaySections.value[0];
@@ -69,7 +77,6 @@
 	const getLinkInContextUrl = (section: Section) =>
 		`/${encodeURIComponent(section.filename)}/${encodeURIComponent(props.nestFilename)}#s${section.section_id}`;
 
-	const getSpeechPageUrl = (sectionId: number) => `/speech/${sectionId}`;
 
 	const getSpeakerUrl = (sectionSpeaker: string) => `/speaker/${sectionSpeaker}`;
 
@@ -107,8 +114,9 @@
 		return blocks;
 	});
 
-	const blockBorderStyle = (block: SpeakerBlock) =>
-		block.speaker ? { borderLeftColor: block.color } : {};
+	const blockStyle = (block: SpeakerBlock): Record<string, string> => ({
+		'--speaker-color': block.speaker ? block.color : 'var(--rule)',
+	});
 
 	const blockAvatarStyle = (block: SpeakerBlock) => ({
 		borderColor: block.color,
@@ -145,170 +153,108 @@
 	<template>
 		<div class="page">
 			<Navbar>
-			<a
-				v-if="alternateUrl && alternateLabel"
-				:href="alternateUrl"
-				class="sayit-lang-switch"
-				:aria-label="alternateLabel === 'English' ? 'Switch to English' : '切換至華文'"
-			>
-				{{ alternateLabel }}
-			</a>
-								<div id="sayit-search" class="sayit-search" role="search">
-					<div class="sayit-search__row">
-						<div class="sayit-search__input-wrap">
-								<input id="sayit-search-input" type="search" class="sayit-search__input" autocomplete="off" spellcheck="false" aria-label="Search speeches">
-								<span class="sayit-search__shortcut" id="sayit-search-shortcut" aria-hidden="true">/</span>
-						</div>
-						<button type="button" class="sayit-search__submit" aria-label="Search">
-								<span aria-hidden="true">✨</span>
-						</button>
-					</div>
-				</div>
+				<a
+					v-if="alternateUrl && alternateLabel"
+					:href="alternateUrl"
+					class="sayit-lang-switch"
+					:aria-label="alternateLabel === 'English' ? 'Open English record' : '開啟華文紀錄'"
+				>
+					<span lang="zh">開啟 {{ alternateLabel }}</span><span lang="en">Open {{ alternateLabel }}</span>
+				</a>
 			</Navbar>
-			<div class="sayit-ask-overlay">
-			<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
-			<button type="button" id="sayit-ask-submit" class="homepage-ask__submit" hidden aria-hidden="true"></button>
-			</div>
-			<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
-			<div class="full-page">
-				<div class="full-page__row">
-					<div class="full-page__unit">
-						<div class="page-header page-header--speech">
-							<ul class="breadcrumbs">
-								<li>
-									<a :href="getNestListUrl()">{{ formattedParentTitle }}</a>
-								</li>
-							</ul>
-							<h1>{{ formattedTitle }}</h1>
-						</div>
-						<div class="page-content__row" v-if="!loading">
-							<div class="primary-content__unit">
-								<ul class="section-list">
-									<li
-										v-for="block in speakerBlocks"
-										:key="`block-${block.id}`"
-										:class="[
-											'speech',
-											'speech--',
-											'speech--border',
-											block.speaker ? 'speech--with-portrait speaker-block' : ''
-										]"
-										:style="blockBorderStyle(block)"
-									>
-										<div class="speaker-portrait-wrapper" v-if="block.speaker">
-											<img
-												:src="block.photoURL || '/static/speeches/i/a.png'"
-												:alt="block.name || ''"
-												:style="blockAvatarStyle(block)"
-												class="speaker-portrait speaker-portrait--left round-image speaker-portrait--medium"
-											/>
-										</div>
-										<div class="speech__meta-data" v-if="block.speaker && block.name">
-											<span class="speech__meta-data__speaker-name">
-												<a :href="getSpeakerUrl(block.speaker)">{{ block.name }}</a>
-											</span>
-										</div>
-										<div
-											v-for="section in block.sections"
-											:key="section.section_id"
-											:id="`s${section.section_id}`"
-											class="speech-wrapper speaker-block__section"
+			<main id="main-content">
+				<div class="sayit-ask-overlay">
+					<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
+				</div>
+				<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden></div>
+				<div class="full-page">
+					<div class="full-page__row">
+						<div class="full-page__unit">
+							<header class="page-header page-header--speech">
+								<nav aria-label="Breadcrumb">
+									<ul class="breadcrumbs">
+										<li><a :href="getNestListUrl()">{{ formattedParentTitle }}</a></li>
+									</ul>
+								</nav>
+								<h1>{{ formattedTitle }}</h1>
+							</header>
+							<div class="page-content__row" v-if="!loading">
+								<div class="primary-content__unit">
+									<ol class="section-list" aria-label="Transcript turns">
+										<li
+											v-for="block in speakerBlocks"
+											:key="`block-${block.id}`"
+											class="speech speech--border speaker-block"
+											:style="blockStyle(block)"
 										>
-											<div class="speech__content" v-html="sanitizeHtmlContent(section.section_content)"></div>
-											<div class="speech__links">
-												<a :href="getLinkInContextUrl(section)" title="Link in context">
-													<i class="speech-icon icon-link-in-context"></i><span lang="zh">前後文</span><span lang="en">Link in context</span>
-												</a>
-												<a :href="getSpeechPageUrl(section.section_id)" title="Link">
-													<i class="speech-icon icon-link"></i><span lang="zh">連結</span><span lang="en">Link</span>
-												</a>
+											<div v-if="block.speaker" class="turnline__speaker">
+												<img
+													:src="block.photoURL || '/static/speeches/i/a.png'"
+													:alt="block.name || ''"
+													:style="blockAvatarStyle(block)"
+													class="speaker-portrait speaker-portrait--medium"
+												>
+												<span :id="`speaker-${block.id}`" class="turnline__speaker-name">
+													<a :href="getSpeakerUrl(block.speaker)">{{ block.name || block.speaker }}</a>
+												</span>
 											</div>
-										</div>
-									</li>
-								</ul>
-							</div>
-							<!-- close primary-content__unit -->
-							<div class="sidebar__unit section-detail-sidebar">
-								<div class="section-navigation">
-									<a
-										v-if="previousSibling"
-										class="button speech-navigation__button"
-										:href="getNestUrl(previousSibling.nest_filename)"
-										data-prev-btn
-									>
-									   ← {{ formattedPreviousSiblingTitle }}
-									</a>
-									<a
-										v-if="nextSibling"
-										class="button speech-navigation__button"
-										:href="getNestUrl(nextSibling.nest_filename)"
-										data-next-btn
-									>
-									{{ formattedNextSiblingTitle }} →
-									</a>
+											<article
+												v-for="section in block.sections"
+												:key="section.section_id"
+												:id="`s${section.section_id}`"
+												class="speech-wrapper speaker-block__section"
+												:aria-labelledby="block.speaker ? `speaker-${block.id}` : undefined"
+											>
+												<a
+													class="turnline__anchor"
+													:href="getLinkInContextUrl(section)"
+													data-sayit-share
+													:data-share-url="getLinkInContextUrl(section)"
+													:data-share-title="section.display_name"
+													:title="recordLanguage === 'zh-Hant' ? '分享此段' : 'Share turn'"
+													:aria-label="recordLanguage === 'zh-Hant' ? `分享發言段落 ${section.section_id}` : `Share turn ${section.section_id}`"
+												></a>
+												<div
+													class="speech__content record-copy"
+													:lang="recordLanguage"
+													v-html="sanitizeHtmlContent(section.section_content)"
+												></div>
+											</article>
+										</li>
+									</ol>
 								</div>
-								<div class="ui-instructions cleared">
-									<h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2>
-									<p>
-										<span class="key-descriptor">j</span> <span lang="zh">下一段</span><span lang="en">next section</span>
-										<span class="key-descriptor">k</span> <span lang="zh">上一段</span><span lang="en">previous section</span>
-									</p>
-								</div>
+								<aside class="sidebar__unit section-detail-sidebar" aria-label="Section navigation">
+									<div class="section-navigation">
+										<a
+											v-if="previousSibling"
+											class="button speech-navigation__button"
+											:href="getNestUrl(previousSibling.nest_filename)"
+											data-prev-btn
+										>
+											← {{ formattedPreviousSiblingTitle }}
+										</a>
+										<a
+											v-if="nextSibling"
+											class="button speech-navigation__button"
+											:href="getNestUrl(nextSibling.nest_filename)"
+											data-next-btn
+										>
+											{{ formattedNextSiblingTitle }} →
+										</a>
+									</div>
+									<div class="ui-instructions">
+										<h2><span lang="zh">鍵盤快捷鍵</span><span lang="en">Keyboard shortcuts</span></h2>
+										<p>
+											<span class="key-descriptor">j</span> <span lang="zh">下一段</span><span lang="en">next section</span>
+											<span class="key-descriptor">k</span> <span lang="zh">上一段</span><span lang="en">previous section</span>
+										</p>
+									</div>
+								</aside>
 							</div>
 						</div>
 					</div>
 				</div>
-			</div>
+			</main>
 			<Footer />
 		</div>
 	</template>
-
-	<style scoped>
-	.breadcrumbs {
-		margin: 0 0 0.5rem;
-	}
-	/* 同一講者連續多段時，所有 sections 共享一個 li.speaker-block：
-	   - 兩欄版面：左欄 avatar、右欄姓名與內容（mimic 原本的 .speech--with-portrait 視覺）
-	   - chrome（avatar、姓名）sticky 在整個 block 範圍內，講者切換時自然滑出。 */
-	.speaker-block {
-		display: grid;
-		grid-template-columns: 8.33% 1fr;
-		gap: 0 0.5em;
-	}
-	.speaker-block .speaker-portrait-wrapper {
-		grid-column: 1;
-		grid-row: 1 / span 99;
-		float: none;
-		position: sticky;
-		top: 0.5em;
-		align-self: start;
-		z-index: 4;
-		width: auto;
-	}
-	.speaker-block .speech__meta-data {
-		grid-column: 2;
-		grid-row: 1;
-		position: sticky;
-		top: 0;
-		z-index: 5;
-		margin: 0;
-		padding: 0.25em 0;
-		background: rgba(255, 255, 255, 0.94);
-	}
-	.speaker-block .speaker-block__section {
-		grid-column: 2;
-		scroll-margin-top: 4em;
-		/* 讓每段內的 .speech__links（position: absolute）錨在該段，而不是整個
-		   speaker-block li——否則同講者連續多段時，所有 .speech__links 會疊在
-		   block 最底部，只剩最後一段看得到 hover 連結。 */
-		position: relative;
-	}
-	.speaker-block .speaker-block__section + .speaker-block__section {
-		margin-top: 0.5em;
-	}
-	@media (prefers-color-scheme: dark) {
-		.speaker-block .speech__meta-data {
-			background: rgba(13, 19, 29, 0.92);
-		}
-	}
-	</style>
