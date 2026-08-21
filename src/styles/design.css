@@ -383,6 +383,19 @@ small,
 	transform: translateY(0);
 }
 
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
 .site-header {
 	position: sticky;
 	z-index: 50;
@@ -1976,6 +1989,25 @@ mark,
 	}
 }
 
+@media (prefers-contrast: more) {
+	:root {
+		--rule: #7c9099;
+	}
+}
+
+@media (pointer: coarse) {
+	.sayit-search__submit,
+	.sayit-site-lang-toggle,
+	.sayit-share-button,
+	.sayit-popup__close {
+		min-height: 2.75rem;
+	}
+
+	.site-nav a {
+		padding-block: var(--space-5) var(--space-4);
+	}
+}
+
 @media (forced-colors: active) {
 	.speaker-block::before,
 	.speaker-block__section::before {
@@ -1984,6 +2016,10 @@ mark,
 
 	.speaker-portrait {
 		border-color: CanvasText !important;
+	}
+
+	.sayit-search__spinner {
+		border-color: CanvasText;
 	}
 }
 
@@ -2020,7 +2056,9 @@ mark,
 	.speech-navigation,
 	.ui-instructions,
 	.pagination,
-	.sayit-share-toast {
+	.sayit-share-toast,
+	.skip-link,
+	.sayit-popup {
 		display: none !important;
 	}
 

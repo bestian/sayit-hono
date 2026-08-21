@@ -29,8 +29,9 @@ const colorStyle = (route: string, name?: string) => {
 						<h1><span lang="zh">講者索引</span><span lang="en">Speaker index</span></h1>
 					</div>
 					<form class="site-search site-search--on-results-page" action="/search/" method="get">
+						<label for="site-search-input" class="visually-hidden"><span lang="zh">搜尋講者</span><span lang="en">Search speakers</span></label>
 						<div class="search-wrapper">
-							<input type="search" class="site-search__input" placeholder="Search speakers or exact words" name="q" />
+							<input type="search" id="site-search-input" class="site-search__input" placeholder="Search speakers or exact words" name="q" />
 							<button type="submit" class="site-search__submit"><span lang="zh">搜尋</span><span lang="en">Search</span></button>
 						</div>
 					</form>
@@ -40,7 +41,8 @@ const colorStyle = (route: string, name?: string) => {
 								<div class="speaker-card">
 									<img :src="speaker.photoURL || '/static/speeches/i/a.png'"
 										:style="colorStyle(speaker.route_pathname, speaker.name)"
-										:alt="speaker.name || 'Speaker Photo'"
+										alt=""
+										loading="lazy" decoding="async"
 										class="speaker-card__portrait speaker-portrait round-image speaker-portrait--small">
 									<span class="speaker-card__name"> {{ speaker.name || 'Speaker' }}</span>
 								</div>

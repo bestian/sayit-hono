@@ -246,9 +246,9 @@ const formatLongestSectionSummary = (summary: string) => {
 					<div class="page-header page-header--with-portrait">
 						<div class="page-header__row">
 							<div class="speaker-page__details">
-								<img :src="portraitUrl" :style="`border-color: ${speakerColor}; background-color: ${speakerColor};`"
-									class="speaker-portrait speaker-portrait--left speaker-portrait--large round-image"
-									:alt="`Headshot of ${displayName}`">
+							<img :src="portraitUrl" :style="`border-color: ${speakerColor}; background-color: ${speakerColor};`"
+								class="speaker-portrait speaker-portrait--left speaker-portrait--large round-image"
+								alt="" loading="lazy" decoding="async">
 								<div class="speaker-information">
 									<h1>{{ displayName }}</h1>
 								</div>
@@ -322,7 +322,8 @@ const formatLongestSectionSummary = (summary: string) => {
 										<ul class="breadcrumbs">
 											<li>
 												<a :href="getSpeechNameUrl(section.filename)">
-													{{ section.display_name }}
+												<template v-if="/^\d{4}-\d{2}-\d{2}/.test(section.display_name)"><time :datetime="section.display_name.slice(0, 10)">{{ section.display_name.slice(0, 10) }}</time>{{ section.display_name.slice(10) }}</template>
+												<template v-else>{{ section.display_name }}</template>
 												</a>
 											</li>
 											<li class="no-content-after">

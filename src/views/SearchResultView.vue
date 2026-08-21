@@ -10,9 +10,9 @@
 			<div class="full-page__row">
 				<div class="full-page__unit">
 					<h1 class="search-title-with-result"><span lang="zh">搜尋原文</span><span lang="en">Search the record</span> / <strong>{{ query }}</strong></h1>
-					<form class="site-search site-search--on-results-page" action="/search/" method="get">
+					<form class="site-search site-search--on-results-page" role="search" action="/search/" method="get">
 						<div class="search-wrapper">
-							<input type="search" class="site-search__input" placeholder="Search exact words, speakers, or sections" name="q" :value="query" />
+							<input type="search" class="site-search__input" placeholder="Search exact words, speakers, or sections" aria-label="Search exact words, speakers, or sections" name="q" :value="query" />
 							<button type="submit" class="site-search__submit"><span lang="zh">搜尋</span><span lang="en">Search</span></button>
 						</div>
 					</form>

@@ -57,7 +57,8 @@ const sortedSpeeches = computed(() => {
 						<li v-for="speech in sortedSpeeches" :key="speech.filename">
 							<span class="section-title">
 							<a :href="`/${encodeURIComponent(speech.filename)}`">
-								{{ speech.display_name }}
+								<template v-if="extractDate(speech.display_name)"><time :datetime="extractDate(speech.display_name)">{{ extractDate(speech.display_name) }}</time>{{ speech.display_name.slice(10) }}</template>
+								<template v-else>{{ speech.display_name }}</template>
 							</a>
 							</span>
 						</li>

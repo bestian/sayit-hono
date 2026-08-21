@@ -10,7 +10,8 @@
 					<span lang="zh">公開發言紀錄</span><span lang="en">Public speech archive</span>
 				</span>
 			</a>
-			<nav class="site-nav" aria-label="Primary navigation">
+			<nav class="site-nav" aria-labelledby="site-nav-label">
+				<span id="site-nav-label" class="visually-hidden"><span lang="zh">主要導覽</span><span lang="en">Primary navigation</span></span>
 				<a href="/speakers/"><span lang="zh">講者</span><span lang="en">Speakers</span></a>
 				<a href="/speeches/"><span lang="zh">對話</span><span lang="en">Speeches</span></a>
 			</nav>
@@ -56,7 +57,7 @@
 					type="button"
 					id="sayit-site-lang-toggle"
 					class="sayit-site-lang-toggle"
-					aria-label="Switch interface language"
+					aria-label="切換介面語言 Switch interface language"
 				>
 					<span lang="zh">介面：華文</span><span lang="en">Interface: English</span>
 				</button>

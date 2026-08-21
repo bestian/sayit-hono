@@ -58,7 +58,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 				<div class="full-page__row">
 					<div class="full-page__unit">
 						<div class="single-speech-layout">
-							<article class="speech speech-single-speech" :style="{ '--speaker-color': speakerColor }">
+							<article class="speech speech-single-speech" aria-labelledby="page-title" :style="{ '--speaker-color': speakerColor }">
 								<a
 									v-if="section.section_speaker"
 									class="speech-single-speech__speaker-portrait"
@@ -75,7 +75,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 									<p class="homepage-search__kicker">
 										<span lang="zh">可引用的發言段落</span><span lang="en">Citable transcript turn</span>
 									</p>
-									<h1 :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }">#{{ section.section_id }}</h1>
+									<h1 id="page-title" :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }">#{{ section.section_id }}</h1>
 									<p v-if="section.section_speaker && section.name">
 										<span lang="zh">講者：</span><span lang="en">Speaker: </span>
 										<span class="speech__meta-data__speaker-name">
@@ -88,7 +88,8 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 									:lang="recordLanguage"
 									v-html="parsedContent"
 								></div>
-								<nav class="speech__links" aria-label="Turn actions">
+								<nav class="speech__links" aria-labelledby="turn-actions-label">
+									<span id="turn-actions-label" class="visually-hidden"><span lang="zh">逐字稿導覽</span><span lang="en">Transcript navigation</span></span>
 									<a :href="getContextUrl(section.filename, section.section_id)">
 										<template v-if="recordLanguage === 'zh-Hant'">查看前後文</template>
 										<template v-else>View context</template>
@@ -104,11 +105,13 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 										<template v-else>Share turn</template>
 									</button>
 								</nav>
-								<nav class="breadcrumbs" v-if="section.filename" aria-label="Source record">
+								<nav class="breadcrumbs" v-if="section.filename" aria-labelledby="source-record-label">
+									<span id="source-record-label" class="visually-hidden"><span lang="zh">來源逐字稿</span><span lang="en">Source record</span></span>
 									<a :href="getSpeechUrl(section.filename)">{{ section.display_name }}</a>
 								</nav>
 							</article>
-							<nav class="speech-navigation" aria-label="Adjacent turns">
+							<nav class="speech-navigation" aria-labelledby="adjacent-turns-label">
+								<span id="adjacent-turns-label" class="visually-hidden"><span lang="zh">相鄰段落</span><span lang="en">Adjacent turns</span></span>
 								<a
 									v-if="section.previous_section_id"
 									:href="getParagraphUrl(section.previous_section_id)"

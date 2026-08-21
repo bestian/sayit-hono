@@ -21,6 +21,14 @@ const isChineseRecord = computed(
 	() => props.alternateLabel === 'English' || /[\u3400-\u9fff]/u.test(props.displayName),
 );
 
+// Split a leading YYYY-MM-DD date off the page title so it can be wrapped in <time>.
+const heading = computed(() => {
+	const text = props.displayName;
+	return /^\d{4}-\d{2}-\d{2}/.test(text)
+		? { date: text.slice(0, 10), rest: text.slice(10) }
+		: { date: null, rest: text };
+});
+
 const getNestUrl = (nestFilename: string) =>
 	`/${encodeURIComponent(props.speechName)}/${encodeURIComponent(nestFilename)}`;
 </script>
@@ -38,7 +46,7 @@ const getNestUrl = (nestFilename: string) =>
 					<div class="full-page__unit">
 						<header class="page-header page-header--speech">
 							<div class="page-header__title-row">
-								<h1 :class="{ 'jf-lanyanghei-extrabold': isChineseRecord }">{{ displayName }}</h1>
+								<h1 id="page-title" :class="{ 'jf-lanyanghei-extrabold': isChineseRecord }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
 								<a
 									v-if="alternateUrl && alternateLabel"
 									:href="alternateUrl"
@@ -51,8 +59,8 @@ const getNestUrl = (nestFilename: string) =>
 							</div>
 						</header>
 						<div class="page-content__row">
-							<div class="primary-content__unit">
-								<ul class="section-list">
+							<article class="primary-content__unit" aria-labelledby="page-title">
+								<ol class="section-list">
 									<li
 										v-for="nest in nestedList"
 										:key="nest.nest_filename"
@@ -65,8 +73,8 @@ const getNestUrl = (nestFilename: string) =>
 											</a>
 										</span>
 									</li>
-								</ul>
-							</div>
+								</ol>
+							</article>
 						</div>
 					</div>
 				</div>
