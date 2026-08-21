@@ -158,15 +158,39 @@ const loading = false
 											class="speech-wrapper speaker-block__section"
 											:aria-labelledby="block.speaker ? `speaker-${block.id}` : undefined"
 										>
-											<a
-												class="turnline__anchor"
-												:href="getLinkInContextUrl(section)"
-												data-sayit-share
-												:data-share-url="getLinkInContextUrl(section)"
-												:data-share-title="section.display_name"
-												:title="recordLanguage === 'zh-Hant' ? '分享此段' : 'Share turn'"
-												:aria-label="recordLanguage === 'zh-Hant' ? `分享發言段落 ${section.section_id}` : `Share turn ${section.section_id}`"
-											></a>
+											<details class="turnline__share-menu">
+												<summary
+													class="turnline__anchor"
+													:title="recordLanguage === 'zh-Hant' ? '段落分享選項' : 'Turn sharing options'"
+													:aria-label="recordLanguage === 'zh-Hant' ? `發言段落 ${section.section_id} 的分享選項` : `Sharing options for turn ${section.section_id}`"
+												></summary>
+												<div
+													class="turnline__share-actions"
+													role="group"
+													:aria-label="recordLanguage === 'zh-Hant' ? '選擇分享方式' : 'Choose sharing mode'"
+												>
+													<button
+														type="button"
+														class="turnline__share-option"
+														data-sayit-share
+														:data-share-url="getLinkInContextUrl(section)"
+														:data-share-title="section.display_name"
+													>
+														<template v-if="recordLanguage === 'zh-Hant'">連同前後文分享</template>
+														<template v-else>Share with context</template>
+													</button>
+													<button
+														type="button"
+														class="turnline__share-option"
+														data-sayit-share
+														:data-share-url="`/speech/${section.section_id}`"
+														:data-share-title="section.display_name"
+													>
+														<template v-if="recordLanguage === 'zh-Hant'">分享單一段落</template>
+														<template v-else>Share this turn only</template>
+													</button>
+												</div>
+											</details>
 											<div
 												class="speech__content record-copy"
 												:lang="recordLanguage"
