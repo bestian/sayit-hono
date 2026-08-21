@@ -107,17 +107,7 @@ const loading = false
 
 <template>
 	<div class="page">
-		<Navbar>
-			<a
-				v-if="alternateUrl && alternateLabel"
-				:href="alternateUrl"
-				class="sayit-lang-switch"
-				:aria-label="alternateLabel === 'English' ? 'Read English transcript' : '讀華文逐字稿'"
-			>
-				<span lang="zh">{{ alternateLabel === 'English' ? '閱讀英語逐字稿' : '閱讀華文逐字稿' }}</span>
-				<span lang="en">{{ alternateLabel === 'English' ? 'Read English transcript' : 'Read 華文 transcript' }}</span>
-			</a>
-		</Navbar>
+		<Navbar />
 		<main id="main-content">
 			<div class="sayit-ask-overlay">
 				<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
@@ -127,10 +117,24 @@ const loading = false
 				<div class="full-page__row">
 					<div class="full-page__unit">
 						<header class="page-header page-header--speech">
-							<h1 v-if="!loading && displaySections.length > 0 && displaySections[0]">
-								{{ displaySections[0].display_name }}
-							</h1>
-							<h1 v-else>{{ formattedSpeechName }}</h1>
+							<div class="page-header__title-row">
+								<h1
+									v-if="!loading && displaySections.length > 0 && displaySections[0]"
+									:class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }"
+								>
+									{{ displaySections[0].display_name }}
+								</h1>
+								<h1 v-else :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }">{{ formattedSpeechName }}</h1>
+								<a
+									v-if="alternateUrl && alternateLabel"
+									:href="alternateUrl"
+									class="record-twin-button"
+									:lang="alternateLabel === 'English' ? 'en' : 'zh-Hant'"
+									:aria-label="alternateLabel === 'English' ? 'Read English transcript' : '閱讀華文逐字稿'"
+								>
+									{{ alternateLabel === 'English' ? 'English' : '華文' }}
+								</a>
+							</div>
 						</header>
 						<div class="page-content__row" v-if="!loading">
 							<div class="primary-content__unit">
@@ -193,7 +197,7 @@ const loading = false
 												</div>
 											</details>
 											<div
-												class="speech__content record-copy"
+												:class="['speech__content record-copy', recordLanguage === 'zh-Hant' ? 'jf-lanyangming-light' : '']"
 												:lang="recordLanguage"
 												v-html="sanitizeHtmlContent(section.section_content)"
 											></div>

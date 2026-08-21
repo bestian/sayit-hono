@@ -11,9 +11,8 @@ const BASE_HEAD = `<meta charset="utf-8">
   <meta property="og:site_name" content="SayIt">
   <meta property="og:type" content="website">
   <meta name="google-site-verification" content="DiXRH7TWCHjMPvi1kvFkDgwpHBGkbFkR2Rxki-iGh2o">
-  <link rel="preload" href="/static/fonts/source-sans-3-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preconnect" href="https://s3-ap-northeast-1.amazonaws.com" crossorigin>
-  <script async src="https://s3-ap-northeast-1.amazonaws.com/justfont-user-script/jf-69938697899.js"></script>`;
+  <link rel="preconnect" href="https://ds.justfont.com" crossorigin>
+  <script src="/static/speeches/js/justfont-loader.js"></script>`;
 
 const DESIGN_STYLES = `<style>${designStyles}</style>`;
 

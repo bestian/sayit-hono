@@ -52,11 +52,13 @@ export default defineConfig(({ command, isPreview }) => ({
 		// Third-party vendored static JS (unbundled, served as-is to the browser) —
 		// never a TS/type-checked module. First-party public/static/speeches/js/*
 		// glue (pagefind-search.js, select2-override.js, speeches.js,
-		// fuse-search.worker.js) stays in scope and must lint clean.
+		// fuse-search.worker.js) stays in scope and must lint clean. The
+		// Justfont dashboard loader is vendor-generated and isolated from lint.
 		ignorePatterns: [
 			'public/static/speeches/js/jquery.js',
 			'public/static/speeches/js/fuse.min.js',
 			'public/static/speeches/js/masonry.pkgd.min.js',
+			'public/static/speeches/js/justfont-loader.js',
 			'public/static/speeches/js/foundation/**',
 		],
 		options: {

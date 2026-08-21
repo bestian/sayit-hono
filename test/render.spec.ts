@@ -19,6 +19,18 @@ describe('SSR layout', () => {
 		expect(html).toContain('navigator.share');
 	});
 
+	it('uses the official local Justfont bootstrap without the failed legacy endpoint or unused font preload', async () => {
+		const html = await renderHtml(HomeView, {
+			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer },
+		});
+
+		expect(html).toContain('src="/static/speeches/js/justfont-loader.js"');
+		expect(html).toContain('href="https://ds.justfont.com"');
+		expect(html).not.toContain('s3-ap-northeast-1.amazonaws.com/justfont-user-script');
+		expect(html).not.toContain('rel="preload" href="/static/fonts/source-sans-3');
+	});
+
 	it('escapes title/meta/link values in the document head (XSS regression, see B5)', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
