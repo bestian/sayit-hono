@@ -93,6 +93,7 @@ html {
 	min-width: 20rem;
 	background: var(--paper);
 	scroll-behavior: smooth;
+	scrollbar-gutter: stable;
 	text-size-adjust: 100%;
 }
 
@@ -526,7 +527,6 @@ small,
 	font-size: 0.875rem;
 }
 
-
 .site-footer a {
 	color: inherit;
 }
@@ -738,6 +738,81 @@ button:disabled,
 .homepage-ask-answer {
 	width: min(calc(100% - 2 * var(--gutter)), 76rem);
 	margin-inline: auto;
+}
+
+body.sayit-popup-open {
+	overflow: hidden;
+}
+
+body.sayit-popup-open::before {
+	position: fixed;
+	z-index: 70;
+	inset: 0;
+	background: rgb(16 26 31 / 58%);
+	content: '';
+}
+
+.sayit-popup {
+	position: fixed !important;
+	z-index: 80 !important;
+	inset-block-start: clamp(4.75rem, 10vh, 7rem);
+	inset-block-end: var(--space-5);
+	inset-inline-start: 50%;
+	width: min(calc(100vw - 2 * var(--gutter)), 76rem) !important;
+	max-height: calc(100dvh - clamp(4.75rem, 10vh, 7rem) - var(--space-5));
+	margin: 0 !important;
+	overflow: auto;
+	overscroll-behavior: contain;
+	border: 1px solid var(--rule);
+	border-radius: 6px;
+	background: var(--sheet);
+	box-shadow: var(--dialog-shadow);
+	transform: translateX(-50%);
+}
+
+.sayit-search__results.sayit-popup:not([hidden]) {
+	padding: var(--space-4);
+}
+
+.homepage-ask-answer.sayit-popup:not([hidden]) {
+	width: min(calc(100vw - 2 * var(--gutter)), 76rem) !important;
+	margin: 0 !important;
+}
+
+.sayit-ask-overlay:has(.sayit-popup) {
+	position: static;
+	z-index: auto;
+}
+
+.sayit-popup__close {
+	position: sticky;
+	z-index: 2;
+	inset-block-start: 0;
+	display: flex;
+	min-width: 2.75rem;
+	min-height: 2.75rem;
+	align-items: center;
+	justify-content: center;
+	margin: 0 0 var(--space-3) auto;
+	padding: 0.45rem 0.75rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius);
+	background: var(--sheet);
+	color: var(--carbon);
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.sayit-popup__close:hover,
+.sayit-popup__close:focus-visible {
+	border-color: var(--index);
+	background: var(--index-wash);
+	color: var(--index-strong);
+}
+
+.sayit-popup__content {
+	min-width: 0;
+	clear: both;
 }
 
 .sayit-search__results:not([hidden]) {
@@ -1759,10 +1834,18 @@ mark,
 		flex: 1 1 100%;
 	}
 
+	.sayit-popup {
+		inset: 0;
+		width: 100% !important;
+		max-height: 100dvh;
+		border: 0;
+		border-radius: 0;
+		transform: none;
+	}
+
 	.site-header__actions .sayit-share-button {
 		flex: 0 0 auto;
 	}
-
 
 	.homepage-hero {
 		min-height: auto;

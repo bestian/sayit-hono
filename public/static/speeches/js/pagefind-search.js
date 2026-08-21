@@ -33,6 +33,9 @@
 			questionTooLong: '問題太長，請縮短到 100 字以內。',
 			fetchError: '提問服務暫時無法使用，請稍後再試。',
 			networkError: '連線發生錯誤，請稍後再試。',
+			closePopup: '關閉',
+			searchDialogLabel: '逐字稿搜尋結果',
+			aiDialogLabel: 'AI 綜整結果',
 			consentRequired: '請先同意隱私權政策和使用條款；原文搜尋仍可使用。',
 		},
 		en: {
@@ -52,6 +55,9 @@
 			questionTooLong: 'Your question is too long. Please shorten it to 100 characters or fewer.',
 			fetchError: 'The ask service is temporarily unavailable. Please try again later.',
 			networkError: 'Connection error. Please try again later.',
+			closePopup: 'Close',
+			searchDialogLabel: 'Transcript search results',
+			aiDialogLabel: 'AI synthesis result',
 			consentRequired: 'Please agree to the Privacy Policy and Terms of Use; exact search remains available.',
 		},
 	};
@@ -64,6 +70,7 @@
 		input.setAttribute('placeholder', askT.searchPlaceholder);
 		input.setAttribute('aria-label', askT.searchAriaLabel);
 		updateAskControls();
+		refreshPopupLabels();
 	}
 
 	var searchSubmitButtons = document.querySelectorAll('.sayit-search__submit');
@@ -103,6 +110,7 @@
 	var askCooldownTimer = null;
 	var askCooldownRemaining = 0;
 	var askAbortController = null;
+	var popupOpener = null;
 	function resolveAskBaseUrl() {
 		var host = window.location.hostname;
 		var isDevHost = host === 'localhost' || host === '127.0.0.1';
@@ -437,26 +445,96 @@
 		return { html: sanitizeHtml(html), sources: sources };
 	}
 
+	function refreshPopupLabels() {
+		[results, askAnswer].forEach(function (container) {
+			if (!container || !container.classList.contains('sayit-popup')) return;
+			var label = container === askAnswer ? askT.aiDialogLabel : askT.searchDialogLabel;
+			container.setAttribute('aria-label', label);
+			var close = container.querySelector('[data-sayit-popup-close]');
+			if (close) {
+				close.textContent = askT.closePopup;
+				close.setAttribute('aria-label', askT.closePopup);
+			}
+		});
+	}
+
+	function setPopupContent(container, html) {
+		if (!container) return;
+		var opening = container.hidden || !container.classList.contains('sayit-popup');
+		var closeHadFocus = container.querySelector('[data-sayit-popup-close]') === document.activeElement;
+		if (opening) {
+			popupOpener = document.activeElement instanceof HTMLElement ? document.activeElement : input;
+		}
+		var label = container === askAnswer ? askT.aiDialogLabel : askT.searchDialogLabel;
+		container.innerHTML =
+			'<button type="button" class="sayit-popup__close" data-sayit-popup-close aria-label="' +
+			escapeHtml(askT.closePopup) +
+			'">' +
+			escapeHtml(askT.closePopup) +
+			'</button><div class="sayit-popup__content">' +
+			html +
+			'</div>';
+		container.hidden = false;
+		container.classList.add('sayit-popup');
+		container.setAttribute('role', 'dialog');
+		container.setAttribute('aria-modal', 'true');
+		container.setAttribute('aria-label', label);
+		document.body.classList.add('sayit-popup-open');
+		if (opening) container.scrollTop = 0;
+		if (opening || closeHadFocus) {
+			requestAnimationFrame(function () {
+				var close = container.querySelector('[data-sayit-popup-close]');
+				if (close) close.focus({ preventScroll: true });
+			});
+		}
+	}
+
+	function closePopup(container, restoreFocus) {
+		if (!container) return;
+		container.hidden = true;
+		container.classList.remove('sayit-popup');
+		container.removeAttribute('role');
+		container.removeAttribute('aria-modal');
+		container.removeAttribute('aria-label');
+		var anotherPopup = document.querySelector('.sayit-popup:not([hidden])');
+		document.body.classList.toggle('sayit-popup-open', Boolean(anotherPopup));
+		if (restoreFocus) {
+			var target = popupOpener && popupOpener.isConnected ? popupOpener : input;
+			popupOpener = null;
+			requestAnimationFrame(function () {
+				if (target && typeof target.focus === 'function') target.focus({ preventScroll: true });
+			});
+		}
+	}
+
 	function showResults() {
 		if (!results) return;
-		results.hidden = false;
 		if (speechList) speechList.style.display = 'none';
 	}
 
-	function hideResults() {
+	function hideResults(restoreFocus) {
 		if (!results) return;
-		results.hidden = true;
+		closePopup(results, restoreFocus === true);
 		results.innerHTML = '';
 		if (speechList) speechList.style.display = '';
 		currentSearchResults = null;
 		displayedCount = 0;
 	}
 
-	function hideAskAnswer() {
+	function hideAskAnswer(restoreFocus) {
 		if (!askAnswer) return;
-		askAnswer.hidden = true;
+		closePopup(askAnswer, restoreFocus === true);
 		askAnswer.innerHTML = '';
 		lastAskMarkdown = '';
+	}
+
+	function dismissAskPopup() {
+		if (askAbortController) {
+			askAbortController.abort();
+			askAbortController = null;
+		}
+		setAskLoading(false);
+		hideAskAnswer(true);
 	}
 
 	function setAskStatus(message) {
@@ -506,7 +584,6 @@
 	function renderAskAnswer(raw, loading, error) {
 		if (!askAnswer) return;
 		bindAskCopyButton();
-		askAnswer.hidden = false;
 
 		var generatedLabel = askT.provenance;
 		if (askGeneratedAt) {
@@ -525,7 +602,7 @@
 
 		if (error) {
 			lastAskMarkdown = '';
-			askAnswer.innerHTML = header + '<p class="homepage-ask-answer__error">' + sanitizeHtml(escapeHtml(error)) + '</p>';
+			setPopupContent(askAnswer, header + '<p class="homepage-ask-answer__error">' + sanitizeHtml(escapeHtml(error)) + '</p>');
 			return;
 		}
 
@@ -533,7 +610,7 @@
 		var parsed = parseAskAnswer(raw);
 		if (!loading && parsed.sources.length === 0) {
 			lastAskMarkdown = '';
-			askAnswer.innerHTML = header + '<p class="homepage-ask-answer__error">' + escapeHtml(askT.unsourcedAnswer) + '</p>';
+			setPopupContent(askAnswer, header + '<p class="homepage-ask-answer__error">' + escapeHtml(askT.unsourcedAnswer) + '</p>');
 			return;
 		}
 
@@ -558,36 +635,42 @@
 			}
 			html += '</ol></div>';
 		}
-		askAnswer.innerHTML = html;
+		setPopupContent(askAnswer, html);
 	}
 
 	function renderLoading() {
 		showResults();
-		results.innerHTML =
+		setPopupContent(
+			results,
 			'<div class="sayit-search__loading">' +
-			'<div class="sayit-search__spinner"></div>' +
-			'<span>' + (isZh ? '搜尋中…' : 'Searching…') + '</span>' +
-			'</div>';
+				'<div class="sayit-search__spinner"></div>' +
+				'<span>' + (isZh ? '搜尋中…' : 'Searching…') + '</span>' +
+				'</div>',
+		);
 	}
 
 	function renderNoResults(query) {
 		showResults();
-		results.innerHTML =
+		setPopupContent(
+			results,
 			'<div class="sayit-search__results-inner">' +
-			'<div class="sayit-search__status">' +
-			(isZh
-				? '找不到與「' + escapeHtml(query) + '」相關的結果'
-				: 'No results for \u201c' + escapeHtml(query) + '\u201d') +
-			'</div>' +
-			'</div>';
+				'<div class="sayit-search__status">' +
+				(isZh
+					? '找不到與「' + escapeHtml(query) + '」相關的結果'
+					: 'No results for \u201c' + escapeHtml(query) + '\u201d') +
+				'</div>' +
+				'</div>',
+		);
 	}
 
 	function renderError() {
 		showResults();
-		results.innerHTML =
+		setPopupContent(
+			results,
 			'<div class="sayit-search__status">' +
-			(isZh ? '搜尋功能暫時無法使用' : 'Search is currently unavailable') +
-			'</div>';
+				(isZh ? '搜尋功能暫時無法使用' : 'Search is currently unavailable') +
+				'</div>',
+		);
 	}
 
 	function groupResults(items) {
@@ -710,7 +793,7 @@
 		}
 
 		html += '</div>';
-		results.innerHTML = html;
+		setPopupContent(results, html);
 
 		var moreBtn = document.getElementById('sayit-search-more');
 		if (moreBtn) moreBtn.addEventListener('click', loadMore);
@@ -924,7 +1007,39 @@
 		}
 	});
 
+	document.addEventListener('click', function (event) {
+		var target = event.target;
+		if (!(target instanceof Element)) return;
+		var close = target.closest('[data-sayit-popup-close]');
+		if (!close) return;
+		var popup = close.closest('.sayit-popup');
+		if (popup === results) hideResults(true);
+		else if (popup === askAnswer) dismissAskPopup();
+	});
+
 	document.addEventListener('keydown', function (e) {
+		var popup = document.querySelector('.sayit-popup:not([hidden])');
+		if (popup && e.key === 'Escape') {
+			e.preventDefault();
+			if (popup === results) hideResults(true);
+			else if (popup === askAnswer) dismissAskPopup();
+			return;
+		}
+		if (popup && e.key === 'Tab') {
+			var focusable = popup.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])');
+			if (focusable.length > 0) {
+				var first = focusable[0];
+				var last = focusable[focusable.length - 1];
+				if (e.shiftKey && (document.activeElement === first || !popup.contains(document.activeElement))) {
+					e.preventDefault();
+					last.focus();
+				} else if (!e.shiftKey && document.activeElement === last) {
+					e.preventDefault();
+					first.focus();
+				}
+			}
+			return;
+		}
 		if (e.key !== '/') return;
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
 		var tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
