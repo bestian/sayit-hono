@@ -540,7 +540,7 @@ Use plain, archival verbs:
 - **Copy link**
 - **Copy citation**
 - Title-adjacent record twin: **English** / **華文**
-- Utility-bar interface state: **介面：華文** / **Interface: English**
+- Interface control shows the **destination** language: **EN** on 華文 pages, **華文** on English pages — the switch is recognizable from either side, never the current state alone.
 
 Avoid promotional copy such as “Discover insights,” “Unlock the conversation,” or “Experience AI-powered search.” The archive is already valuable; the interface need only make it usable.
 
