@@ -230,6 +230,14 @@ small,
 	display: none !important;
 }
 
+.lang-zh .record-copy[lang='en'],
+.lang-zh .record-copy [lang='en'],
+.lang-en .record-copy[lang='zh'],
+.lang-en .record-copy[lang='zh-Hant'],
+.lang-en .record-copy [lang='zh'] {
+	display: revert !important;
+}
+
 .page {
 	display: flex;
 	min-height: 100vh;
@@ -428,6 +436,19 @@ small,
 	text-decoration: none;
 	white-space: nowrap;
 	cursor: pointer;
+}
+
+.sayit-lang-switch {
+	border-color: color-mix(in srgb, var(--index) 42%, var(--rule));
+	background: var(--index-wash);
+	color: var(--index-strong);
+	font-weight: 720;
+}
+
+.sayit-site-lang-toggle {
+	border-color: transparent;
+	color: var(--slate);
+	font-size: 0.875rem;
 }
 
 .sayit-share-button:hover,

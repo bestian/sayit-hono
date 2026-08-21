@@ -111,7 +111,7 @@ export function headForSearch(query: string): HeadSpec {
 	};
 }
 
-export function headForSingleSpeech(displayName: string | null | undefined, filename: string): HeadSpec {
+export function headForSingleSpeech(displayName: string | null | undefined, filename: string): HeadSpec & { links: LinkEntry[] } {
 	const name = displayName?.trim() || 'Untitled record';
 	return {
 		title: `${name} — SayIt`,
@@ -143,10 +143,11 @@ export function headForSpeaker(routePathname: string | null | undefined): HeadSp
 
 export function headForSpeechContent(titleText: string | null | undefined, sectionId: number, sectionHtml?: string): HeadSpec {
 	const safeTitle = titleText?.trim() || `Turn ${sectionId}`;
+	const pageTitle = titleText?.trim() ? `${safeTitle} — Turn ${sectionId} — SayIt` : `${safeTitle} — SayIt`;
 	const descText = sectionHtml ? toPlainText(sectionHtml) : '';
 	const ogImageUrl = `https://archive.tw/og/speech/${sectionId}.png`;
 	const meta: MetaEntry[] = [
-		og(`${safeTitle} — Turn ${sectionId} — SayIt`),
+		og(pageTitle),
 		{ property: 'og:image', content: ogImageUrl },
 		{ property: 'og:image:width', content: '1200' },
 		{ property: 'og:image:height', content: '630' },
@@ -159,13 +160,13 @@ export function headForSpeechContent(titleText: string | null | undefined, secti
 		meta.push(...describe(baseOgDescription));
 	}
 	return {
-		title: `${safeTitle} — Turn ${sectionId} — SayIt`,
+		title: pageTitle,
 		meta,
 		links: canonical(`/speech/${sectionId}`),
 	};
 }
 
-export function headForNestedSpeech(displayName: string | null | undefined, filename: string): HeadSpec {
+export function headForNestedSpeech(displayName: string | null | undefined, filename: string): HeadSpec & { links: LinkEntry[] } {
 	const name = displayName?.trim() || 'Untitled record';
 	return {
 		title: `${name} — SayIt`,
@@ -179,7 +180,11 @@ export function headForNestedSpeech(displayName: string | null | undefined, file
 	};
 }
 
-export function headForNestedSpeechDetail(nestDisplayName: string | null | undefined, filename: string, nestFilename: string): HeadSpec {
+export function headForNestedSpeechDetail(
+	nestDisplayName: string | null | undefined,
+	filename: string,
+	nestFilename: string,
+): HeadSpec & { links: LinkEntry[] } {
 	const name = nestDisplayName?.trim() || 'Untitled record';
 	const path = `/${encodeURIComponent(filename)}/${encodeURIComponent(nestFilename)}`;
 	return {

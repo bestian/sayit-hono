@@ -240,6 +240,8 @@ function wrapHtml(appHtml: string, { title, styles, head, scripts }: RenderOptio
   <style>
     .lang-zh [lang="en"] { display: none; }
     .lang-en [lang="zh"] { display: none; }
+    .lang-zh .record-copy[lang="en"],
+    .lang-zh .record-copy [lang="en"] { display: revert !important; }
   </style>
   <title>${headTitle}</title>
   ${metaTags}

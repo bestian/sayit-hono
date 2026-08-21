@@ -349,8 +349,9 @@ Hierarchy should usually be expressed with spacing, type, and a rule—not a con
 
 - The header is a compact finding aid, not a promotional masthead.
 - Keep the archive name, primary search entry, current section, and language twin legible at every width.
-- Use `華文` and `English` text links with correct `lang` attributes. Flags represent countries, not languages.
-- On a language twin link, preserve the conceptual destination and query where the data permits. Do not silently replace the page in place.
+- Treat **record language** and **interface language** as separate controls. The record link names its action—**閱讀英語逐字稿** / **Read 華文 transcript**—while the quieter interface control states the current mode—**介面：華文** / **Interface: English**.
+- Never use bare `華文` / `English` buttons for both axes. Use correct `lang` attributes; flags represent countries, not languages.
+- On a record-language twin link, preserve the conceptual destination and query where the data permits. Do not silently replace the page in place.
 - The active item uses weight plus a short index-blue rule; colour alone is insufficient.
 - Provide a skip link that lands at the page’s unique main heading or transcript.
 
@@ -537,7 +538,8 @@ Use plain, archival verbs:
 - **View source turn**
 - **Copy link**
 - **Copy citation**
-- **Open English** / **開啟華文版**
+- **閱讀英語逐字稿** / **Read 華文 transcript**
+- **介面：華文** / **Interface: English**
 
 Avoid promotional copy such as “Discover insights,” “Unlock the conversation,” or “Experience AI-powered search.” The archive is already valuable; the interface need only make it usable.
 
@@ -547,6 +549,7 @@ Avoid promotional copy such as “Discover insights,” “Unlock the conversati
 - Provide canonical and `hreflang` metadata for real language twins.
 - Translate interface vocabulary consistently; the same action keeps the same name through button, loading state, and confirmation.
 - Do not use flags, automatic locale assumptions, or unlabeled globe icons.
+- Switching the interface language must never hide, replace, or reinterpret the transcript’s record language.
 - Preserve names as the record presents them while exposing canonical/transliterated forms where the data supports it.
 - Localize date order and number formatting without changing stable identifiers.
 

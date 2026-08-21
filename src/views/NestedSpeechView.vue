@@ -29,9 +29,10 @@ const getNestUrl = (nestFilename: string) =>
 				v-if="alternateUrl && alternateLabel"
 				:href="alternateUrl"
 				class="sayit-lang-switch"
-				:aria-label="alternateLabel === 'English' ? 'Open English record' : '開啟華文紀錄'"
+				:aria-label="alternateLabel === 'English' ? 'Read English transcript' : '讀華文逐字稿'"
 			>
-				<span lang="zh">開啟 {{ alternateLabel }}</span><span lang="en">Open {{ alternateLabel }}</span>
+				<span lang="zh">{{ alternateLabel === 'English' ? '閱讀英語逐字稿' : '閱讀華文逐字稿' }}</span>
+				<span lang="en">{{ alternateLabel === 'English' ? 'Read English transcript' : 'Read 華文 transcript' }}</span>
 			</a>
 		</Navbar>
 		<main id="main-content">

@@ -409,7 +409,8 @@ describe('SSR /:filename', () => {
 		const html = await res.text();
 		expect(html).toContain('hreflang');
 		expect(html).toContain('class="sayit-lang-switch"');
-		expect(html).toMatch(/<a[^>]*class="sayit-lang-switch"[^>]*>\s*English\s*<\/a>/);
+		expect(html).toContain('閱讀英語逐字稿');
+		expect(html).toContain('Read English transcript');
 	});
 });
 
