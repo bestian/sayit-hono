@@ -166,7 +166,8 @@ Latin faces come first so mixed-script lines retain a considered Latin texture; 
 
 The production webfont path is deliberate and narrow:
 
-- Justfont project **65960** registers five faces: `jf-lanyangming-light` (**200**) and `jf-lanyangming-bold` (**700**) under family alias `jf-lanyangming`; `jf-lanyanghei-bold` (**700**), `jf-lanyanghei-extrabold` (**800**), and `jf-lanyanghei-heavy` (**900**) under alias `jf-lanyanghei`.
+- The loader snippet registers five faces: `jf-lanyangming-light` (**200**) and `jf-lanyangming-bold` (**700**) under family alias `jf-lanyangming`; `jf-lanyanghei-bold` (**700**), `jf-lanyanghei-extrabold` (**800**), and `jf-lanyanghei-heavy` (**900**) under alias `jf-lanyanghei`. Registration is a request, not a guarantee: the kit only creates `@font-face` rules for faces the service returns for this origin.
+- What Justfont project **65960** actually serves to `archive.tw` is `jf-lanyanghei-bold` and `jf-lanyanghei-heavy` — nothing else (measured 2026-08-21: the kit's `go.justfont.com/jfont/api?o=https%3A%2F%2Farchive.tw&p=65960&t=woff` response lists exactly those two `fn` entries, and `document.fonts` holds only `jf-lanyanghei 700` and `jf-lanyanghei 900`). Consequence today: the ExtraBold registration is inert, and Han record body has no webfont — it falls through `--font-record` to system Ming (measured: `Songti TC`). Re-check that one API response before blaming CSS for a missing Lanyang face.
 - The design uses Hei **Bold** and **Heavy** only. Never hand a Han decisive slot a Latin-tuned weight above 700: CSS matching prefers the heavier neighbour, so 720–780 silently selects Heavy (measured: a speaker name at 760 rendered `jf蘭陽黑體 W9`). Route every decisive rule through `--weight-decisive` / `--weight-display`, or pin the face with the loader class.
 - Bootstrap it from the project’s local copy of the official Justfont Universal **v6.1** snippet, which loads kit ID **69938697899** from `ds.justfont.com`; do not resurrect the obsolete S3 loader endpoint.
 - Justfont is the sole deliberate runtime font-service exception. Do not add Google Fonts, another foundry loader, or a second copy of the same faces.
@@ -174,7 +175,7 @@ The production webfont path is deliberate and narrow:
 - Never commit or publicly serve Lanyang font binaries. The existing licensed local-font-to-PNG Open Graph path remains image-only; its output may ship, its source font may not.
 - Self-host route-appropriate WOFF2 subsets of Newsreader and Source Sans 3. Do not preload a face unless measured above-the-fold use justifies it; do not make CJK shards part of the Latin critical path.
 - Newsreader italic is a real italic file/axis. No browser-synthesized italic or bold anywhere in the system.
-- Set `font-synthesis: none` globally. Request normal text weight at the style layer so system fallbacks stay legible; the registered 200 Ming face remains the record body face, and `strong` inside record copy resolves to the registered 700 Ming Bold instead of rendering as unemphasised Light.
+- Set `font-synthesis: none` globally. Request normal text weight at the style layer so system fallbacks stay legible. The weights are already correct for Ming the moment the service serves it: record body asks 400, which matches the 200 Light face (for a 400 target CSS checks 500, then descends below 400), and `strong` inherits the UA `bolder` step to 700, which matches Ming Bold exactly. Until then Han body and its emphasis both render in the system Ming fallback.
 - Test three states: all fonts loaded, Justfont blocked, and all webfonts blocked. Each must preserve hierarchy, readable measures, and stable controls.
 
 ### Reading sizes and rhythm
