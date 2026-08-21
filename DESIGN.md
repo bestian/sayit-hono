@@ -394,9 +394,9 @@ The hash target must land below sticky navigation without JavaScript timing tric
 
 ### Dialogs, drawers, and overlays
 
-- Search and AI overlays use a real dialog only when they interrupt the current task. Otherwise, use an in-flow region with a stable URL.
-- A modal traps focus, closes with Escape, labels itself, and restores focus to its invoker.
-- On narrow screens, a drawer may occupy the viewport, but the close action stays in the first focusable region and the underlying page does not scroll.
+- Search and AI launched from the persistent header open as a centred fixed dialog, so results remain visible at any scroll depth. Preserve the underlying reading position.
+- The dialog has a real label, close control, backdrop, trapped keyboard focus, Escape handling, and focus restoration to its invoker.
+- On narrow screens, the dialog becomes a full-viewport sheet; the underlying page does not scroll.
 - Overlay type remains the finding voice. Quoted source excerpts inside it switch deliberately to the record voice.
 
 ### Empty, loading, and error states

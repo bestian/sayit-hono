@@ -4,7 +4,7 @@ import type { ApiEnv } from '../../api/types';
 export type WorkerEnv = ApiEnv['Bindings'];
 export type AppContext = Context<{ Bindings: WorkerEnv }>;
 
-export const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js?v=archive-turnline-1"></script>';
+export const PAGEFIND_SCRIPT = '<script src="/static/speeches/js/pagefind-search.js?v=archive-popup-1"></script>';
 export const TWITTER_WIDGETS_SCRIPT = '<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>';
 export const STATS_SCRIPT = `<script>(function(){fetch('/stats.json').then(function(r){return r.json()}).then(function(s){var fmt=function(n){return n.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g,',')};var e;e=document.getElementById('sayit-stat-speeches');if(e)e.textContent=fmt(s.speeches);e=document.getElementById('sayit-stat-speakers');if(e)e.textContent=fmt(s.speakers);e=document.getElementById('sayit-stat-sections');if(e)e.textContent=fmt(s.sections)}).catch(function(){})})()</script>`;
 
