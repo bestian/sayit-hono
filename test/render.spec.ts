@@ -80,7 +80,7 @@ describe('SSR layout', () => {
 		expect(html).not.toContain('white-space: pre-wrap');
 	});
 
-	it('renders an explicit current interface-language control', async () => {
+	it('renders a destination-labelled interface-language control', async () => {
 		const html = await renderHtml(HomeView, {
 			styles: [HomeViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
 			components: { Navbar, Footer },
@@ -89,8 +89,10 @@ describe('SSR layout', () => {
 		const toggleMatch = html.match(/<button[^>]*id="sayit-site-lang-toggle"[^>]*>[\s\S]*?<\/button>/);
 		expect(toggleMatch).not.toBeNull();
 		const toggleHtml = toggleMatch![0];
-		expect(toggleHtml).toContain('介面：華文');
-		expect(toggleHtml).toContain('Interface: English');
+		expect(toggleHtml).toContain('sayit-lang-option--en');
+		expect(toggleHtml).toContain('sayit-lang-option--zh');
+		expect(toggleHtml).toContain('>EN</span>');
+		expect(toggleHtml).toContain('華文</span>');
 		expect(toggleHtml).not.toContain('\u{1F1EC}\u{1F1E7}');
 		expect(toggleHtml).not.toContain('\u{1F1F9}\u{1F1FC}');
 	});

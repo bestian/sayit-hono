@@ -59,7 +59,7 @@
 					class="sayit-site-lang-toggle"
 					aria-label="切換介面語言 Switch interface language"
 				>
-					<span lang="zh">介面：華文</span><span lang="en">Interface: English</span>
+					<span class="sayit-lang-option sayit-lang-option--en">EN</span><span class="sayit-lang-option sayit-lang-option--zh">華文</span>
 				</button>
 				<button
 					type="button"

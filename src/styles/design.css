@@ -95,6 +95,7 @@ html {
 	scroll-behavior: smooth;
 	scrollbar-gutter: stable;
 	text-size-adjust: 100%;
+	hanging-punctuation: first allow-end last;
 }
 
 body {
@@ -109,6 +110,13 @@ body {
 	font-synthesis: none;
 	font-variant-numeric: proportional-nums;
 	-webkit-font-smoothing: antialiased;
+	text-spacing-trim: trim-start;
+	-webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+	background: var(--index-wash);
+	color: var(--carbon);
 }
 
 button,
@@ -487,12 +495,35 @@ small,
 	text-decoration: none;
 	white-space: nowrap;
 	cursor: pointer;
+	transition:
+		color 0.2s ease,
+		border-color 0.2s ease,
+		background-color 0.2s ease;
 }
 
 .sayit-site-lang-toggle {
-	border-color: transparent;
+	border-color: color-mix(in srgb, var(--rule) 55%, transparent);
 	color: var(--slate);
 	font-size: 0.875rem;
+	letter-spacing: 0.04em;
+}
+
+.sayit-lang-option {
+	display: none;
+}
+
+.sayit-lang-option--en {
+	display: revert;
+	letter-spacing: 0.08em;
+}
+
+.lang-en .sayit-lang-option--en {
+	display: none;
+}
+
+.lang-en .sayit-lang-option--zh {
+	display: revert;
+	letter-spacing: 0.06em;
 }
 
 .sayit-share-button:hover,
