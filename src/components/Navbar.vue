@@ -70,6 +70,15 @@
 					<span lang="zh">分享此頁</span><span lang="en">Share page</span>
 				</button>
 			</div>
+			<details class="site-nav-mobile">
+				<summary class="site-nav-mobile__toggle" aria-label="主選單 Main menu">
+					<span class="site-nav-mobile__icon" aria-hidden="true"></span>
+				</summary>
+				<div class="site-nav-mobile__panel">
+					<a href="/speakers/"><span lang="zh">講者</span><span lang="en">Speakers</span></a>
+					<a href="/speeches/"><span lang="zh">對話</span><span lang="en">Speeches</span></a>
+				</div>
+			</details>
 		</div>
 		<div id="sayit-share-feedback" class="sayit-share-toast" aria-live="polite" aria-atomic="true" hidden></div>
 	</header>

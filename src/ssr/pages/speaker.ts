@@ -3,6 +3,7 @@ import type { Section, WorkerEnv } from './shared';
 import { hasTwitterEmbed, PAGEFIND_SCRIPT, TWITTER_WIDGETS_SCRIPT } from './shared';
 import { DEFAULT_HTML_CACHE_CONTROL, buildR2HtmlKey, readR2Cache, tags, withCacheHeaders, writeR2Cache } from '../../api/cache';
 import { renderHtml } from '../render';
+import { renderErrorPage } from './error';
 import { headForSpeaker } from '../heads';
 import { normalizeSections } from '../../utils/sectionUtils';
 import { buildPaginationPages } from '../../utils/pagination';
@@ -55,7 +56,7 @@ export async function renderSpeakerPage(c: SpeakerPageContext): Promise<Response
 		const speakerRow = await getSpeakerDetail(c.env.DB, routePathname);
 
 		if (!speakerRow) {
-			return c.text('Not Found', 404);
+			return renderErrorPage(c, 404);
 		}
 
 		const pageSize = 50;
