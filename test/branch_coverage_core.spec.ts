@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { CACHE_KEY_VERSION } from '../src/cacheKeyVersion';
 import { purgeMock } from './setup-cache-isolation';
 import { createMockEnv, dispatch, type QueryResolver } from './helpers/mockEnv';
-import { decodeHtmlEntities } from '../src/utils/textUtils';
+import { decodeHtmlEntities, renderSpeechHtml } from '../src/utils/textUtils';
 import { sectionMatchKey } from '../src/utils/sectionPatch';
 import { docsFromSections, type ApiSection } from '../src/search/docBuilder';
 import { buildSearchDocsForSpeech } from '../src/search/runtime';
@@ -17,6 +17,17 @@ describe('Branch Coverage Core Gaps', () => {
 		it('preserves unknown HTML entities', () => {
 			expect(decodeHtmlEntities('&unknown;')).toBe('&unknown;');
 			expect(decodeHtmlEntities('&amp;')).toBe('&');
+		});
+
+		it('renders imported Markdown emphasis and removes script fragments', () => {
+			const html = renderSpeechHtml('<p>稱之為**關懷六力**，或**<a href="/care">6-Pack of Care</a>**。</p><script>alert(1)</script>');
+			expect(html).toContain('<strong>關懷六力</strong>');
+			expect(html).toContain('<strong><a href="/care">6-Pack of Care</a></strong>');
+			expect(html).not.toContain('alert(1)');
+
+			const encoded = renderSpeechHtml(JSON.stringify('<p>**JSON emphasis**</p><script />'));
+			expect(encoded).toContain('<strong>JSON emphasis</strong>');
+			expect(encoded).toContain('unexpected script removed');
 		});
 	});
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { getSpeakerColor } from '../utils/speakerColor';
+	import { renderSpeechHtml } from '../utils/textUtils';
 
 	interface Section {
 		filename: string;
@@ -139,13 +140,6 @@
 	const getNestUrl = (nestFilename: string) =>
 		`/${encodeURIComponent(props.speechName)}/${encodeURIComponent(nestFilename)}`;
 
-	const sanitizeHtmlContent = (html: string): string => {
-		// Remove script tags with various formats and replace with warning comment
-		return html
-			.replace(/<script[\s\S]*?<\/script>/gi, '<!-- Warning: there\'s an unexpected Script -->')
-			.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '<!-- Warning: there\'s an unexpected Script -->')
-			.replace(/<script[^>]*\/>/gi, '<!-- Warning: there\'s an unexpected Script -->');
-	};
 
 	const loading = false;
 	</script>
@@ -243,7 +237,7 @@
 												<div
 													:class="['speech__content record-copy', recordLanguage === 'zh-Hant' ? 'jf-lanyangming-light' : '']"
 													:lang="recordLanguage"
-													v-html="sanitizeHtmlContent(section.section_content)"
+													v-html="renderSpeechHtml(section.section_content)"
 												></div>
 											</article>
 										</li>

@@ -264,6 +264,10 @@ small,
 	border-block-end: 1px solid var(--rule);
 }
 
+.page-header--index {
+	padding-block: var(--space-6) var(--space-4);
+}
+
 .page-header--speech {
 	width: min(100%, 58rem);
 	margin-inline: auto;
@@ -1024,6 +1028,16 @@ button:disabled,
 	font-size: 1.08rem;
 	font-weight: 620;
 	text-decoration: none;
+}
+
+#sayit-speech-list {
+	margin-block-end: var(--space-6);
+}
+
+#sayit-speech-list a {
+	padding-block: var(--space-3);
+	font-size: clamp(1.1875rem, 1.1rem + 0.3vw, 1.375rem);
+	line-height: 1.4;
 }
 
 #sayit-speech-list a:hover,

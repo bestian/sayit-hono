@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { getSpeakerColor } from '../utils/speakerColor'
-import { parseContent, toPlainText } from '../utils/textUtils'
+import { parseContent, renderSpeechHtml, toPlainText } from '../utils/textUtils'
 
 type Section = {
 	filename: string;
@@ -28,15 +28,8 @@ const speakerColor = getSpeakerColor(
 const avatarStyle = { borderColor: speakerColor, backgroundColor: speakerColor };
 
 
-function sanitizeHtmlContent(html: string): string {
-	// Remove script tags with various formats and replace with warning comment
-	return html
-		.replace(/<script[\s\S]*?<\/script>/gi, '<!-- Warning: there\'s an unexpected Script -->')
-		.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '<!-- Warning: there\'s an unexpected Script -->')
-		.replace(/<script[^>]*\/>/gi, '<!-- Warning: there\'s an unexpected Script -->');
-}
 
-const parsedContent = sanitizeHtmlContent(parseContent(props.section?.section_content));
+const parsedContent = renderSpeechHtml(props.section?.section_content);
 const previousTextPreview = props.section?.previous_content
 	? toPlainText(parseContent(props.section.previous_content)).slice(0, 30)
 	: '';
