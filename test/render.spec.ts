@@ -105,6 +105,7 @@ describe('SSR layout', () => {
 		expect(html).toContain('href="/privacy"');
 		expect(html).toContain('href="/terms"');
 		expect(html).not.toContain('ask.archive.tw/privacy');
+		expect(html).not.toContain('site-footer__nav');
 	});
 
 	it('renders bilingual civic.ai footer notice with CC0 attribution', async () => {
@@ -116,7 +117,7 @@ describe('SSR layout', () => {
 		expect(html).toContain('id="cc"');
 		expect(html).toContain('Co-maintained by Audrey Tang and Bestian Tang');
 		expect(html).toContain('archive is released under CC0');
-		expect(html).toContain('Learn more about Civic AI and the 6-Pack of Care');
+		expect(html).toContain('For more information on Civic AI and 6-Pack of Care, please visit');
 		expect(html).toContain('href="https://civic.ai/"');
 		expect(html).toContain('本站由唐鳳與唐宗浩共同維運');
 		expect(html).toContain('內容以 CC0 釋出');
