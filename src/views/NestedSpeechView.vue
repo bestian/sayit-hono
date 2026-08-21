@@ -46,7 +46,7 @@ const getNestUrl = (nestFilename: string) =>
 					<div class="full-page__unit">
 						<header class="page-header page-header--speech">
 							<div class="page-header__title-row">
-								<h1 id="page-title" :class="{ 'jf-lanyanghei-extrabold': isChineseRecord }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
+								<h1 id="page-title" :class="{ 'jf-lanyanghei-heavy': isChineseRecord }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
 								<a
 									v-if="alternateUrl && alternateLabel"
 									:href="alternateUrl"
