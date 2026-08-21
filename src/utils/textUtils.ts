@@ -32,6 +32,24 @@ export function parseContent(raw?: string | null): string {
 	}
 }
 
+/**
+ * Prepare transcript HTML for direct SSR presentation. The archive stores
+ * mostly-HTML fragments, but some imported records retain Markdown `**`
+ * emphasis around plain text or an inline link.
+ */
+export function renderSpeechHtml(raw?: string | null): string {
+	const scriptWarning = '<!-- Warning: unexpected script removed -->';
+	const sanitized = parseContent(raw)
+		.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, scriptWarning)
+		.replace(/<script\b[^>]*\/\s*>/gi, scriptWarning)
+		.replace(/\*\*(<a\b[^>]*>[\s\S]*?<\/a>)\*\*/gi, '<strong>$1</strong>');
+
+	return sanitized
+		.split(/(<[^>]+>)/g)
+		.map((segment) => (segment.startsWith('<') ? segment : segment.replace(/\*\*([^*\r\n]+?)\*\*/g, '<strong>$1</strong>')))
+		.join('');
+}
+
 /** Decode numeric (&#nn; / &#xHH;) and the six named HTML entities to characters. */
 export function decodeHtmlEntities(value: string): string {
 	return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {

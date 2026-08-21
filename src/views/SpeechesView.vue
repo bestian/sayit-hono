@@ -47,7 +47,7 @@ const sortedSpeeches = computed(() => {
 			</div>
 			<div class="full-page__row">
 				<div class="full-page__unit">
-					<div class="page-header">
+					<div class="page-header page-header--index">
 						<h1><span lang="zh">對話紀錄</span><span lang="en">Recorded conversations</span></h1>
 					</div>
 					<div id="sayit-search-results" class="sayit-search__results" aria-live="polite" hidden>
