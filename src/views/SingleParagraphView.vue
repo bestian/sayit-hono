@@ -91,8 +91,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 								<nav class="speech__links" aria-labelledby="turn-actions-label">
 									<span id="turn-actions-label" class="visually-hidden"><span lang="zh">逐字稿導覽</span><span lang="en">Transcript navigation</span></span>
 									<a :href="getContextUrl(section.filename, section.section_id)">
-										<template v-if="recordLanguage === 'zh-Hant'">查看前後文</template>
-										<template v-else>View context</template>
+									<span lang="zh">查看前後文</span><span lang="en">View context</span>
 									</a>
 									<button
 										type="button"
@@ -101,8 +100,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 										:data-share-url="getContextUrl(section.filename, section.section_id)"
 										:data-share-title="section.display_name"
 									>
-										<template v-if="recordLanguage === 'zh-Hant'">分享此段</template>
-										<template v-else>Share turn</template>
+									<span lang="zh">分享此段</span><span lang="en">Share turn</span>
 									</button>
 								</nav>
 								<nav class="breadcrumbs" v-if="section.filename" aria-labelledby="source-record-label">

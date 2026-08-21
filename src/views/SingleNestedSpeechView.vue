@@ -185,7 +185,7 @@
 							</header>
 							<div class="page-content__row" v-if="!loading">
 								<article class="primary-content__unit" aria-labelledby="page-title">
-									<ol class="section-list" :aria-label="recordLanguage === 'zh-Hant' ? '逐字稿發言段落' : 'Transcript turns'">
+								<ol class="section-list" aria-label="逐字稿發言段落 Transcript turns">
 										<li
 											v-for="block in speakerBlocks"
 											:key="`block-${block.id}`"
@@ -213,13 +213,13 @@
 												<details class="turnline__share-menu">
 													<summary
 														class="turnline__anchor"
-														:title="recordLanguage === 'zh-Hant' ? '段落分享選項' : 'Turn sharing options'"
-														:aria-label="recordLanguage === 'zh-Hant' ? `發言段落 ${section.section_id} 的分享選項` : `Sharing options for turn ${section.section_id}`"
+													:title="'段落分享選項 Turn sharing options'"
+													:aria-label="`發言段落 ${section.section_id} 的分享選項 Sharing options for turn ${section.section_id}`"
 													></summary>
 													<div
 														class="turnline__share-actions"
 														role="group"
-														:aria-label="recordLanguage === 'zh-Hant' ? '選擇分享方式' : 'Choose sharing mode'"
+													:aria-label="'選擇分享方式 Choose sharing mode'"
 													>
 														<button
 															type="button"
@@ -228,8 +228,7 @@
 															:data-share-url="getLinkInContextUrl(section)"
 															:data-share-title="section.display_name"
 														>
-															<template v-if="recordLanguage === 'zh-Hant'">連同前後文分享</template>
-															<template v-else>Share with context</template>
+															<span lang="zh">連同前後文分享</span><span lang="en">Share with context</span>
 														</button>
 														<button
 															type="button"
@@ -238,8 +237,7 @@
 															:data-share-url="`/speech/${section.section_id}`"
 															:data-share-title="section.display_name"
 														>
-															<template v-if="recordLanguage === 'zh-Hant'">分享單一段落</template>
-															<template v-else>Share this turn only</template>
+															<span lang="zh">分享單一段落</span><span lang="en">Share this turn only</span>
 														</button>
 													</div>
 												</details>
