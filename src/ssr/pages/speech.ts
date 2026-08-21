@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import type { AppContext, AlternateInfo, Section, SpeechIndexRow, WorkerEnv } from './shared';
 import { hasTwitterEmbed, isExcludedPath, PAGEFIND_SCRIPT, TWITTER_WIDGETS_SCRIPT } from './shared';
 import { DEFAULT_HTML_CACHE_CONTROL, buildR2HtmlKey, readR2Cache, tags, withCacheHeaders, writeR2Cache } from '../../api/cache';
+import { renderErrorPage } from './error';
 import { renderHtml } from '../render';
 import { headForNestedSpeech, headForNestedSpeechDetail, headForSingleSpeech, headForSpeechContent } from '../heads';
 import { normalizeSections } from '../../utils/sectionUtils';
@@ -124,7 +125,7 @@ export async function renderSectionPage(c: SectionPageContext): Promise<Response
 	// 以下為動態段落頁
 	const sectionId = Number(param);
 	if (!Number.isInteger(sectionId)) {
-		return c.text('Bad Request', 400);
+		return renderErrorPage(c, 400);
 	}
 
 	const cacheKey = buildR2HtmlKey(c.req.url, { includeSearch: false });
@@ -144,7 +145,7 @@ export async function renderSectionPage(c: SectionPageContext): Promise<Response
 	}
 
 	if (!section) {
-		return c.text('Not Found', 404);
+		return renderErrorPage(c, 404);
 	}
 
 	const sectionHtml = parseContent(section.section_content ?? '');
@@ -185,7 +186,7 @@ export async function renderNestedSpeechPage(c: NestedSpeechPageContext): Promis
 		filename = decodeURIComponent(encodedFilename);
 		nestFilename = decodeURIComponent(encodedNestFilename);
 	} catch {
-		return c.text('Not Found', 404);
+		return renderErrorPage(c, 404);
 	}
 
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
@@ -204,11 +205,11 @@ export async function renderNestedSpeechPage(c: NestedSpeechPageContext): Promis
 		if (redirectTo) {
 			return buildSpeechRedirectResponse(c, `/${encodeURIComponent(redirectTo)}/${encodeURIComponent(nestFilename)}`);
 		}
-		return c.text('Not Found', 404);
+		return renderErrorPage(c, 404);
 	}
 
 	if (!speechMeta.isNested) {
-		return c.text('Not Found', 404);
+		return renderErrorPage(c, 404);
 	}
 
 	let sections: Section[];
@@ -254,7 +255,7 @@ export async function renderNestedSpeechPage(c: NestedSpeechPageContext): Promis
 		}));
 
 		if (rawSections.length === 0) {
-			return c.text('Not Found', 404);
+			return renderErrorPage(c, 404);
 		}
 
 		sections = normalizeSections(rawSections);
@@ -320,14 +321,14 @@ export async function renderSpeechPage(c: SpeechPageContext): Promise<Response> 
 
 	// 純數字留給 /speech/:section_id
 	if (/^\d+$/.test(encodedFilename)) {
-		return c.text('Not Found', 404);
+		return renderErrorPage(c, 404);
 	}
 
 	let filename: string;
 	try {
 		filename = decodeURIComponent(encodedFilename);
 	} catch {
-		return c.text('Not Found', 404);
+		return renderErrorPage(c, 404);
 	}
 
 	const r2Cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey);
@@ -349,7 +350,7 @@ export async function renderSpeechPage(c: SpeechPageContext): Promise<Response> 
 		if (redirectTo) {
 			return buildSpeechRedirectResponse(c, `/${encodeURIComponent(redirectTo)}`);
 		}
-		return c.text('Not Found', 404);
+		return renderErrorPage(c, 404);
 	}
 
 	if (speechMeta.isNested) {
@@ -413,7 +414,7 @@ export async function renderSpeechPage(c: SpeechPageContext): Promise<Response> 
 		}
 
 		if (nests.length === 0) {
-			return c.text('Not Found', 404);
+			return renderErrorPage(c, 404);
 		}
 
 		const alternate = await loadAlternateInfo(c, filename);
@@ -482,7 +483,7 @@ export async function renderSpeechPage(c: SpeechPageContext): Promise<Response> 
 		}));
 
 		if (rawSections.length === 0) {
-			return c.text('Not Found', 404);
+			return renderErrorPage(c, 404);
 		}
 
 		sections = normalizeSections(rawSections);

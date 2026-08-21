@@ -30,6 +30,7 @@ import { extractDate } from './search/docBuilder';
 
 import type { WorkerEnv } from './ssr/pages/shared';
 import { isExcludedPath } from './ssr/pages/shared';
+import { renderErrorPage } from './ssr/pages/error';
 import { renderHomePage, renderSpeechesPage, renderSpeakersPage, renderPrivacyPage, renderTermsPage } from './ssr/pages/home';
 import { normalizeSearchQuery, runSearchQuery, renderSearchPage, SEARCH_DEFAULT_PAGE_SIZE, SEARCH_MAX_PAGE_SIZE } from './ssr/pages/search';
 import { renderSectionPage, renderNestedSpeechPage, renderSpeechPage } from './ssr/pages/speech';
@@ -435,7 +436,11 @@ app.on(['GET', 'HEAD'], '/:path{[^/]+\\.an}', (c) => serveAnByKey(c, c.req.param
 // SSR 演講頁（單一演講或巢狀清單，直接用 filename 作為路徑；需置於最後的 catch-all 之前）
 app.get('/:filename', (c) => renderSpeechPage(c));
 
-// 其餘請求：靜態已由 middleware 嘗試過，未匹配則 404
-app.get('*', (c) => c.text('Not Found', 404));
+// 其餘請求：靜態已由 middleware 嘗試過，未匹配則回 HTML 錯誤頁；API 介面維持純文字
+app.get('*', async (c) => {
+	const pathname = new URL(c.req.url).pathname;
+	if (pathname === '/api' || pathname.startsWith('/api/')) return c.text('Not Found', 404);
+	return renderErrorPage(c, 404);
+});
 
 export default app;

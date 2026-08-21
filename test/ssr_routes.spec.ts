@@ -50,6 +50,50 @@ describe('SSR /speakers', () => {
 	});
 });
 
+describe('SSR error pages', () => {
+	it('renders a styled HTML 404 for unknown page paths', async () => {
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/definitely-not-a-page', env);
+		expect(res.status).toBe(404);
+		expect(res.headers.get('content-type')).toContain('text/html');
+		const body = await res.text();
+		expect(body).toContain('name="viewport"');
+		expect(body).toContain('Page not found');
+		expect(body).toContain('找不到這一頁');
+		expect(env.__r2Store.size).toBe(0);
+	});
+
+	it('renders an HTML 400 for a malformed section id', async () => {
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/speech/not-a-number', env);
+		expect(res.status).toBe(400);
+		expect(res.headers.get('content-type')).toContain('text/html');
+		expect(await res.text()).toContain('無效的網址');
+	});
+
+	it('keeps /api errors as plain text', async () => {
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/api/unknown-endpoint', env);
+		expect(res.status).toBe(404);
+		expect(res.headers.get('content-type')).toContain('text/plain');
+	});
+
+	it('catch-all renders an HTML 404 for unmatched multi-segment paths', async () => {
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/no/such/page', env);
+		expect(res.status).toBe(404);
+		expect(res.headers.get('content-type')).toContain('text/html');
+		expect(await res.text()).toContain('name="viewport"');
+	});
+
+	it('catch-all keeps deep /api paths as plain text', async () => {
+		const env = createMockEnv(() => ({ success: true, results: [] }));
+		const { res } = await dispatch('/api/no/such', env);
+		expect(res.status).toBe(404);
+		expect(res.headers.get('content-type')).toContain('text/plain');
+	});
+});
+
 describe('SSR /speeches', () => {
 	it('returns 500 when the speeches query reports failure', async () => {
 		const env = createMockEnv((sql) => {
