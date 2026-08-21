@@ -1529,6 +1529,18 @@ body.sayit-popup-open::before {
 	height: auto;
 }
 
+/* Legacy embeds pasted without their aspect-ratio wrapper: the iframe is a
+   bare child carrying inline position:absolute + height:100%, which collapses
+   against the nearest positioned ancestor. Author !important overrides the
+   inline style; the child combinator leaves wrapped embeds untouched. */
+.speech__content > iframe {
+	position: static !important;
+	display: block;
+	width: 100% !important;
+	height: auto !important;
+	aspect-ratio: 16 / 9;
+}
+
 .speech__content blockquote {
 	margin-inline: 0;
 	padding-inline-start: var(--space-4);
