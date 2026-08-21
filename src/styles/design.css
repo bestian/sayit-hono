@@ -49,6 +49,8 @@
 	--font-record: 'Newsreader', 'jf-lanyangming', 'Noto Serif TC', 'Songti TC', 'PMingLiU', Georgia, serif;
 	--font-finding: 'Source Sans 3', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
 	--font-decisive: 'Source Sans 3', 'jf-lanyanghei', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif;
+	--weight-decisive: 700;
+	--weight-display: 800;
 	--space-1: 0.25rem;
 	--space-2: 0.5rem;
 	--space-3: 0.75rem;
@@ -62,6 +64,14 @@
 	--reading-zh: 36ic;
 	--radius: 3px;
 	font-synthesis: none;
+}
+
+/* Two decisive weights, and no more. Utility text is 700 in both scripts because Han
+   appears in decisive slots (speaker names, record titles) whatever the UI language:
+   any Latin-tuned value above 700 makes Han glyphs match the heavier Lanyang Hei face.
+   Display Han steps up to the Heavy 900 face; Latin display stays on the 800 axis stop. */
+:lang(zh) {
+	--weight-display: 900;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -189,20 +199,20 @@ h4 {
 	margin: 0;
 	color: var(--carbon);
 	font-family: var(--font-decisive);
-	font-weight: 760;
+	font-weight: var(--weight-decisive);
 	letter-spacing: -0.025em;
 	text-wrap: balance;
 }
 
 :where(h1, h2, h3, h4):lang(zh),
 :where(h1, h2, h3, h4) [lang='zh'] {
-	font-weight: 800;
 	letter-spacing: 0;
 }
 
 h1 {
 	max-inline-size: 18ch;
 	font-size: clamp(2.25rem, 1.75rem + 2.2vw, 3.75rem);
+	font-weight: var(--weight-display);
 	line-height: 1.02;
 }
 
@@ -430,7 +440,7 @@ small,
 	color: var(--carbon);
 	font-family: var(--font-decisive);
 	font-size: 1.2rem;
-	font-weight: 780;
+	font-weight: var(--weight-decisive);
 	letter-spacing: -0.02em;
 	text-decoration: none;
 }
@@ -903,7 +913,7 @@ body.sayit-popup-open::before {
 	color: var(--slate);
 	font-family: var(--font-decisive);
 	font-size: 0.875rem;
-	font-weight: 760;
+	font-weight: var(--weight-decisive);
 }
 
 .homepage-browse {
@@ -941,7 +951,7 @@ body.sayit-popup-open::before {
 
 .homepage-browse strong {
 	font-family: var(--font-decisive);
-	font-weight: 740;
+	font-weight: var(--weight-decisive);
 }
 
 .homepage-browse a > span {
@@ -1014,7 +1024,7 @@ body.sayit-popup-open::before {
 	margin: 0;
 	font-family: var(--font-decisive);
 	font-size: 0.9rem;
-	font-weight: 800;
+	font-weight: var(--weight-decisive);
 }
 
 .homepage-ask-answer__provenance {
@@ -1217,7 +1227,7 @@ body.sayit-popup-open::before {
 .speaker-card__name {
 	font-family: var(--font-decisive);
 	font-size: 1.05rem;
-	font-weight: 720;
+	font-weight: var(--weight-decisive);
 }
 
 .page-header--with-portrait {
@@ -1363,7 +1373,7 @@ body.sayit-popup-open::before {
 	max-inline-size: 9rem;
 	font-family: var(--font-decisive);
 	font-size: 0.9rem;
-	font-weight: 780;
+	font-weight: var(--weight-decisive);
 	line-height: 1.3;
 }
 
@@ -1632,7 +1642,7 @@ body.sayit-popup-open::before {
 .speech-single-speech .speech__meta-data__speaker-name {
 	font-family: var(--font-decisive);
 	font-size: 1rem;
-	font-weight: 760;
+	font-weight: var(--weight-decisive);
 }
 
 .speech-single-speech .breadcrumbs {
@@ -1684,7 +1694,7 @@ body.sayit-popup-open::before {
 
 .search-results-list .speech__meta-data__speaker-name {
 	font-family: var(--font-decisive);
-	font-weight: 740;
+	font-weight: var(--weight-decisive);
 }
 
 .search-results-list .speech__content {

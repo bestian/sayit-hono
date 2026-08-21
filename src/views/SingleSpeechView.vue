@@ -126,9 +126,9 @@ const heading = computed(() => {
 								<h1
 									id="page-title"
 									v-if="!loading && displaySections.length > 0 && displaySections[0]"
-									:class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }"
+									:class="{ 'jf-lanyanghei-heavy': recordLanguage === 'zh-Hant' }"
 								><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
-								<h1 id="page-title" v-else :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
+								<h1 id="page-title" v-else :class="{ 'jf-lanyanghei-heavy': recordLanguage === 'zh-Hant' }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
 								<a
 									v-if="alternateUrl && alternateLabel"
 									:href="alternateUrl"

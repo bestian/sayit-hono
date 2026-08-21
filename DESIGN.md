@@ -108,8 +108,8 @@ There is no third “technical” voice. Monospace metadata would turn a civic r
 
 | Role | English / Latin | Traditional Chinese | Use |
 |---|---|---|---|
-| Record | **Newsreader**, regular with real italic | **jf Lanyang Ming Light** (`.jf-lanyangming-light`, family `jf-lanyangming`) | transcript turns, quoted source excerpts, long editorial and legal reading |
-| Decisive finding | **Source Sans 3**, 700–800 | **jf Lanyang Hei ExtraBold** (`.jf-lanyanghei-extrabold`, family `jf-lanyanghei`) | page titles, section titles, speaker hand-offs, primary actions |
+| Record | **Newsreader**, regular with real italic | **jf Lanyang Ming Light** (`.jf-lanyangming-light`, family `jf-lanyangming` at 200), **Ming Bold** (700) for emphasis inside record copy | transcript turns, quoted source excerpts, long editorial and legal reading |
+| Decisive finding | **Source Sans 3**, 700–800 | **jf Lanyang Hei Heavy** (`.jf-lanyanghei-heavy`, family `jf-lanyanghei` at 900) for display; **Hei Bold** (`.jf-lanyanghei-bold`, 700) for everything else decisive | page titles in Heavy; section titles, speaker hand-offs, primary actions in Bold |
 | Routine finding | **Source Sans 3**, 400–650 | **PingFang TC**, **Noto Sans TC**, system sans | navigation, controls, filters, metadata, dense indexes |
 
 This is one matched system across two scripts, not an English design with Chinese fallback.
@@ -117,8 +117,8 @@ This is one matched system across two scripts, not an English design with Chines
 - **Newsreader** was made for continuous on-screen reading. Its optical sizes, open rhythm, and true italic give English the care that the present Georgia fallback cannot.
 - **Lanyang Ming** gives the zh-Hant record the texture of a spoken archive without turning it into a facsimile or a newspaper.
 - **Source Sans 3** is plainspoken and exceptionally legible at utility sizes.
-- **Lanyang Hei ExtraBold** supplies decisive Han headings and speaker hand-offs. Its force is valuable because it is rare.
-- Routine Han UI stays in a normal system sans. Setting every control in ExtraBold would make the interface shout over the record.
+- **Lanyang Hei** carries decisive Han in exactly two weights: Heavy for the page title, Bold for section titles, speaker hand-offs, and primary actions. Two steps read as hierarchy; a third weight in the same role would only blur it.
+- Routine Han UI stays in a normal system sans. Setting every control in Lanyang Hei would make the interface shout over the record.
 
 ### Font stacks
 
@@ -148,6 +148,15 @@ This is one matched system across two scripts, not an English design with Chines
     "Noto Sans TC",
     system-ui,
     sans-serif;
+
+  /* Utility decisive text is 700 in both scripts; only display steps up, and only Han
+     steps to the Heavy face. Han appears in decisive slots regardless of UI language. */
+  --weight-decisive: 700; /* Latin Bold; Han → jf Lanyang Hei Bold */
+  --weight-display: 800; /* Latin ExtraBold */
+}
+
+:lang(zh) {
+  --weight-display: 900; /* Han display → jf Lanyang Hei Heavy */
 }
 ```
 
@@ -157,14 +166,15 @@ Latin faces come first so mixed-script lines retain a considered Latin texture; 
 
 The production webfont path is deliberate and narrow:
 
-- Justfont project **65960** provides loader class `jf-lanyangming-light` at registered weight **200** with family alias `jf-lanyangming`, and `jf-lanyanghei-extrabold` at **800** with alias `jf-lanyanghei`.
+- Justfont project **65960** registers five faces: `jf-lanyangming-light` (**200**) and `jf-lanyangming-bold` (**700**) under family alias `jf-lanyangming`; `jf-lanyanghei-bold` (**700**), `jf-lanyanghei-extrabold` (**800**), and `jf-lanyanghei-heavy` (**900**) under alias `jf-lanyanghei`.
+- The design uses Hei **Bold** and **Heavy** only. Never hand a Han decisive slot a Latin-tuned weight above 700: CSS matching prefers the heavier neighbour, so 720–780 silently selects Heavy (measured: a speaker name at 760 rendered `jf蘭陽黑體 W9`). Route every decisive rule through `--weight-decisive` / `--weight-display`, or pin the face with the loader class.
 - Bootstrap it from the project’s local copy of the official Justfont Universal **v6.1** snippet, which loads kit ID **69938697899** from `ds.justfont.com`; do not resurrect the obsolete S3 loader endpoint.
 - Justfont is the sole deliberate runtime font-service exception. Do not add Google Fonts, another foundry loader, or a second copy of the same faces.
 - The page must remain fully visible and usable while Justfont is unavailable or loading. Never gate the body behind a `.loading` class.
 - Never commit or publicly serve Lanyang font binaries. The existing licensed local-font-to-PNG Open Graph path remains image-only; its output may ship, its source font may not.
 - Self-host route-appropriate WOFF2 subsets of Newsreader and Source Sans 3. Do not preload a face unless measured above-the-fold use justifies it; do not make CJK shards part of the Latin critical path.
 - Newsreader italic is a real italic file/axis. No browser-synthesized italic or bold anywhere in the system.
-- Set `font-synthesis: none` globally. Request normal text weight at the style layer so system fallbacks stay legible; when Justfont is present, its registered 200 Ming face remains the selected family face.
+- Set `font-synthesis: none` globally. Request normal text weight at the style layer so system fallbacks stay legible; the registered 200 Ming face remains the record body face, and `strong` inside record copy resolves to the registered 700 Ming Bold instead of rendering as unemphasised Light.
 - Test three states: all fonts loaded, Justfont blocked, and all webfonts blocked. Each must preserve hierarchy, readable measures, and stable controls.
 
 ### Reading sizes and rhythm
