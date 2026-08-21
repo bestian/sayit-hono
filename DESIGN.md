@@ -85,12 +85,12 @@ Narrow transcript
 #### Turnline rules
 
 - The base line uses the rule colour; the active speaker segment uses a deterministic speaker colour.
-- A speaker name is always present. Colour is redundant identity, never the only identity.
-- Consecutive turns by the same speaker keep one visual segment. Every turn still keeps its own semantic label and anchor.
-- The anchor appears on hover and keyboard focus; it is always visible on coarse pointers and in print.
+- Every named speaker is shown. Unlabelled editorial turns keep a neutral segment rather than inventing a distracting identity. Colour is never the only identity cue.
+- Consecutive turns by the same speaker keep one visual segment. Every turn still keeps its own semantic anchor.
+- The quiet Turnline dot opens two explicit share modes: **with surrounding context** (`#s{id}`) or **this turn only** (`/speech/{id}`). The choices appear only on intent.
 - A hash-targeted turn receives one restrained arrival cue: the segment strengthens and a cool wash fades once. It does not pulse indefinitely.
 - On small screens, the line moves inside the content edge and the speaker label sits above the turn. It never steals horizontal reading measure.
-- In print, the line becomes a thin grayscale rule; names and turn identifiers carry the meaning.
+- In print, the line becomes a thin grayscale rule; names and source order carry the meaning.
 - The Turnline is reserved for source sequence. Search results, AI answers, and generic lists must not borrow it.
 
 ---

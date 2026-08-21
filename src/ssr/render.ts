@@ -82,10 +82,12 @@ const SHARE_SCRIPT = `<script>
     async function share(button) {
       var title = (button && button.getAttribute('data-share-title')) || document.title || 'SayIt';
       var url = resolveUrl(button);
+      var menu = button && button.closest ? button.closest('details.turnline__share-menu') : null;
 
       if (navigator.share) {
         try {
           await navigator.share({ title: title, url: url });
+          if (menu) menu.removeAttribute('open');
           return;
         } catch (error) {
           if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
@@ -96,8 +98,10 @@ const SHARE_SCRIPT = `<script>
 
       try {
         await copyText(url);
+        if (menu) menu.removeAttribute('open');
         showToast(isZh() ? '連結已複製' : 'Link copied');
       } catch (error) {
+        if (menu) menu.removeAttribute('open');
         window.prompt(isZh() ? '請複製這個連結' : 'Copy this link', url);
       }
     }
@@ -106,9 +110,22 @@ const SHARE_SCRIPT = `<script>
       var target = event.target;
       if (!(target instanceof Element)) return;
       var button = target.closest('[data-sayit-share]');
+      var clickedMenu = target.closest('details.turnline__share-menu');
+      document.querySelectorAll('details.turnline__share-menu[open]').forEach(function(menu) {
+        if (menu !== clickedMenu) menu.removeAttribute('open');
+      });
       if (!button) return;
       event.preventDefault();
-      share(button);
+      void share(button);
+    });
+
+    document.addEventListener('keydown', function(event) {
+      if (event.key !== 'Escape') return;
+      document.querySelectorAll('details.turnline__share-menu[open]').forEach(function(menu) {
+        menu.removeAttribute('open');
+        var summary = menu.querySelector('summary');
+        if (summary) summary.focus();
+      });
     });
   })();
 </script>`;
