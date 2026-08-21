@@ -108,8 +108,8 @@ There is no third “technical” voice. Monospace metadata would turn a civic r
 
 | Role | English / Latin | Traditional Chinese | Use |
 |---|---|---|---|
-| Record | **Newsreader**, regular with real italic | **jf Lanyang Ming Light / jf-lanyangming-light** | transcript turns, quoted source excerpts, long editorial and legal reading |
-| Decisive finding | **Source Sans 3**, 700–800 | **jf Lanyang Hei ExtraBold / jf-lanyanghei-extrabold** | page titles, section titles, speaker hand-offs, primary actions |
+| Record | **Newsreader**, regular with real italic | **jf Lanyang Ming Light** (`.jf-lanyangming-light`, family `jf-lanyangming`) | transcript turns, quoted source excerpts, long editorial and legal reading |
+| Decisive finding | **Source Sans 3**, 700–800 | **jf Lanyang Hei ExtraBold** (`.jf-lanyanghei-extrabold`, family `jf-lanyanghei`) | page titles, section titles, speaker hand-offs, primary actions |
 | Routine finding | **Source Sans 3**, 400–650 | **PingFang TC**, **Noto Sans TC**, system sans | navigation, controls, filters, metadata, dense indexes |
 
 This is one matched system across two scripts, not an English design with Chinese fallback.
@@ -126,7 +126,7 @@ This is one matched system across two scripts, not an English design with Chines
 :root {
   --font-record:
     "Newsreader",
-    "jf-lanyangming-light",
+    "jf-lanyangming",
     "Noto Serif TC",
     "Songti TC",
     "PMingLiU",
@@ -143,7 +143,7 @@ This is one matched system across two scripts, not an English design with Chines
 
   --font-decisive:
     "Source Sans 3",
-    "jf-lanyanghei-extrabold",
+    "jf-lanyanghei",
     "PingFang TC",
     "Noto Sans TC",
     system-ui,
@@ -157,12 +157,12 @@ Latin faces come first so mixed-script lines retain a considered Latin texture; 
 
 The production webfont path is deliberate and narrow:
 
-- Justfont project **65960** provides `jf-lanyangming-light` at registered weight **200** and `jf-lanyanghei-extrabold` at **800**.
-- Load it through the existing Justfont Universal **v6.1** loader, ID **69938697899**.
+- Justfont project **65960** provides loader class `jf-lanyangming-light` at registered weight **200** with family alias `jf-lanyangming`, and `jf-lanyanghei-extrabold` at **800** with alias `jf-lanyanghei`.
+- Bootstrap it from the project’s local copy of the official Justfont Universal **v6.1** snippet, which loads kit ID **69938697899** from `ds.justfont.com`; do not resurrect the obsolete S3 loader endpoint.
 - Justfont is the sole deliberate runtime font-service exception. Do not add Google Fonts, another foundry loader, or a second copy of the same faces.
 - The page must remain fully visible and usable while Justfont is unavailable or loading. Never gate the body behind a `.loading` class.
 - Never commit or publicly serve Lanyang font binaries. The existing licensed local-font-to-PNG Open Graph path remains image-only; its output may ship, its source font may not.
-- Self-host route-appropriate WOFF2 subsets of Newsreader and Source Sans 3. Preload only the face required above the fold; do not make CJK shards part of the Latin critical path.
+- Self-host route-appropriate WOFF2 subsets of Newsreader and Source Sans 3. Do not preload a face unless measured above-the-fold use justifies it; do not make CJK shards part of the Latin critical path.
 - Newsreader italic is a real italic file/axis. No browser-synthesized italic or bold anywhere in the system.
 - Set `font-synthesis: none` globally. Request normal text weight at the style layer so system fallbacks stay legible; when Justfont is present, its registered 200 Ming face remains the selected family face.
 - Test three states: all fonts loaded, Justfont blocked, and all webfonts blocked. Each must preserve hierarchy, readable measures, and stable controls.
@@ -349,8 +349,9 @@ Hierarchy should usually be expressed with spacing, type, and a rule—not a con
 
 - The header is a compact finding aid, not a promotional masthead.
 - Keep the archive name, primary search entry, current section, and language twin legible at every width.
-- Treat **record language** and **interface language** as separate controls. The record link names its action—**閱讀英語逐字稿** / **Read 華文 transcript**—while the quieter interface control states the current mode—**介面：華文** / **Interface: English**.
-- Never use bare `華文` / `English` buttons for both axes. Use correct `lang` attributes; flags represent countries, not languages.
+- Treat **record language** and **interface language** as separate controls. Following civic.ai’s interior-page treatment, place the record twin as a compact, hairline-framed **English** / **華文** button beside the title; its position establishes that it changes the document, while its accessible name says “Read … transcript.”
+- Keep the quieter interface control in the utility bar and state its current mode—**介面：華文** / **Interface: English**.
+- Never place two bare language buttons in the same control group. Use correct `lang` attributes; flags represent countries, not languages.
 - On a record-language twin link, preserve the conceptual destination and query where the data permits. Do not silently replace the page in place.
 - The active item uses weight plus a short index-blue rule; colour alone is insufficient.
 - Provide a skip link that lands at the page’s unique main heading or transcript.
@@ -538,8 +539,8 @@ Use plain, archival verbs:
 - **View source turn**
 - **Copy link**
 - **Copy citation**
-- **閱讀英語逐字稿** / **Read 華文 transcript**
-- **介面：華文** / **Interface: English**
+- Title-adjacent record twin: **English** / **華文**
+- Utility-bar interface state: **介面：華文** / **Interface: English**
 
 Avoid promotional copy such as “Discover insights,” “Unlock the conversation,” or “Experience AI-powered search.” The archive is already valuable; the interface need only make it usable.
 

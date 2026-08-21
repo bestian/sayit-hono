@@ -152,17 +152,7 @@
 
 	<template>
 		<div class="page">
-			<Navbar>
-				<a
-					v-if="alternateUrl && alternateLabel"
-					:href="alternateUrl"
-					class="sayit-lang-switch"
-					:aria-label="alternateLabel === 'English' ? 'Read English transcript' : '讀華文逐字稿'"
-				>
-					<span lang="zh">{{ alternateLabel === 'English' ? '閱讀英語逐字稿' : '閱讀華文逐字稿' }}</span>
-					<span lang="en">{{ alternateLabel === 'English' ? 'Read English transcript' : 'Read 華文 transcript' }}</span>
-				</a>
-			</Navbar>
+			<Navbar />
 			<main id="main-content">
 				<div class="sayit-ask-overlay">
 					<div id="sayit-ask-answer" class="homepage-ask-answer" aria-live="polite" hidden></div>
@@ -177,7 +167,18 @@
 										<li><a :href="getNestListUrl()">{{ formattedParentTitle }}</a></li>
 									</ul>
 								</nav>
-								<h1>{{ formattedTitle }}</h1>
+								<div class="page-header__title-row">
+									<h1 :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }">{{ formattedTitle }}</h1>
+									<a
+										v-if="alternateUrl && alternateLabel"
+										:href="alternateUrl"
+										class="record-twin-button"
+										:lang="alternateLabel === 'English' ? 'en' : 'zh-Hant'"
+										:aria-label="alternateLabel === 'English' ? 'Read English transcript' : '閱讀華文逐字稿'"
+									>
+										{{ alternateLabel === 'English' ? 'English' : '華文' }}
+									</a>
+								</div>
 							</header>
 							<div class="page-content__row" v-if="!loading">
 								<div class="primary-content__unit">
@@ -240,7 +241,7 @@
 													</div>
 												</details>
 												<div
-													class="speech__content record-copy"
+													:class="['speech__content record-copy', recordLanguage === 'zh-Hant' ? 'jf-lanyangming-light' : '']"
 													:lang="recordLanguage"
 													v-html="sanitizeHtmlContent(section.section_content)"
 												></div>

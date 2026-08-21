@@ -46,9 +46,9 @@
 	--warning: #805800;
 	--error: #9a3340;
 	--dialog-shadow: 0 18px 48px rgb(22 38 45 / 16%);
-	--font-record: 'Newsreader', 'jf-lanyangming-light', 'Noto Serif TC', 'Songti TC', 'PMingLiU', Georgia, serif;
+	--font-record: 'Newsreader', 'jf-lanyangming', 'Noto Serif TC', 'Songti TC', 'PMingLiU', Georgia, serif;
 	--font-finding: 'Source Sans 3', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
-	--font-decisive: 'Source Sans 3', 'jf-lanyanghei-extrabold', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif;
+	--font-decisive: 'Source Sans 3', 'jf-lanyanghei', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif;
 	--space-1: 0.25rem;
 	--space-2: 0.5rem;
 	--space-3: 0.75rem;
@@ -270,6 +270,40 @@ small,
 	padding-block-end: var(--space-5);
 }
 
+.page-header__title-row {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-3);
+}
+
+.page-header__title-row h1 {
+	min-width: 0;
+	flex: 1;
+}
+
+.record-twin-button {
+	flex: 0 0 auto;
+	margin-block-start: 0.35rem;
+	padding: 0.3rem 0.7rem;
+	border: 1px solid color-mix(in srgb, var(--carbon) 28%, transparent);
+	border-radius: var(--radius);
+	background: transparent;
+	color: var(--slate);
+	font-family: var(--font-finding);
+	font-size: 0.8rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	line-height: 1.2;
+	text-decoration: none;
+}
+
+.record-twin-button:hover,
+.record-twin-button:focus-visible {
+	border-color: var(--index);
+	background: color-mix(in srgb, var(--index) 8%, transparent);
+	color: var(--index-strong);
+}
+
 .page-header.page-header--speech h1 {
 	max-inline-size: 100%;
 	font-size: clamp(2rem, 1.6rem + 1.5vw, 3rem);
@@ -421,7 +455,6 @@ small,
 }
 
 .sayit-share-button,
-.sayit-lang-switch,
 .sayit-site-lang-toggle {
 	display: inline-flex;
 	min-height: 2.75rem;
@@ -438,13 +471,6 @@ small,
 	cursor: pointer;
 }
 
-.sayit-lang-switch {
-	border-color: color-mix(in srgb, var(--index) 42%, var(--rule));
-	background: var(--index-wash);
-	color: var(--index-strong);
-	font-weight: 720;
-}
-
 .sayit-site-lang-toggle {
 	border-color: transparent;
 	color: var(--slate);
@@ -452,7 +478,6 @@ small,
 }
 
 .sayit-share-button:hover,
-.sayit-lang-switch:hover,
 .sayit-site-lang-toggle:hover {
 	border-color: var(--index);
 	background: var(--index-wash);

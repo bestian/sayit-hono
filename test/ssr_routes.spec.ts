@@ -408,9 +408,11 @@ describe('SSR /:filename', () => {
 		expect(res.status).toBe(200);
 		const html = await res.text();
 		expect(html).toContain('hreflang');
-		expect(html).toContain('class="sayit-lang-switch"');
-		expect(html).toContain('閱讀英語逐字稿');
-		expect(html).toContain('Read English transcript');
+		expect(html).toContain('class="record-twin-button"');
+		expect(html).toContain('aria-label="Read English transcript"');
+		expect(html).toMatch(/class="record-twin-button"[^>]*lang="en"[^>]*>[\s\S]*?English[\s\S]*?<\/a>/);
+		expect(html.indexOf('class="record-twin-button"')).toBeGreaterThan(html.indexOf('class="page-header__title-row"'));
+		expect(html.indexOf('class="record-twin-button"')).toBeGreaterThan(html.indexOf('<main id="main-content"'));
 	});
 });
 

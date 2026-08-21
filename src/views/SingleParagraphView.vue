@@ -82,7 +82,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 									<p class="homepage-search__kicker">
 										<span lang="zh">可引用的發言段落</span><span lang="en">Citable transcript turn</span>
 									</p>
-									<h1>#{{ section.section_id }}</h1>
+									<h1 :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }">#{{ section.section_id }}</h1>
 									<p v-if="section.section_speaker && section.name">
 										<span lang="zh">講者：</span><span lang="en">Speaker: </span>
 										<span class="speech__meta-data__speaker-name">
@@ -91,7 +91,7 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 									</p>
 								</header>
 								<div
-									class="speech__content speech__content-single-speech record-copy"
+									:class="['speech__content speech__content-single-speech record-copy', recordLanguage === 'zh-Hant' ? 'jf-lanyangming-light' : '']"
 									:lang="recordLanguage"
 									v-html="parsedContent"
 								></div>
