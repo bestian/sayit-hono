@@ -97,6 +97,17 @@ const blockAvatarStyle = (block: SpeakerBlock) => ({
 
 
 const loading = false
+
+// Split a leading YYYY-MM-DD date off the page title so it can be wrapped in <time>.
+const heading = computed(() => {
+  const text =
+    !loading && displaySections.value.length > 0 && displaySections.value[0]
+      ? displaySections.value[0].display_name
+      : formattedSpeechName.value
+  return /^\d{4}-\d{2}-\d{2}/.test(text)
+    ? { date: text.slice(0, 10), rest: text.slice(10) }
+    : { date: null, rest: text }
+})
 </script>
 
 <template>
@@ -113,12 +124,11 @@ const loading = false
 						<header class="page-header page-header--speech">
 							<div class="page-header__title-row">
 								<h1
+									id="page-title"
 									v-if="!loading && displaySections.length > 0 && displaySections[0]"
 									:class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }"
-								>
-									{{ displaySections[0].display_name }}
-								</h1>
-								<h1 v-else :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }">{{ formattedSpeechName }}</h1>
+								><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
+								<h1 id="page-title" v-else :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
 								<a
 									v-if="alternateUrl && alternateLabel"
 									:href="alternateUrl"
@@ -131,8 +141,8 @@ const loading = false
 							</div>
 						</header>
 						<div class="page-content__row" v-if="!loading">
-							<div class="primary-content__unit">
-								<ol class="section-list" aria-label="Transcript turns">
+							<article class="primary-content__unit" aria-labelledby="page-title">
+								<ol class="section-list" :aria-label="recordLanguage === 'zh-Hant' ? '逐字稿發言段落' : 'Transcript turns'">
 									<li
 										v-for="block in speakerBlocks"
 										:key="`block-${block.id}`"
@@ -198,7 +208,7 @@ const loading = false
 										</article>
 									</li>
 								</ol>
-							</div>
+							</article>
 							<div class="sidebar__unit section-detail-sidebar"></div>
 						</div>
 					</div>

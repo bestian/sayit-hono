@@ -59,6 +59,14 @@
 		return props.nestFilename;
 	});
 
+	// Split a leading YYYY-MM-DD date off the page title so it can be wrapped in <time>.
+	const heading = computed(() => {
+		const text = formattedTitle.value;
+		return /^\d{4}-\d{2}-\d{2}/.test(text)
+			? { date: text.slice(0, 10), rest: text.slice(10) }
+			: { date: null, rest: text };
+	});
+
 	const formattedParentTitle = computed(() => {
 		if (props.speechDisplayName) return props.speechDisplayName;
 		const firstSection = displaySections.value[0];
@@ -156,13 +164,14 @@
 					<div class="full-page__row">
 						<div class="full-page__unit">
 							<header class="page-header page-header--speech">
-								<nav aria-label="Breadcrumb">
+								<nav aria-labelledby="breadcrumbs-label">
+									<span id="breadcrumbs-label" class="visually-hidden"><span lang="zh">麵包屑導覽</span><span lang="en">Breadcrumb</span></span>
 									<ul class="breadcrumbs">
 										<li><a :href="getNestListUrl()">{{ formattedParentTitle }}</a></li>
 									</ul>
 								</nav>
 								<div class="page-header__title-row">
-									<h1 :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }">{{ formattedTitle }}</h1>
+									<h1 id="page-title" :class="{ 'jf-lanyanghei-extrabold': recordLanguage === 'zh-Hant' }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
 									<a
 										v-if="alternateUrl && alternateLabel"
 										:href="alternateUrl"
@@ -175,8 +184,8 @@
 								</div>
 							</header>
 							<div class="page-content__row" v-if="!loading">
-								<div class="primary-content__unit">
-									<ol class="section-list" aria-label="Transcript turns">
+								<article class="primary-content__unit" aria-labelledby="page-title">
+									<ol class="section-list" :aria-label="recordLanguage === 'zh-Hant' ? '逐字稿發言段落' : 'Transcript turns'">
 										<li
 											v-for="block in speakerBlocks"
 											:key="`block-${block.id}`"
@@ -242,8 +251,9 @@
 											</article>
 										</li>
 									</ol>
-								</div>
-								<aside class="sidebar__unit section-detail-sidebar" aria-label="Section navigation">
+								</article>
+								<aside class="sidebar__unit section-detail-sidebar" aria-labelledby="section-navigation-label">
+									<span id="section-navigation-label" class="visually-hidden"><span lang="zh">段落導覽</span><span lang="en">Section navigation</span></span>
 									<div class="section-navigation">
 										<a
 											v-if="previousSibling"

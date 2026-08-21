@@ -586,6 +586,15 @@ Target WCAG 2.2 AA as a floor.
 - Touch targets are at least `44px`; adjacent turn actions have enough separation to avoid accidental activation.
 - Test with keyboard only, VoiceOver/Safari, one Chromium screen reader pairing, 200% zoom, forced colours, and font loading blocked.
 
+### Semantic markup contracts
+
+- Turn sequences are ordered lists (`ol`); the transcript region is one `article` labelled by the page `h1` (`id="page-title"`).
+- Date-prefixed record names wrap their date in `<time datetime="YYYY-MM-DD">`. The visible character sequence never changes.
+- Landmarks and icon-only controls are named bilingually through `aria-labelledby` pointing at a `.visually-hidden` paired-language span — never an English-only `aria-label`.
+- The primary nav's `aria-current="page"` is owned by the shared shell script. Do not add per-component duplicates; these pages are server-rendered and never hydrated, so component lifecycle hooks never run.
+- Search regions keep `role="search"`. The header search input carries `aria-keyshortcuts="/"`; search and AI loads set `aria-busy` and announce a single result-count line through the existing live region.
+- Speaker portraits use `alt=""` whenever the name is adjacent visible text; `loading="lazy"` and `decoding="async"` on list portraits.
+
 ---
 
 ## 11. Performance and resilience

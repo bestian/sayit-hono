@@ -64,6 +64,7 @@
 	var askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
 	input.setAttribute('placeholder', askT.searchPlaceholder);
 	input.setAttribute('aria-label', askT.searchAriaLabel);
+	input.setAttribute('aria-keyshortcuts', '/');
 	function refreshSearchI18n() {
 		isZh = document.documentElement.classList.contains('lang-zh');
 		askT = ASK_STRINGS[isZh ? 'zh' : 'en'];
@@ -460,6 +461,7 @@
 
 	function setPopupContent(container, html) {
 		if (!container) return;
+		if (container === results) container.removeAttribute('aria-busy');
 		var opening = container.hidden || !container.classList.contains('sayit-popup');
 		var closeHadFocus = container.querySelector('[data-sayit-popup-close]') === document.activeElement;
 		if (opening) {
@@ -514,6 +516,7 @@
 
 	function hideResults(restoreFocus) {
 		if (!results) return;
+		results.removeAttribute('aria-busy');
 		closePopup(results, restoreFocus === true);
 		results.innerHTML = '';
 		if (speechList) speechList.style.display = '';
@@ -523,6 +526,7 @@
 
 	function hideAskAnswer(restoreFocus) {
 		if (!askAnswer) return;
+		askAnswer.removeAttribute('aria-busy');
 		closePopup(askAnswer, restoreFocus === true);
 		askAnswer.innerHTML = '';
 		lastAskMarkdown = '';
@@ -554,6 +558,11 @@
 		askSubmit.textContent = askLoading
 			? askT.submitting
 			: (askCooldownRemaining > 0 ? askT.cooldown(askCooldownRemaining) : askT.submit);
+		if (askSubmit.hidden) {
+			askSubmit.setAttribute('aria-hidden', 'true');
+		} else {
+			askSubmit.removeAttribute('aria-hidden');
+		}
 
 		if (!askPanel) return;
 		var samples = askPanel.querySelectorAll('[data-sayit-ask-question]');
@@ -584,6 +593,11 @@
 	function renderAskAnswer(raw, loading, error) {
 		if (!askAnswer) return;
 		bindAskCopyButton();
+		if (loading) {
+			askAnswer.setAttribute('aria-busy', 'true');
+		} else {
+			askAnswer.removeAttribute('aria-busy');
+		}
 
 		var generatedLabel = askT.provenance;
 		if (askGeneratedAt) {
@@ -647,6 +661,7 @@
 				'<span>' + (isZh ? '搜尋中…' : 'Searching…') + '</span>' +
 				'</div>',
 		);
+		results.setAttribute('aria-busy', 'true');
 	}
 
 	function renderNoResults(query) {
