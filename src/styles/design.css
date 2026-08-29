@@ -253,7 +253,10 @@ small,
 .lang-zh .record-copy [lang='en'],
 .lang-en .record-copy[lang='zh'],
 .lang-en .record-copy[lang='zh-Hant'],
-.lang-en .record-copy [lang='zh'] {
+.lang-en .record-copy [lang='zh'],
+.lang-zh .record-twin-button[lang='en'],
+.lang-en .record-twin-button[lang='zh'],
+.lang-en .record-twin-button[lang='zh-Hant'] {
 	display: revert !important;
 }
 
