@@ -171,11 +171,43 @@ describe('SSR layout', () => {
 						name: 'Audrey',
 					},
 				],
+				alternateUrl: '/english-record-zh',
+				alternateLabel: '華文',
 			},
 		});
 
 		expect(html).toContain('class="speech__content record-copy" lang="en"');
 		expect(html).toContain('.lang-zh .record-copy[lang="en"]');
+		expect(html).toContain('.lang-zh .record-twin-button[lang="en"]');
+		expect(html).toMatch(/class="record-twin-button"[^>]*lang="zh-Hant"[^>]*>[\s\S]*?華文[\s\S]*?<\/a>/);
+	});
+
+	it('keeps the English record-twin link visible when the interface is 華文', async () => {
+		const html = await renderHtml(SingleSpeechView, {
+			styles: [SingleSpeechViewStyles, NavbarStyles, FooterStyles].filter(Boolean).join('\n'),
+			components: { Navbar, Footer },
+			props: {
+				speechName: 'zh-record',
+				displayName: '華文紀錄',
+				sections: [
+					{
+						filename: 'zh-record',
+						section_id: 1,
+						previous_section_id: null,
+						next_section_id: null,
+						section_speaker: 'audrey',
+						section_content: '<p>這是紀錄。</p>',
+						display_name: '華文紀錄',
+						photoURL: null,
+						name: '唐鳳',
+					},
+				],
+				alternateUrl: '/zh-record-en',
+				alternateLabel: 'English',
+			},
+		});
+		expect(html).toMatch(/class="record-twin-button"[^>]*lang="en"[^>]*>[\s\S]*?English[\s\S]*?<\/a>/);
+		expect(html).toContain('.lang-zh .record-twin-button[lang="en"]');
 	});
 
 	it('renders bilingual privacy policy content', async () => {
