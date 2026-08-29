@@ -7,6 +7,7 @@ import {
 	SEARCH_STATS_KEY,
 } from '../src/search/indexFormat';
 import { createMockEnv, dispatch, type QueryResolver } from './helpers/mockEnv';
+import { htmlWithoutTwinExceptions, parseRecordTwinButton, twinDisplayUnderZhUi } from './helpers/computedDisplay';
 
 describe('SSR /speakers', () => {
 	const resolver: QueryResolver = (sql) => {
@@ -457,6 +458,89 @@ describe('SSR /:filename', () => {
 		expect(html).toMatch(/class="record-twin-button"[^>]*lang="en"[^>]*>[\s\S]*?English[\s\S]*?<\/a>/);
 		expect(html.indexOf('class="record-twin-button"')).toBeGreaterThan(html.indexOf('class="page-header__title-row"'));
 		expect(html.indexOf('class="record-twin-button"')).toBeGreaterThan(html.indexOf('<main id="main-content"'));
+	});
+
+	it('keeps the English twin visible under 華文 UI and navigates to that href', async () => {
+		const zhFilename = '2026-08-29-platform-originals-對齊的另一面';
+		const enFilename = '2026-08-29-platform-originals-the-other-side-of-al';
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('FROM speech_index WHERE filename = ?')) {
+				if (args[0] === zhFilename) {
+					return {
+						success: true,
+						results: [{ filename: zhFilename, display_name: '對齊的另一面', isNested: 0, nest_filenames: null, nest_display_names: null }],
+					};
+				}
+				if (args[0] === enFilename) {
+					return {
+						success: true,
+						results: [
+							{
+								filename: enFilename,
+								display_name: 'The Other Side of Alignment',
+								isNested: 0,
+								nest_filenames: null,
+								nest_display_names: null,
+							},
+						],
+					};
+				}
+				return { success: true, results: [] };
+			}
+			if (sql.includes('FROM speech_index si') && sql.includes('alternate_filename')) {
+				if (args[0] === zhFilename) {
+					return {
+						success: true,
+						results: [{ alternate_filename: enFilename, alternate_display_name: 'The Other Side of Alignment' }],
+					};
+				}
+				return { success: true, results: [] };
+			}
+			if (
+				sql.includes('FROM speech_content sc') &&
+				sql.includes('WHERE sc.filename = ?') &&
+				sql.includes('LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname') &&
+				!sql.includes('GROUP BY')
+			) {
+				const filename = String(args[0]);
+				if (filename === zhFilename || filename === enFilename) {
+					return {
+						success: true,
+						results: [
+							{
+								filename,
+								section_id: filename === zhFilename ? 1 : 2,
+								previous_section_id: null,
+								next_section_id: null,
+								section_speaker: 'audrey-tang',
+								section_content: filename === zhFilename ? '<p>中文</p>' : '<p>English body</p>',
+								photoURL: null,
+								name: filename === zhFilename ? '唐鳳' : 'Audrey',
+							},
+						],
+					};
+				}
+				return { success: true, results: [] };
+			}
+			return { success: true, results: [] };
+		});
+
+		const { res } = await dispatch(`/${encodeURIComponent(zhFilename)}`, env);
+		expect(res.status).toBe(200);
+		const html = await res.text();
+		const twin = parseRecordTwinButton(html);
+		expect(twin).toEqual({
+			href: `/${enFilename}`,
+			lang: 'en',
+			label: 'English',
+		});
+		expect(twinDisplayUnderZhUi(htmlWithoutTwinExceptions(html))).toBe('none');
+		expect(twinDisplayUnderZhUi(html)).not.toBe('none');
+		if (!twin) throw new Error('expected a record-twin-button');
+
+		const { res: enRes } = await dispatch(twin.href, env);
+		expect(enRes.status).toBe(200);
+		expect(await enRes.text()).toContain('The Other Side of Alignment');
 	});
 });
 
