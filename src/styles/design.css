@@ -253,11 +253,14 @@ small,
 .lang-zh .record-copy [lang='en'],
 .lang-en .record-copy[lang='zh'],
 .lang-en .record-copy[lang='zh-Hant'],
-.lang-en .record-copy [lang='zh'],
+.lang-en .record-copy [lang='zh'] {
+	display: revert !important;
+}
+
 .lang-zh .record-twin-button[lang='en'],
 .lang-en .record-twin-button[lang='zh'],
 .lang-en .record-twin-button[lang='zh-Hant'] {
-	display: revert !important;
+	display: inline-flex !important;
 }
 
 .page {
@@ -308,6 +311,7 @@ small,
 }
 
 .record-twin-button {
+	display: inline-flex;
 	flex: 0 0 auto;
 	margin-block-start: 0.35rem;
 	padding: 0.3rem 0.7rem;

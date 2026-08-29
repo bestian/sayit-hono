@@ -24,6 +24,7 @@
 		"build:search": "tsx --tsconfig scripts/tsconfig.json scripts/build-search-index.ts",
 		"test": "node node_modules/vite-plus/bin/vp test run",
 		"test:coverage": "node node_modules/vite-plus/bin/vp test run --coverage",
+		"test:twin-chrome": "bun scripts/record-twin-chrome.ts",
 		"test:watch": "node node_modules/vite-plus/bin/vp test",
 		"typecheck": "tsgo --noEmit",
 		"lint": "node node_modules/vite-plus/bin/vp lint",

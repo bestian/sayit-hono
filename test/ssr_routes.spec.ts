@@ -7,7 +7,6 @@ import {
 	SEARCH_STATS_KEY,
 } from '../src/search/indexFormat';
 import { createMockEnv, dispatch, type QueryResolver } from './helpers/mockEnv';
-import { htmlWithoutTwinExceptions, parseRecordTwinButton, twinDisplayUnderZhUi } from './helpers/computedDisplay';
 
 describe('SSR /speakers', () => {
 	const resolver: QueryResolver = (sql) => {
@@ -528,17 +527,12 @@ describe('SSR /:filename', () => {
 		const { res } = await dispatch(`/${encodeURIComponent(zhFilename)}`, env);
 		expect(res.status).toBe(200);
 		const html = await res.text();
-		const twin = parseRecordTwinButton(html);
-		expect(twin).toEqual({
-			href: `/${enFilename}`,
-			lang: 'en',
-			label: 'English',
-		});
-		expect(twinDisplayUnderZhUi(htmlWithoutTwinExceptions(html))).toBe('none');
-		expect(twinDisplayUnderZhUi(html)).not.toBe('none');
-		if (!twin) throw new Error('expected a record-twin-button');
+		const twinTag = html.match(/<a\b([^>]*\bclass="record-twin-button"[^>]*)>([\s\S]*?)<\/a>/);
+		expect(twinTag?.[1]).toContain(`href="/${enFilename}"`);
+		expect(twinTag?.[1]).toContain('lang="en"');
+		expect(twinTag?.[2]?.trim()).toBe('English');
 
-		const { res: enRes } = await dispatch(twin.href, env);
+		const { res: enRes } = await dispatch(`/${enFilename}`, env);
 		expect(enRes.status).toBe(200);
 		expect(await enRes.text()).toContain('The Other Side of Alignment');
 	});
