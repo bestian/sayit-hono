@@ -673,6 +673,10 @@ small,
 	cursor: pointer;
 }
 
+.homepage-ask__submit {
+	border: 3px solid var(--index);
+}
+
 .sayit-search__submit:hover,
 .site-search__submit:hover,
 .homepage-ask__submit:hover,
