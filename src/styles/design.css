@@ -663,7 +663,7 @@ small,
 	align-items: center;
 	justify-content: center;
 	padding: 0.6rem 0.95rem;
-	border: 3px solid var(--index);
+	border: 1px solid var(--index);
 	border-radius: var(--radius);
 	background: var(--index);
 	color: #fff;
@@ -671,6 +671,10 @@ small,
 	line-height: 1.2;
 	text-decoration: none;
 	cursor: pointer;
+}
+
+.homepage-ask__submit {
+	border: 3px solid var(--index);
 }
 
 .sayit-search__submit:hover,
