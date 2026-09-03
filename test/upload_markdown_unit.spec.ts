@@ -1811,6 +1811,8 @@ describe('upload_markdown PATCH — nested parent speech title update', () => {
 			}
 			return { success: true, results: [] };
 		});
+		env.__r2Store.set(`${CACHE_KEY_VERSION}/example.com/speech/255910`, { body: 'cached' } as const);
+		env.__r2Store.set(`${CACHE_KEY_VERSION}/example.com/speech/255911`, { body: 'cached' } as const);
 
 		const { res } = await dispatch('/api/upload_markdown', env, {
 			method: 'PATCH',
@@ -1824,6 +1826,10 @@ describe('upload_markdown PATCH — nested parent speech title update', () => {
 		expect(res.status).toBe(200);
 		const data = (await res.json()) as { sectionsCount: number };
 		expect(data.sectionsCount).toBe(2);
+
+		// Proves child section caches are actively purged:
+		expect(env.__r2Store.has(`${CACHE_KEY_VERSION}/example.com/speech/255910`)).toBe(false);
+		expect(env.__r2Store.has(`${CACHE_KEY_VERSION}/example.com/speech/255911`)).toBe(false);
 
 		const stmts = boundStmts(env);
 		const titleUpdate = stmts.find((s) => s.sql.includes('UPDATE speech_index SET display_name'));
