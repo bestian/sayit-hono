@@ -1912,4 +1912,71 @@ describe('upload_markdown PATCH — previous_title collision disambiguation', ()
 		const data = (await res.json()) as { filename: string };
 		expect(data.filename).toBe(hashedSlug);
 	});
+
+	it('handles idempotent retry when keeper already has incomingTitle in D1', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === keeperSlug) {
+					return {
+						success: true,
+						results: [{ filename: keeperSlug, display_name: '2026-03-05 BW Column: New Title', isNested: 0 }],
+					};
+				}
+				if (args[0] === hashedSlug) {
+					return {
+						success: true,
+						results: [{ filename: hashedSlug, display_name: 'Unrelated Hashed Speech', isNested: 0 }],
+					};
+				}
+			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(100, args);
+			return { success: true, results: [] };
+		});
+
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: longFilename,
+				markdown: '# 2026-03-05 BW Column: New Title\n## Audrey:\nUpdated content',
+				previous_title: '2026-03-04 BW Column: Old Title',
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { filename: string };
+		expect(data.filename).toBe(keeperSlug);
+	});
+
+	it('returns 409 when collision target is ambiguous (neither candidate matches)', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === keeperSlug) {
+					return {
+						success: true,
+						results: [{ filename: keeperSlug, display_name: 'Existing Title A', isNested: 0 }],
+					};
+				}
+				if (args[0] === hashedSlug) {
+					return {
+						success: true,
+						results: [{ filename: hashedSlug, display_name: 'Existing Title B', isNested: 0 }],
+					};
+				}
+			}
+			return { success: true, results: [] };
+		});
+
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: longFilename,
+				markdown: '# Brand New Unmatched Title\n## Audrey:\nBody',
+				previous_title: 'Unmatched Previous Title',
+			}),
+		});
+
+		expect(res.status).toBe(409);
+	});
 });
