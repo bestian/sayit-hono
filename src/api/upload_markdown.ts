@@ -805,45 +805,93 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			if (!body.markdown || typeof body.markdown !== 'string') {
 				return c.json({ error: 'Missing or invalid markdown field' }, 400, corsHeadersWithMethods);
 			}
-
 			let filename = transformFilename(rawFilename.trim());
 			const markdown = body.markdown;
 			const patchFirstLine = markdown.split('\n')[0].trim();
 			const incomingTitle = patchFirstLine.replace(/^#\s*/, '');
-			let existingSpeech = await withRetry(() =>
-				c.env.DB.prepare('SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?')
-					.bind(filename)
-					.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>(),
-			);
-			if (!existingSpeech) {
-				// 若 filename 已被合併到 canonical，改 PATCH 到 canonical，避免重新生出重複列
-				const canonicalFilename = await lookupRedirectTarget(c, filename);
-				if (canonicalFilename) {
-					console.log('[upload_markdown] PATCH redirect:', { from: filename, to: canonicalFilename });
-					filename = canonicalFilename;
-					existingSpeech = await withRetry(() =>
-						c.env.DB.prepare('SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?')
-							.bind(filename)
-							.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>(),
-					);
-				}
+			const rawPreviousTitle = (body as Record<string, unknown>).previous_title;
+			const previousTitle = typeof rawPreviousTitle === 'string' ? rawPreviousTitle.trim() : null;
+			const resistantKey = collisionResistantKey(rawFilename.trim());
+
+			// 1. Check if canonical target exists via redirects
+			const canonicalFilename = await lookupRedirectTarget(c, filename);
+			if (canonicalFilename) {
+				console.log('[upload_markdown] PATCH redirect:', { from: filename, to: canonicalFilename });
+				filename = canonicalFilename;
 			}
-			// CLOBBER GUARD (mirrors POST): if this (possibly truncated) key holds a
-			// DIFFERENTLY-TITLED speech, it is a distinct transcript that collided on
-			// the key — re-point to a collision-resistant key so we edit/create the
-			// right speech instead of corrupting the incumbent.
-			if (existingSpeech && incomingTitle && existingSpeech.display_name && existingSpeech.display_name !== incomingTitle) {
-				const resistantKey = collisionResistantKey(rawFilename.trim());
-				if (resistantKey !== filename) {
+
+			// 2. Fetch candidates: candidateA (truncated) and candidateB (hashed, if distinct)
+			const candidateA = await withRetry(() =>
+				c.env.DB.prepare('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')
+					.bind(filename)
+					.first<{
+						filename: string;
+						display_name?: string | null;
+						alternate_filename?: string | null;
+						isNested?: number | boolean | null;
+					}>(),
+			);
+			let candidateB: typeof candidateA = null;
+			if (resistantKey !== filename) {
+				candidateB = await withRetry(() =>
+					c.env.DB.prepare('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')
+						.bind(resistantKey)
+						.first<{
+							filename: string;
+							display_name?: string | null;
+							alternate_filename?: string | null;
+							isNested?: number | boolean | null;
+						}>(),
+				);
+			}
+
+			// 3. Disambiguate between candidateA (truncated keeper) and candidateB (hashed collision record)
+			let existingSpeech: typeof candidateA = candidateA;
+			if (candidateB && !candidateA) {
+				// Only hashed record exists in DB
+				filename = resistantKey;
+				existingSpeech = candidateB;
+			} else if (candidateA && candidateB) {
+				// Both exist: use previousTitle / incomingTitle to target the intended record
+				if (previousTitle) {
+					if (candidateA.display_name === previousTitle && candidateB.display_name !== previousTitle) {
+						filename = candidateA.filename;
+						existingSpeech = candidateA;
+					} else if (candidateB.display_name === previousTitle && candidateA.display_name !== previousTitle) {
+						filename = candidateB.filename;
+						existingSpeech = candidateB;
+					} else if (candidateB.display_name === incomingTitle) {
+						filename = candidateB.filename;
+						existingSpeech = candidateB;
+					} else {
+						filename = candidateA.filename;
+						existingSpeech = candidateA;
+					}
+				} else if (candidateB.display_name === incomingTitle && candidateA.display_name !== incomingTitle) {
+					filename = candidateB.filename;
+					existingSpeech = candidateB;
+				} else {
+					filename = candidateA.filename;
+					existingSpeech = candidateA;
+				}
+			} else if (candidateA && !candidateB) {
+				// Only candidateA exists.
+				// If previousTitle is supplied and matches candidateA's display_name,
+				// this is a confirmed title edit on candidateA (the keeper).
+				if (previousTitle && candidateA.display_name && candidateA.display_name === previousTitle) {
+					filename = candidateA.filename;
+					existingSpeech = candidateA;
+				} else if (resistantKey !== filename && candidateA.display_name && candidateA.display_name !== incomingTitle) {
+					// Title differs and previousTitle does not match candidateA:
+					// Treat as a missing collision record -> route to resistantKey
 					console.warn(
-						`[upload_markdown] PATCH key collision on "${filename}" (existing "${existingSpeech.display_name}" != incoming "${incomingTitle}"); using "${resistantKey}"`,
+						`[upload_markdown] PATCH collision for "${rawFilename}" (keeper "${candidateA.display_name}" != previous "${previousTitle ?? 'none'}" / incoming "${incomingTitle}"); creating "${resistantKey}"`,
 					);
 					filename = resistantKey;
-					existingSpeech = await withRetry(() =>
-						c.env.DB.prepare('SELECT filename, display_name, alternate_filename FROM speech_index WHERE filename = ?')
-							.bind(filename)
-							.first<{ filename: string; display_name?: string | null; alternate_filename?: string | null }>(),
-					);
+					existingSpeech = null;
+				} else {
+					filename = candidateA.filename;
+					existingSpeech = candidateA;
 				}
 			}
 			if (!existingSpeech) {
@@ -908,6 +956,74 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 			const { speakers, sectionPayloads } = await parseIncomingMarkdown(markdown);
 			const newSpeakerRoutePathnames = getUniqueSpeakerRoutePathnames(speakers);
 
+			const isNestedSpeech = Boolean(existingSpeech?.isNested);
+			if (isNestedSpeech && sectionPayloads.length === 0) {
+				// Nested parent records (e.g. # 2018-05-23 社創中心 第二十次 Office Hour) contain no section
+				// bodies in git; their sections live under child records. Updating title must NOT delete child sections.
+				const nestedBatch: Parameters<typeof c.env.DB.batch>[0] = [
+					c.env.DB.prepare('UPDATE speech_index SET display_name = ?, alternate_filename = ? WHERE filename = ?').bind(
+						displayName,
+						desiredAlternateFilename,
+						filename,
+					),
+				];
+				if (hasAlternateFilename && currentAlternateFilename && currentAlternateFilename !== desiredAlternateFilename) {
+					nestedBatch.push(
+						c.env.DB.prepare('UPDATE speech_index SET alternate_filename = NULL WHERE filename = ? AND alternate_filename = ?').bind(
+							currentAlternateFilename,
+							filename,
+						),
+					);
+				}
+				if (hasAlternateFilename && desiredAlternateFilename) {
+					nestedBatch.push(
+						c.env.DB.prepare('UPDATE speech_index SET alternate_filename = ? WHERE filename = ?').bind(filename, desiredAlternateFilename),
+					);
+				}
+				await withRetry(() => c.env.DB.batch(nestedBatch));
+				const cachePurge = await invalidateSpeechCaches(c, filename, []);
+				const searchSync = await syncSearchArtifactsAfterUpsert(c, filename);
+				const searchFrontPurge = searchSync ? await purgeSearchFrontCache() : false;
+				const searchFresh = searchSync && searchFrontPurge;
+				if (!cachePurge || !searchFresh) {
+					console.error('[upload_markdown] PATCH nested post-commit invalidation incomplete', {
+						filename,
+						cachePurge,
+						searchSync,
+						searchFrontPurge,
+					});
+					return c.json(
+						{
+							success: true,
+							filename,
+							alternate_filename: desiredAlternateFilename,
+							sectionsCount: 0,
+							insertedCount: 0,
+							updatedCount: 0,
+							deletedCount: 0,
+							cachePurge,
+							searchSync: searchFresh,
+						},
+						503,
+						{ ...corsHeadersWithMethods, 'Retry-After': '2' },
+					);
+				}
+				return c.json(
+					{
+						success: true,
+						filename,
+						alternate_filename: desiredAlternateFilename,
+						sectionsCount: 0,
+						insertedCount: 0,
+						updatedCount: 0,
+						deletedCount: 0,
+						cachePurge: true,
+						searchSync: true,
+					},
+					200,
+					corsHeadersWithMethods,
+				);
+			}
 			// Reserve a contiguous, collision-free block of fresh ids up front.
 			// sectionPayloads.length is an upper bound on how many we can need
 			// (matched sections reuse their old ids); any unused reserved ids are
