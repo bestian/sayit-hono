@@ -138,7 +138,7 @@ async function buildSearchIndex() {
 	const cacheIndexPath = path.resolve('scripts', 'search-index-cache.json');
 	const dumpPath = path.resolve('scripts', 'sections-dump.json');
 	const apiUrl = process.env.SAYIT_API_URL || 'https://archive.tw/api/speech_index.json';
-	const apiBase = apiUrl.replace(/\/api\/speech_index\.json$/, '');
+	const apiBase = new URL(apiUrl).origin;
 	const skipFetch = process.env.SKIP_FETCH === '1';
 	const skipUpload = process.env.SKIP_UPLOAD === '1';
 	const refreshDump = process.env.REFRESH_DUMP === '1';
