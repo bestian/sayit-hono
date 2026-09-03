@@ -1766,7 +1766,7 @@ describe('decodeURIComponent catch for speaker name', () => {
 // ---------------------------------------------------------------------------
 
 describe('upload_markdown PATCH — nested parent speech title update', () => {
-	it('updates display_name without deleting existing speech_content or speech_speakers', async () => {
+	it('updates display_name without deleting existing speech_content or speech_speakers, and invalidates child section IDs', async () => {
 		const nestedSlug = '2018-05-23-社創中心-第二十次-office-hour';
 		const env = createMockEnv((sql, _args) => {
 			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
@@ -1782,6 +1782,33 @@ describe('upload_markdown PATCH — nested parent speech title update', () => {
 					],
 				};
 			}
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return {
+					success: true,
+					results: [
+						{
+							section_id: 255910,
+							previous_section_id: null,
+							next_section_id: 255911,
+							section_speaker: '%E5%BC%B5%E5%86%A0%E7%BE%A3',
+							section_content: '<p>One</p>',
+						},
+						{
+							section_id: 255911,
+							previous_section_id: 255910,
+							next_section_id: null,
+							section_speaker: '%E5%BC%B5%E5%86%A0%E7%BE%A3',
+							section_content: '<p>Two</p>',
+						},
+					],
+				};
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
+				return {
+					success: true,
+					results: [{ speaker_route_pathname: '%E5%BC%B5%E5%86%A0%E7%BE%A3' }],
+				};
+			}
 			return { success: true, results: [] };
 		});
 
@@ -1795,6 +1822,9 @@ describe('upload_markdown PATCH — nested parent speech title update', () => {
 		});
 
 		expect(res.status).toBe(200);
+		const data = (await res.json()) as { sectionsCount: number };
+		expect(data.sectionsCount).toBe(2);
+
 		const stmts = boundStmts(env);
 		const titleUpdate = stmts.find((s) => s.sql.includes('UPDATE speech_index SET display_name'));
 		expect(titleUpdate).toBeDefined();
