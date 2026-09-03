@@ -149,14 +149,22 @@ export async function writeR2Cache(
 	}
 }
 
-/** 刪除 R2 origin 快取。成功 true；失敗 false（不可靜默，否則 front MISS 會從髒 R2 回填）。 */
-export async function deleteR2Cache(bucket: { delete(keys: string | string[]): Promise<void> }, cacheKey: string): Promise<boolean> {
+/** 刪除 R2 origin 快取。支援單一 key 或 key 陣列（自動以 ≤500 筆分批刪除以符合 R2 限制）。成功 true；失敗 false（不可靜默，否則 front MISS 會從髒 R2 回填）。 */
+export async function deleteR2Cache(
+	bucket: { delete(keys: string | string[]): Promise<void> },
+	cacheKey: string | string[],
+): Promise<boolean> {
+	const keys = Array.isArray(cacheKey) ? cacheKey : [cacheKey];
+	if (keys.length === 0) return true;
+	const CHUNK_SIZE = 500;
 	try {
-		await bucket.delete(cacheKey);
-		console.log('[r2 cache] deleted', cacheKey);
+		for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+			const chunk = keys.slice(i, i + CHUNK_SIZE);
+			await bucket.delete(chunk.length === 1 ? chunk[0] : chunk);
+		}
 		return true;
 	} catch (err) {
-		console.error('[r2 cache] delete error', cacheKey, err);
+		console.error('[r2 cache] delete error', err);
 		return false;
 	}
 }
