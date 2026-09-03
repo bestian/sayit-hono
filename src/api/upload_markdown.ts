@@ -853,26 +853,26 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 				existingSpeech = candidateB;
 			} else if (candidateA && candidateB) {
 				// Both exist: use previousTitle / incomingTitle to target the intended record
-				if (previousTitle) {
-					if (candidateA.display_name === previousTitle && candidateB.display_name !== previousTitle) {
-						filename = candidateA.filename;
-						existingSpeech = candidateA;
-					} else if (candidateB.display_name === previousTitle && candidateA.display_name !== previousTitle) {
-						filename = candidateB.filename;
-						existingSpeech = candidateB;
-					} else if (candidateB.display_name === incomingTitle) {
-						filename = candidateB.filename;
-						existingSpeech = candidateB;
-					} else {
-						filename = candidateA.filename;
-						existingSpeech = candidateA;
-					}
+				if (previousTitle && candidateA.display_name === previousTitle && candidateB.display_name !== previousTitle) {
+					filename = candidateA.filename;
+					existingSpeech = candidateA;
+				} else if (previousTitle && candidateB.display_name === previousTitle && candidateA.display_name !== previousTitle) {
+					filename = candidateB.filename;
+					existingSpeech = candidateB;
+				} else if (candidateA.display_name === incomingTitle && candidateB.display_name !== incomingTitle) {
+					// Idempotent retry or body-only edit targeting candidate A
+					filename = candidateA.filename;
+					existingSpeech = candidateA;
 				} else if (candidateB.display_name === incomingTitle && candidateA.display_name !== incomingTitle) {
+					// Idempotent retry or body-only edit targeting candidate B
 					filename = candidateB.filename;
 					existingSpeech = candidateB;
 				} else {
-					filename = candidateA.filename;
-					existingSpeech = candidateA;
+					return c.json(
+						{ error: 'Ambiguous collision: cannot uniquely determine target from previous_title or incoming title' },
+						409,
+						corsHeadersWithMethods,
+					);
 				}
 			} else if (candidateA && !candidateB) {
 				// Only candidateA exists.
@@ -981,7 +981,8 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 					);
 				}
 				await withRetry(() => c.env.DB.batch(nestedBatch));
-				const cachePurge = await invalidateSpeechCaches(c, filename, []);
+				const childSectionIds = oldSections.map((s) => s.section_id);
+				const cachePurge = await invalidateSpeechCaches(c, filename, childSectionIds);
 				const searchSync = await syncSearchArtifactsAfterUpsert(c, filename);
 				const searchFrontPurge = searchSync ? await purgeSearchFrontCache() : false;
 				const searchFresh = searchSync && searchFrontPurge;
@@ -997,7 +998,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 							success: true,
 							filename,
 							alternate_filename: desiredAlternateFilename,
-							sectionsCount: 0,
+							sectionsCount: oldSections.length,
 							insertedCount: 0,
 							updatedCount: 0,
 							deletedCount: 0,
@@ -1013,7 +1014,7 @@ export async function uploadMarkdown(c: Context<ApiEnv>) {
 						success: true,
 						filename,
 						alternate_filename: desiredAlternateFilename,
-						sectionsCount: 0,
+						sectionsCount: oldSections.length,
 						insertedCount: 0,
 						updatedCount: 0,
 						deletedCount: 0,
