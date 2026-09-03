@@ -1851,6 +1851,72 @@ describe('upload_markdown PATCH — nested parent speech title update', () => {
 		expect(contentDeletes).toHaveLength(0);
 		expect(speakerDeletes).toHaveLength(0);
 	});
+
+	it('chunks R2 invalidation into calls of <= 500 keys when speech has 581 child sections (1168 keys)', async () => {
+		const nestedSlug = '2018-05-23-社創中心-第二十次-office-hour';
+		const totalSections = 581;
+		const mockSections = Array.from({ length: totalSections }, (_, i) => ({
+			section_id: 255910 + i,
+			previous_section_id: i > 0 ? 255910 + i - 1 : null,
+			next_section_id: i < totalSections - 1 ? 255910 + i + 1 : null,
+			section_speaker: '%E5%BC%B5%E5%86%A0%E7%BE%A3',
+			section_content: `<p>Section ${i}</p>`,
+		}));
+
+		const env = createMockEnv((sql, _args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				return {
+					success: true,
+					results: [
+						{
+							filename: nestedSlug,
+							display_name: '2018-05-23 社創中心\xa0第二十次 Office Hour',
+							alternate_filename: null,
+							isNested: 1,
+						},
+					],
+				};
+			}
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) {
+				return { success: true, results: mockSections };
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) {
+				return { success: true, results: [{ speaker_route_pathname: '%E5%BC%B5%E5%86%A0%E7%BE%A3' }] };
+			}
+			return { success: true, results: [] };
+		});
+
+		const deleteCalls: string[][] = [];
+		const origDelete = env.SPEECH_CACHE.delete;
+		env.SPEECH_CACHE.delete = async (keys) => {
+			const arr = Array.isArray(keys) ? keys : [keys];
+			deleteCalls.push(arr);
+			return origDelete(keys);
+		};
+
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: '2018-05-23-社創中心-第二十次-Office-Hour.md',
+				markdown: '# 2018-05-23 社創中心 第二十次 Office Hour\n',
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { sectionsCount: number };
+		expect(data.sectionsCount).toBe(581);
+
+		// 6 base keys + 2 * 581 = 1168 keys total
+		const totalKeysDeleted = deleteCalls.reduce((sum, chunk) => sum + chunk.length, 0);
+		expect(totalKeysDeleted).toBe(1168);
+
+		// Every delete call MUST be <= 500 keys to respect Cloudflare R2's 1000-key limit:
+		expect(deleteCalls.length).toBe(3); // 500 + 500 + 168 = 1168
+		for (const chunk of deleteCalls) {
+			expect(chunk.length).toBeLessThanOrEqual(500);
+		}
+	});
 });
 
 describe('upload_markdown PATCH — previous_title collision disambiguation', () => {

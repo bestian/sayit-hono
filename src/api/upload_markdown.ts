@@ -349,10 +349,9 @@ async function invalidateSpeechCaches(c: Context<ApiEnv>, filename: string, extr
 	const { r2Keys, tags: purgeTags } = planSpeechInvalidation(host, filename, [...sectionIds]);
 	// Both tiers must clear: R2 origin delete AND Workers Cache purge.
 	// If R2 delete fails but front purge succeeds, the next MISS re-poisons the front from stale R2.
-	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
-	const r2Ok = r2Results.every(Boolean);
+	const r2Ok = await deleteR2Cache(c.env.SPEECH_CACHE, r2Keys);
 	if (!r2Ok) {
-		console.error('[invalidate] R2 origin delete incomplete', { filename, failed: r2Results.filter((ok) => !ok).length });
+		console.error('[invalidate] R2 origin delete incomplete', { filename });
 	}
 	// Split tags vs pathPrefixes so a bad prefix cannot block tag purge.
 	const [tagsOk, pathsOk] = await Promise.all([purgeWorkersCache({ tags: purgeTags }), purgeWorkersCache({ pathPrefixes })]);
@@ -371,12 +370,9 @@ async function invalidateSpeakerCaches(c: Context<ApiEnv>, speakerRoutePathnames
 
 	const { r2Keys, tags: purgeTags } = planSpeakerInvalidation(host, speakerRoutePathnames);
 
-	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
-	const r2Ok = r2Results.every(Boolean);
+	const r2Ok = await deleteR2Cache(c.env.SPEECH_CACHE, r2Keys);
 	if (!r2Ok) {
-		console.error('[invalidate] speaker R2 origin delete incomplete', {
-			failed: r2Results.filter((ok) => !ok).length,
-		});
+		console.error('[invalidate] speaker R2 origin delete incomplete');
 	}
 	const tagsOk = await purgeWorkersCache({ tags: purgeTags });
 	const pathsOk = pathPrefixes.length > 0 ? await purgeWorkersCache({ pathPrefixes }) : true;
@@ -388,12 +384,9 @@ async function invalidateListPageCaches(c: Context<ApiEnv>): Promise<boolean> {
 	const host = new URL(c.req.url).host;
 	const { r2Keys, tags: purgeTags } = planListInvalidation(host, true, true, true);
 
-	const r2Results = await Promise.all(r2Keys.map((key) => deleteR2Cache(c.env.SPEECH_CACHE, key)));
-	const r2Ok = r2Results.every(Boolean);
+	const r2Ok = await deleteR2Cache(c.env.SPEECH_CACHE, r2Keys);
 	if (!r2Ok) {
-		console.error('[invalidate] list R2 origin delete incomplete', {
-			failed: r2Results.filter((ok) => !ok).length,
-		});
+		console.error('[invalidate] list R2 origin delete incomplete');
 	}
 	// home is always requested, so purgeTags is never empty.
 	const purgeOk = await purgeWorkersCache({ tags: purgeTags });
