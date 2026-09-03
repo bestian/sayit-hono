@@ -1811,8 +1811,14 @@ describe('upload_markdown PATCH — nested parent speech title update', () => {
 			}
 			return { success: true, results: [] };
 		});
-		env.__r2Store.set(`${CACHE_KEY_VERSION}/example.com/speech/255910`, { body: 'cached' } as const);
-		env.__r2Store.set(`${CACHE_KEY_VERSION}/example.com/speech/255911`, { body: 'cached' } as const);
+		const deletedKeys: string[] = [];
+		const origDelete = env.SPEECH_CACHE.delete;
+		env.SPEECH_CACHE.delete = async (keys) => {
+			for (const k of Array.isArray(keys) ? keys : [keys]) deletedKeys.push(k);
+			return origDelete(keys);
+		};
+		env.__r2Store.set(`${CACHE_KEY_VERSION}/example.com/speech/255910`, { body: 'cached' });
+		env.__r2Store.set(`${CACHE_KEY_VERSION}/example.com/speech/255911`, { body: 'cached' });
 
 		const { res } = await dispatch('/api/upload_markdown', env, {
 			method: 'PATCH',
@@ -1827,10 +1833,13 @@ describe('upload_markdown PATCH — nested parent speech title update', () => {
 		const data = (await res.json()) as { sectionsCount: number };
 		expect(data.sectionsCount).toBe(2);
 
-		// Proves child section caches are actively purged:
+		// Explicitly proves child section HTML and OG caches are actively purged:
+		expect(deletedKeys).toContain(`${CACHE_KEY_VERSION}/example.com/speech/255910`);
+		expect(deletedKeys).toContain(`${CACHE_KEY_VERSION}/example.com/speech/255911`);
+		expect(deletedKeys).toContain(`${CACHE_KEY_VERSION}/og/speech/255910.png`);
+		expect(deletedKeys).toContain(`${CACHE_KEY_VERSION}/og/speech/255911.png`);
 		expect(env.__r2Store.has(`${CACHE_KEY_VERSION}/example.com/speech/255910`)).toBe(false);
 		expect(env.__r2Store.has(`${CACHE_KEY_VERSION}/example.com/speech/255911`)).toBe(false);
-
 		const stmts = boundStmts(env);
 		const titleUpdate = stmts.find((s) => s.sql.includes('UPDATE speech_index SET display_name'));
 		expect(titleUpdate).toBeDefined();
