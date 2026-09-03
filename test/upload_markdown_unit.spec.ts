@@ -1760,3 +1760,156 @@ describe('decodeURIComponent catch for speaker name', () => {
 		expect(res.status).toBe(200);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// PATCH nested speech parent record & collision disambiguation via previous_title
+// ---------------------------------------------------------------------------
+
+describe('upload_markdown PATCH — nested parent speech title update', () => {
+	it('updates display_name without deleting existing speech_content or speech_speakers', async () => {
+		const nestedSlug = '2018-05-23-社創中心-第二十次-office-hour';
+		const env = createMockEnv((sql, _args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				return {
+					success: true,
+					results: [
+						{
+							filename: nestedSlug,
+							display_name: '2018-05-23 社創中心\xa0第二十次 Office Hour',
+							alternate_filename: null,
+							isNested: 1,
+						},
+					],
+				};
+			}
+			return { success: true, results: [] };
+		});
+
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: '2018-05-23-社創中心-第二十次-Office-Hour.md',
+				markdown: '# 2018-05-23 社創中心 第二十次 Office Hour\n',
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const stmts = boundStmts(env);
+		const titleUpdate = stmts.find((s) => s.sql.includes('UPDATE speech_index SET display_name'));
+		expect(titleUpdate).toBeDefined();
+		expect(titleUpdate!.args[0]).toBe('2018-05-23 社創中心 第二十次 Office Hour');
+
+		// Crucial safety assertion: speech_content and speech_speakers MUST NOT be deleted
+		const contentDeletes = stmts.filter((s) => s.sql.includes('DELETE FROM speech_content'));
+		const speakerDeletes = stmts.filter((s) => s.sql.includes('DELETE FROM speech_speakers'));
+		expect(contentDeletes).toHaveLength(0);
+		expect(speakerDeletes).toHaveLength(0);
+	});
+});
+
+describe('upload_markdown PATCH — previous_title collision disambiguation', () => {
+	const keeperSlug = '2026-03-05-good-enough-gardeners-must-harness-ai-t';
+	const hashedSlug = '2026-03-05-good-enough-gardeners-must-harn-0q0ni83';
+	const longFilename = '2026-03-05-Good-enough-gardeners-must-harness-AI-teams-in-the-Year-of-the-Horse.md';
+
+	it('targets keeper (candidate A) on title edit matching previous_title when hashed record exists', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === keeperSlug) {
+					return {
+						success: true,
+						results: [{ filename: keeperSlug, display_name: '2026-03-04 BW Column: Old Title', isNested: 0 }],
+					};
+				}
+				if (args[0] === hashedSlug) {
+					return {
+						success: true,
+						results: [{ filename: hashedSlug, display_name: '2026-03-05 BW Column: New Title', isNested: 0 }],
+					};
+				}
+			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(100, args);
+			return { success: true, results: [] };
+		});
+
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: longFilename,
+				markdown: '# 2026-03-05 BW Column: New Title\n## Audrey:\nUpdated content',
+				previous_title: '2026-03-04 BW Column: Old Title',
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { filename: string };
+		expect(data.filename).toBe(keeperSlug);
+	});
+
+	it('targets hashed record (candidate B) on title edit matching previous_title', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === keeperSlug) {
+					return {
+						success: true,
+						results: [{ filename: keeperSlug, display_name: '2026-03-04 BW Column: Distinct Keeper', isNested: 0 }],
+					};
+				}
+				if (args[0] === hashedSlug) {
+					return {
+						success: true,
+						results: [{ filename: hashedSlug, display_name: '2026-03-05 BW Column: Old Hashed Title', isNested: 0 }],
+					};
+				}
+			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(100, args);
+			return { success: true, results: [] };
+		});
+
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: longFilename,
+				markdown: '# 2026-03-05 BW Column: New Hashed Title\n## Audrey:\nUpdated content',
+				previous_title: '2026-03-05 BW Column: Old Hashed Title',
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { filename: string };
+		expect(data.filename).toBe(hashedSlug);
+	});
+
+	it('routes to hashed resistantKey when keeper exists but previous_title differs (missing collision record)', async () => {
+		const env = createMockEnv((sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === keeperSlug) {
+					return {
+						success: true,
+						results: [{ filename: keeperSlug, display_name: 'Unrelated Keeper Title', isNested: 0 }],
+					};
+				}
+				return { success: true, results: [] };
+			}
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return reservedCounterResult(100, args);
+			return { success: true, results: [] };
+		});
+
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				filename: longFilename,
+				markdown: '# Brand New Colliding Speech Title\n## Audrey:\nColliding speech body',
+				previous_title: 'Old Title of Colliding Speech',
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { filename: string };
+		expect(data.filename).toBe(hashedSlug);
+	});
+});
