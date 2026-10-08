@@ -23,6 +23,10 @@ describe('renderTitleHtml', () => {
 	it('escapes HTML inside labels and URLs', () => {
 		expect(renderTitleHtml('[a<b](https://x.example/?p="q"&r=1)')).toBe('<a href="https://x.example/?p=&quot;q&quot;&amp;r=1">a&lt;b</a>');
 	});
+	it('renders nullish titles as empty string like Vue interpolation', () => {
+		expect(renderTitleHtml(null)).toBe('');
+		expect(renderTitleHtml(undefined)).toBe('');
+	});
 });
 
 describe('plainTitleText', () => {
@@ -38,5 +42,9 @@ describe('plainTitleText', () => {
 	it('keeps non-http destinations as literal text', () => {
 		expect(plainTitleText('[x](javascript:alert(1))')).toBe('[x](javascript:alert(1))');
 		expect(plainTitleText('[x](/relative/path)')).toBe('[x](/relative/path)');
+	});
+	it('renders nullish titles as empty string like Vue interpolation', () => {
+		expect(plainTitleText(null)).toBe('');
+		expect(plainTitleText(undefined)).toBe('');
 	});
 });

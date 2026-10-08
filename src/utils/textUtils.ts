@@ -96,7 +96,8 @@ export function escapeHtml(value: string): string {
  * `… on [Civic AI](https://civic.ai)` yields a real anchor. Only http(s)
  * destinations become links; anything else stays literal text.
  */
-export function renderTitleHtml(value: string): string {
+export function renderTitleHtml(value: string | null | undefined): string {
+	if (value == null) return '';
 	return escapeHtml(value).replace(/\[([^[\]]+?)\]\((https?:\/\/[^\s)]+?)\)/g, '<a href="$2">$1</a>');
 }
 
@@ -105,6 +106,7 @@ export function renderTitleHtml(value: string): string {
  * text): inline Markdown links `[label](https://…)` collapse to `label`, the
  * same links {@link renderTitleHtml} turns into anchors.
  */
-export function plainTitleText(value: string): string {
+export function plainTitleText(value: string | null | undefined): string {
+	if (value == null) return '';
 	return value.replace(/\[([^[\]]+?)\]\((?:https?:\/\/[^\s)]+?)\)/g, '$1');
 }

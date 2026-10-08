@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { getSpeakerColor } from '../utils/speakerColor'
-import { renderSpeechHtml, renderTitleHtml } from '../utils/textUtils'
+import { plainTitleText, renderSpeechHtml, renderTitleHtml } from '../utils/textUtils'
 
 interface Section {
   filename: string
@@ -183,7 +183,7 @@ const heading = computed(() => {
 														class="turnline__share-option"
 														data-sayit-share
 														:data-share-url="getLinkInContextUrl(section)"
-														:data-share-title="section.display_name"
+														:data-share-title="plainTitleText(section.display_name)"
 													>
 														<span lang="zh">連同前後文分享</span><span lang="en">Share with context</span>
 													</button>
@@ -192,7 +192,7 @@ const heading = computed(() => {
 														class="turnline__share-option"
 														data-sayit-share
 														:data-share-url="`/speech/${section.section_id}`"
-														:data-share-title="section.display_name"
+														:data-share-title="plainTitleText(section.display_name)"
 													>
 														<span lang="zh">分享單一段落</span><span lang="en">Share this turn only</span>
 													</button>

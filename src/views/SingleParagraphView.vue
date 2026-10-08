@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { getSpeakerColor } from '../utils/speakerColor'
-import { parseContent, renderSpeechHtml, toPlainText } from '../utils/textUtils'
+import { parseContent, plainTitleText, renderSpeechHtml, toPlainText } from '../utils/textUtils'
 
 type Section = {
 	filename: string;
@@ -98,14 +98,14 @@ const getParagraphUrl = (sectionId: number) => `/speech/${sectionId}`;
 										class="button button--secondary"
 										data-sayit-share
 										:data-share-url="getContextUrl(section.filename, section.section_id)"
-										:data-share-title="section.display_name"
+										:data-share-title="plainTitleText(section.display_name)"
 									>
 									<span lang="zh">分享此段</span><span lang="en">Share turn</span>
 									</button>
 								</nav>
 								<nav class="breadcrumbs" v-if="section.filename" aria-labelledby="source-record-label">
 									<span id="source-record-label" class="visually-hidden"><span lang="zh">來源逐字稿</span><span lang="en">Source record</span></span>
-									<a :href="getSpeechUrl(section.filename)">{{ section.display_name }}</a>
+									<a :href="getSpeechUrl(section.filename)">{{ plainTitleText(section.display_name) }}</a>
 								</nav>
 							</article>
 							<nav class="speech-navigation" aria-labelledby="adjacent-turns-label">

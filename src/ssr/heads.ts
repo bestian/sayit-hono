@@ -1,4 +1,4 @@
-import { toPlainText } from '../utils/textUtils';
+import { plainTitleText, toPlainText } from '../utils/textUtils';
 export type MetaEntry = {
 	property?: string;
 	name?: string;
@@ -112,7 +112,7 @@ export function headForSearch(query: string): HeadSpec {
 }
 
 export function headForSingleSpeech(displayName: string | null | undefined, filename: string): HeadSpec & { links: LinkEntry[] } {
-	const name = displayName?.trim() || 'Untitled record';
+	const name = plainTitleText(displayName?.trim() || 'Untitled record');
 	return {
 		title: `${name} — SayIt`,
 		meta: [
@@ -142,7 +142,7 @@ export function headForSpeaker(routePathname: string | null | undefined): HeadSp
 }
 
 export function headForSpeechContent(titleText: string | null | undefined, sectionId: number, sectionHtml?: string): HeadSpec {
-	const safeTitle = titleText?.trim() || `Turn ${sectionId}`;
+	const safeTitle = plainTitleText(titleText?.trim() || `Turn ${sectionId}`);
 	const pageTitle = titleText?.trim() ? `${safeTitle} — Turn ${sectionId} — SayIt` : `${safeTitle} — SayIt`;
 	const descText = sectionHtml ? toPlainText(sectionHtml) : '';
 	const ogImageUrl = `https://archive.tw/og/speech/${sectionId}.png`;
@@ -167,7 +167,7 @@ export function headForSpeechContent(titleText: string | null | undefined, secti
 }
 
 export function headForNestedSpeech(displayName: string | null | undefined, filename: string): HeadSpec & { links: LinkEntry[] } {
-	const name = displayName?.trim() || 'Untitled record';
+	const name = plainTitleText(displayName?.trim() || 'Untitled record');
 	return {
 		title: `${name} — SayIt`,
 		meta: [
@@ -185,7 +185,7 @@ export function headForNestedSpeechDetail(
 	filename: string,
 	nestFilename: string,
 ): HeadSpec & { links: LinkEntry[] } {
-	const name = nestDisplayName?.trim() || 'Untitled record';
+	const name = plainTitleText(nestDisplayName?.trim() || 'Untitled record');
 	const path = `/${encodeURIComponent(filename)}/${encodeURIComponent(nestFilename)}`;
 	return {
 		title: `${name} — SayIt`,
