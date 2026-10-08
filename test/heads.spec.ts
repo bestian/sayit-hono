@@ -67,6 +67,14 @@ describe('heads', () => {
 		expect(head.meta?.some((m) => m.name === 'twitter:card')).toBe(true);
 	});
 
+	it('headForSingleSpeech strips Markdown links from title and og:title', () => {
+		const head = headForSingleSpeech('2026-09-11 Oxford Discussion — Audrey Tang on [Civic AI](https://civic.ai)', '2026-09-11-x');
+		expect(head.title).toBe('2026-09-11 Oxford Discussion — Audrey Tang on Civic AI — SayIt');
+		expect(head.meta?.find((m) => m.property === 'og:title')?.content).toBe(
+			'2026-09-11 Oxford Discussion — Audrey Tang on Civic AI — SayIt',
+		);
+	});
+
 	it('headForSpeaker decodes route pathname and strips trailing -N', () => {
 		expect(headForSpeaker('%E5%94%90%E9%B3%B3-3').title).toContain('唐鳳');
 		expect(headForSpeaker('%E5%94%90%E9%B3%B3-3').title).not.toContain('-3');

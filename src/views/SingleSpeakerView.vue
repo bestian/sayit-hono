@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed,  ref } from 'vue'
+import { plainTitleText } from '../utils/textUtils'
 import { getSpeakerColor } from '../utils/speakerColor'
 
 interface ApiSection {
@@ -322,8 +323,8 @@ const formatLongestSectionSummary = (summary: string) => {
 										<ul class="breadcrumbs">
 											<li>
 												<a :href="getSpeechNameUrl(section.filename)">
-												<template v-if="/^\d{4}-\d{2}-\d{2}/.test(section.display_name)"><time :datetime="section.display_name.slice(0, 10)">{{ section.display_name.slice(0, 10) }}</time>{{ section.display_name.slice(10) }}</template>
-												<template v-else>{{ section.display_name }}</template>
+												<template v-if="/^\d{4}-\d{2}-\d{2}/.test(section.display_name)"><time :datetime="section.display_name.slice(0, 10)">{{ section.display_name.slice(0, 10) }}</time>{{ plainTitleText(section.display_name.slice(10)) }}</template>
+												<template v-else>{{ plainTitleText(section.display_name) }}</template>
 												</a>
 											</li>
 											<li class="no-content-after">

@@ -57,7 +57,7 @@
 										<div class="speech__breadcrumb">
 											<ul class="breadcrumbs">
 												<li>
-													<a :href="sectionLink(section)">{{ section.display_name }}</a>
+													<a :href="sectionLink(section)">{{ plainTitleText(section.display_name) }}</a>
 												</li>
 											</ul>
 										</div>
@@ -128,6 +128,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { plainTitleText } from '../utils/textUtils';
 import { getSpeakerColor } from '../utils/speakerColor';
 
 type SpeakerResult = {
