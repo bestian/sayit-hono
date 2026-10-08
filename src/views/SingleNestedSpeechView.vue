@@ -1,7 +1,7 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { getSpeakerColor } from '../utils/speakerColor';
-	import { renderSpeechHtml } from '../utils/textUtils';
+	import { renderSpeechHtml, renderTitleHtml } from '../utils/textUtils';
 
 	interface Section {
 		filename: string;
@@ -171,7 +171,7 @@
 									</ul>
 								</nav>
 								<div class="page-header__title-row">
-									<h1 id="page-title" :class="{ 'jf-lanyanghei-heavy': recordLanguage === 'zh-Hant' }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
+									<h1 id="page-title" :class="{ 'jf-lanyanghei-heavy': recordLanguage === 'zh-Hant' }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time><span v-html="renderTitleHtml(heading.rest)"></span></h1>
 									<a
 										v-if="alternateUrl && alternateLabel"
 										:href="alternateUrl"

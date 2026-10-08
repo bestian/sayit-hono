@@ -4,6 +4,7 @@ import { Resvg, initWasm as initResvg } from '@resvg/resvg-wasm';
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 // @ts-ignore — wrangler resolves .wasm imports to WebAssembly.Module
 import yogaWasm from 'satori/yoga.wasm';
+import { plainTitleText } from '../utils/textUtils';
 
 let wasmInitPromise: Promise<void> | null = null;
 
@@ -352,7 +353,7 @@ export async function generateOgImage(
 	speakers: string[],
 ): Promise<Uint8Array> {
 	const date = extractDate(filename);
-	let title = displayName || filename;
+	let title = plainTitleText(displayName) || filename;
 	// Strip date prefix from title if it's shown separately
 	if (date) title = title.replace(new RegExp(`^${date}[-\\s]*`), '');
 	const allText = ['ARCHIVE.TW', title, date ?? '', '\u00b7', ...speakers].join('');
@@ -371,7 +372,8 @@ export async function generateQuoteOgImage(
 		.replace(/\s+/g, ' ')
 		.trim();
 	const displayQuote = truncate(plainText, 300);
-	const allText = ['ARCHIVE.TW', displayQuote, speakerName ?? '', speechTitle, '\u2014'].join('');
-	const element = buildQuoteElement(plainText, speakerName, speechTitle, avatarDataUri);
+	const plainSpeechTitle = plainTitleText(speechTitle);
+	const allText = ['ARCHIVE.TW', displayQuote, speakerName ?? '', plainSpeechTitle, '\u2014'].join('');
+	const element = buildQuoteElement(plainText, speakerName, plainSpeechTitle, avatarDataUri);
 	return renderElement(element, allText, [400, 500]);
 }

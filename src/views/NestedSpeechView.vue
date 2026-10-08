@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { renderTitleHtml } from '../utils/textUtils';
 
 type NestedItem = {
 	nest_filename: string;
@@ -46,7 +47,7 @@ const getNestUrl = (nestFilename: string) =>
 					<div class="full-page__unit">
 						<header class="page-header page-header--speech">
 							<div class="page-header__title-row">
-								<h1 id="page-title" :class="{ 'jf-lanyanghei-heavy': isChineseRecord }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time>{{ heading.rest }}</h1>
+								<h1 id="page-title" :class="{ 'jf-lanyanghei-heavy': isChineseRecord }"><time v-if="heading.date" :datetime="heading.date">{{ heading.date }}</time><span v-html="renderTitleHtml(heading.rest)"></span></h1>
 								<a
 									v-if="alternateUrl && alternateLabel"
 									:href="alternateUrl"

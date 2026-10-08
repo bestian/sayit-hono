@@ -89,3 +89,22 @@ export function toPlainText(html: string): string {
 export function escapeHtml(value: string): string {
 	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+/**
+ * Render a record title (display_name) as inline HTML: escape everything,
+ * then linkify inline Markdown links `[label](https://…)` so a headline like
+ * `… on [Civic AI](https://civic.ai)` yields a real anchor. Only http(s)
+ * destinations become links; anything else stays literal text.
+ */
+export function renderTitleHtml(value: string): string {
+	return escapeHtml(value).replace(/\[([^[\]]+?)\]\((https?:\/\/[^\s)]+?)\)/g, '<a href="$2">$1</a>');
+}
+
+/**
+ * Plain-text form of a record title for non-HTML surfaces (OG images, share
+ * text): inline Markdown links `[label](https://…)` collapse to `label`, the
+ * same links {@link renderTitleHtml} turns into anchors.
+ */
+export function plainTitleText(value: string): string {
+	return value.replace(/\[([^[\]]+?)\]\((?:https?:\/\/[^\s)]+?)\)/g, '$1');
+}
