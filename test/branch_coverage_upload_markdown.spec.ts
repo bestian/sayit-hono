@@ -204,4 +204,185 @@ describe('upload_markdown branch coverage extra cases', () => {
 		});
 		expect(res.status).toBe(200);
 	});
+
+	it('routes PATCH to the hashed record when only candidateB exists', async () => {
+		const raw = `collision-routing-probe-target-${'q'.repeat(40)}`;
+		const truncated = raw.toLowerCase().slice(0, 50);
+		const resolver: QueryResolver = (sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === truncated) return { success: true, results: [] };
+				return {
+					success: true,
+					results: [{ filename: 'resistant', display_name: 'B Title', isNested: 0, alternate_filename: null }],
+				};
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) return { success: true, results: [] };
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return { success: true, results: [{ next_id: 700 }] };
+			return { success: true, results: [] };
+		};
+		const env = createMockEnv(resolver);
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer ' + 'token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: raw, markdown: '# B Title\n## A:\nhi' }),
+		});
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { filename: string };
+		expect(data.filename).not.toBe(truncated);
+		expect(data.filename).toHaveLength(50);
+		expect(data.filename.startsWith(`${truncated.slice(0, 42)}-`)).toBe(true);
+	});
+
+	it('routes PATCH to candidateB when the incoming title matches only B', async () => {
+		const raw = `collision-incoming-b-probe-target-${'q'.repeat(40)}`;
+		const truncated = raw.toLowerCase().slice(0, 50);
+		const resolver: QueryResolver = (sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === truncated) {
+					return {
+						success: true,
+						results: [{ filename: truncated, display_name: 'Title A', isNested: 0, alternate_filename: null }],
+					};
+				}
+				return {
+					success: true,
+					results: [{ filename: 'b-hash-key-probe', display_name: 'Title B', isNested: 0, alternate_filename: null }],
+				};
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) return { success: true, results: [] };
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return { success: true, results: [{ next_id: 701 }] };
+			return { success: true, results: [] };
+		};
+		const env = createMockEnv(resolver);
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer ' + 'token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: raw, markdown: '# Title B\n## A:\nhi' }),
+		});
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { filename: string };
+		expect(data.filename).toBe('b-hash-key-probe');
+	});
+
+	it('routes PATCH to candidateA when previous_title confirms the keeper', async () => {
+		const raw = `collision-keeper-probe-target-${'q'.repeat(40)}`;
+		const truncated = raw.toLowerCase().slice(0, 50);
+		const resolver: QueryResolver = (sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === truncated) {
+					return {
+						success: true,
+						results: [{ filename: truncated, display_name: 'Old Title', isNested: 0, alternate_filename: null }],
+					};
+				}
+				return { success: true, results: [] };
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) return { success: true, results: [] };
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) return { success: true, results: [] };
+			if (sql.includes('section_id_counter') && sql.includes('RETURNING')) return { success: true, results: [{ next_id: 702 }] };
+			return { success: true, results: [] };
+		};
+		const env = createMockEnv(resolver);
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer ' + 'token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: raw, markdown: '# New Title\n## A:\nhi', previous_title: 'Old Title' }),
+		});
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { filename: string };
+		expect(data.filename).toBe(truncated);
+	});
+
+	it('returns 409 when neither previous_title nor incoming title disambiguates the collision', async () => {
+		const raw = `collision-ambiguous-probe-target-${'q'.repeat(40)}`;
+		const truncated = raw.toLowerCase().slice(0, 50);
+		const resolver: QueryResolver = (sql, args) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				if (args[0] === truncated) {
+					return {
+						success: true,
+						results: [{ filename: truncated, display_name: 'Title A', isNested: 0, alternate_filename: null }],
+					};
+				}
+				return {
+					success: true,
+					results: [{ filename: 'resistant', display_name: 'Title B', isNested: 0, alternate_filename: null }],
+				};
+			}
+			return { success: true, results: [] };
+		};
+		const env = createMockEnv(resolver);
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer ' + 'token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: raw, markdown: '# Third Title\n## A:\nhi', previous_title: 'Unrelated' }),
+		});
+		expect(res.status).toBe(409);
+		const data = (await res.json()) as { error: string };
+		expect(data.error).toContain('Ambiguous');
+	});
+
+	it('unlinks the old alternate and links the new one on nested PATCH with alternate_filename', async () => {
+		const resolver: QueryResolver = (sql) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				return {
+					success: true,
+					results: [{ filename: 'nested-alt-probe', display_name: 'Nested Alt', isNested: 1, alternate_filename: 'old-alt' }],
+				};
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) return { success: true, results: [] };
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) return { success: true, results: [] };
+			return { success: true, results: [] };
+		};
+		const env = createMockEnv(resolver);
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer ' + 'token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: 'nested-alt-probe', markdown: '# Nested Alt\n', alternate_filename: 'new-alt' }),
+		});
+		expect(res.status).toBe(200);
+		const boundStmts = env.__batchedStatements.filter(
+			(s): s is PreparedStatement => s && typeof s === 'object' && 'sql' in s && typeof s.sql === 'string',
+		);
+		const unlink = boundStmts.find((s) => s.sql.includes('SET alternate_filename = NULL WHERE filename = ?'));
+		expect(unlink).toBeDefined();
+		expect(unlink?.args).toEqual(['old-alt', 'nested-alt-probe']);
+		const link = boundStmts.find((s) => s.sql.includes('SET alternate_filename = ? WHERE filename = ?'));
+		expect(link).toBeDefined();
+		expect(link?.args).toEqual(['nested-alt-probe', 'new-alt']);
+	});
+
+	it('returns 503 when nested PATCH post-commit search sync fails', async () => {
+		const resolver: QueryResolver = (sql) => {
+			if (sql.includes('SELECT filename, display_name, alternate_filename, isNested FROM speech_index WHERE filename = ?')) {
+				return {
+					success: true,
+					results: [{ filename: 'nested-503-probe', display_name: 'Nested 503', isNested: 1, alternate_filename: null }],
+				};
+			}
+			if (sql.includes('FROM speech_speakers WHERE speech_filename = ?')) return { success: true, results: [] };
+			if (sql.includes('FROM speech_content') && sql.includes('ORDER BY section_id ASC')) return { success: true, results: [] };
+			return { success: true, results: [] };
+		};
+		const env = createMockEnv(resolver);
+		const originalPut = env.SPEECH_CACHE.put.bind(env.SPEECH_CACHE);
+		env.SPEECH_CACHE.put = async (key: string, body: string) => {
+			if (key.startsWith('search-updates/') || key === 'stats.json' || key === 'search-index-manifest.json') {
+				throw new Error('search sync failed');
+			}
+			return originalPut(key, body);
+		};
+		const { res } = await dispatch('/api/upload_markdown', env, {
+			method: 'PATCH',
+			headers: { Authorization: 'Bearer ' + 'token-audrey', 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: 'nested-503-probe', markdown: '# Nested 503\n' }),
+		});
+		expect(res.status).toBe(503);
+		const data = (await res.json()) as { success: boolean; cachePurge: boolean; searchSync: boolean };
+		expect(data.success).toBe(true);
+		expect(data.cachePurge).toBe(true);
+		expect(data.searchSync).toBe(false);
+	});
 });

@@ -141,6 +141,20 @@ describe('cache.readR2Cache / writeR2Cache', () => {
 		const { bucket } = createBucket();
 		await expect(deleteR2Cache(bucket, 'missing-is-ok')).resolves.toBe(true);
 	});
+
+	it('returns true without touching the bucket for an empty key list', async () => {
+		const { bucket } = createBucket();
+		let calls = 0;
+		const counting = {
+			...bucket,
+			delete: async (keys: string | string[]) => {
+				calls += 1;
+				return bucket.delete(keys);
+			},
+		};
+		await expect(deleteR2Cache(counting, [])).resolves.toBe(true);
+		expect(calls).toBe(0);
+	});
 });
 
 describe('cache key taxonomy helpers', () => {
