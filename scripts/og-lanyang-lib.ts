@@ -7,6 +7,7 @@ import type { FontWeight } from 'satori';
 import { Resvg, initWasm } from '@resvg/resvg-wasm';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { plainTitleText } from '../src/utils/textUtils';
 
 export const OG_WIDTH = 1200;
 export const OG_HEIGHT = 630;
@@ -52,7 +53,7 @@ export function slugFromMarkdownPath(relativeMd: string): string {
 }
 
 export function titleFromDisplayName(displayName: string, date: string | null): string {
-	let title = displayName;
+	let title = plainTitleText(displayName);
 	if (date) title = title.replace(new RegExp(`^${date}[-\\s]*`), '');
 	return title.replace(/^[\s\u00a0]+/, '').trim();
 }
