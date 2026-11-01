@@ -41,7 +41,7 @@
 		"@types/node": "^25",
 		"@typescript/native-preview": "^7.0.0-dev.20260429.1",
 		"@vitest/coverage-istanbul": "4.1.10",
-		"@vue/compiler-sfc": "^3.5.33",
+		"@vue/compiler-sfc": "3.5.42",
 		"fuse.js": "^7.3.0",
 		"lemmascript": "0.5.14",
 		"tsx": "^4.21.0",
@@ -53,12 +53,12 @@
 	},
 	"dependencies": {
 		"@resvg/resvg-wasm": "^2.6.2",
-		"@vue/server-renderer": "^3.5.33",
+		"@vue/server-renderer": "3.5.42",
 		"cheerio": "^1.2.0",
-		"hono": "^4.12.15",
+		"hono": "4.13.14",
 		"marked": "^18",
 		"satori": "^0.26.0",
-		"vue": "^3.5.33"
+		"vue": "3.5.42"
 	},
 	"overrides": {
 		"vite": "npm:@voidzero-dev/vite-plus-core@0.2.4",

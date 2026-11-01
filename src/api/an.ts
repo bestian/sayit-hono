@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
-import { ARTIFACT_CACHE_CONTROL, deleteR2Cache, r2AnKey, readR2Cache, writeR2Cache } from './cache';
+import { ARTIFACT_CACHE_CONTROL, r2AnKey, readR2Cache, writeR2Cache } from './cache';
 import { normalizeSections } from '../utils/sectionUtils';
 import { parseContent } from '../utils/textUtils';
 import type { ApiEnv } from './types';
@@ -199,24 +199,18 @@ export async function serveAnByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	// 完整演講：查 SPEECH_CACHE（an/filename）作為 origin 快取
 	const cacheKey = r2AnKey(baseKey);
-	const purge = c.req.url.includes('?');
-
-	if (purge) {
-		await deleteR2Cache(c.env.SPEECH_CACHE, cacheKey);
-	} else {
-		const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/plain; charset=utf-8');
-		if (cached) {
-			console.log('[an cache] hit r2', cacheKey);
-			const headers = new Headers(cached.headers);
-			headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
-			headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
-			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-			if (c.req.method === 'HEAD') {
-				return new Response(null, { status: 200, headers });
-			}
-			const body = await cached.text();
-			return new Response(body, { status: 200, headers });
+	const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/plain; charset=utf-8');
+	if (cached) {
+		console.log('[an cache] hit r2', cacheKey);
+		const headers = new Headers(cached.headers);
+		headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
+		headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
+		Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+		if (c.req.method === 'HEAD') {
+			return new Response(null, { status: 200, headers });
 		}
+		const body = await cached.text();
+		return new Response(body, { status: 200, headers });
 	}
 
 	// 從 DB 查 speech_content 即時生成 .an

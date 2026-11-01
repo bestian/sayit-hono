@@ -487,17 +487,24 @@ describe('POST /api/upload_markdown — new speech creation', () => {
 		expect(res.status).toBe(400);
 	});
 
-	it('strips <script> tags from section content (XSS guard)', async () => {
+	it('stores only display-safe markup from imported Markdown', async () => {
 		const env = createMockEnv(postNewSpeechResolver());
 		await dispatch('/api/upload_markdown', env, {
 			method: 'POST',
 			headers: { Authorization: 'Bearer token-audrey', 'Content-Type': 'application/json; charset=utf-8' },
-			body: JSON.stringify({ filename: 'new-speech', markdown: '# Title\n## A:\nHello <script>alert(1)</script> world' }),
+			body: JSON.stringify({
+				filename: 'new-speech',
+				markdown:
+					'# Title\n## A:\nHello <script>alert(1)</script><img src=x onerror="alert(1)"> [bad](javascript:alert(1)) [good](https://archive.tw) world',
+			}),
 		});
 		const contentInserts = boundStmts(env).filter((s) => s.sql.startsWith('INSERT INTO speech_content'));
 		const allContent = contentInserts.flatMap((s) => s.args).join('\n');
 		expect(allContent).not.toContain('<script>');
 		expect(allContent).not.toContain('alert(1)');
+		expect(allContent).not.toContain('onerror');
+		expect(allContent).not.toContain('javascript:');
+		expect(allContent).toContain('href="https://archive.tw"');
 	});
 
 	it('creates bidirectional alternate_filename link', async () => {
