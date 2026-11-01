@@ -24,6 +24,8 @@
 	"cache": {
 		"enabled": true
 	},
+	"durable_objects": { "bindings": [{ "name": "SEARCH_BUDGET", "class_name": "SearchBudget" }] },
+	"migrations": [{ "tag": "v1-search-budget", "new_sqlite_classes": ["SearchBudget"] }],
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -73,6 +75,8 @@
 			"cache": {
 				"enabled": true
 			},
+			"durable_objects": { "bindings": [{ "name": "SEARCH_BUDGET", "class_name": "SearchBudget" }] },
+			"migrations": [{ "tag": "v1-search-budget", "new_sqlite_classes": ["SearchBudget"] }],
 			"d1_databases": [
 				{
 					"binding": "DB",
@@ -106,6 +110,8 @@
 			"cache": {
 				"enabled": true
 			},
+			"durable_objects": { "bindings": [{ "name": "SEARCH_BUDGET", "class_name": "SearchBudget" }] },
+			"migrations": [{ "tag": "v1-search-budget", "new_sqlite_classes": ["SearchBudget"] }],
 			"vars": {
 				"PROD_DATA_ORIGIN": "https://archive.tw"
 			},

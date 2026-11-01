@@ -32,11 +32,20 @@ import type { WorkerEnv } from './ssr/pages/shared';
 import { isExcludedPath } from './ssr/pages/shared';
 import { renderErrorPage } from './ssr/pages/error';
 import { renderHomePage, renderSpeechesPage, renderSpeakersPage, renderPrivacyPage, renderTermsPage } from './ssr/pages/home';
-import { normalizeSearchQuery, runSearchQuery, renderSearchPage, SEARCH_DEFAULT_PAGE_SIZE, SEARCH_MAX_PAGE_SIZE } from './ssr/pages/search';
+import {
+	normalizeSearchQuery,
+	runSearchQuery,
+	renderSearchPage,
+	SEARCH_DEFAULT_PAGE_SIZE,
+	SEARCH_MAX_PAGE_SIZE,
+	SEARCH_MIN_QUERY_LENGTH,
+} from './ssr/pages/search';
+import { checkSearchBudget } from './search/budget';
 import { renderSectionPage, renderNestedSpeechPage, renderSpeechPage } from './ssr/pages/speech';
 import { renderSpeakerPage } from './ssr/pages/speaker';
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
+export { SearchBudget } from './search/budgetObject';
 // The dynamic import is intentionally compile-time gated so production builds do not include dev-only SQL.
 if (typeof __LOCAL_D1_SEED__ !== 'undefined' && __LOCAL_D1_SEED__) {
 	app.use('*', async (c, next) => {
@@ -304,14 +313,17 @@ app.get('/api/speech/*', (c) => speechContent(c));
 app.get('/api/section/:section_id', (c) => sectionDetail(c));
 app.get('/api/search.json', async (c) => {
 	const query = normalizeSearchQuery(c.req.query('q'));
+	const speakerParam = Number(c.req.query('p') || '');
+	const speakerId = Number.isFinite(speakerParam) && speakerParam > 0 ? Math.floor(speakerParam) : undefined;
+	if (query.length >= SEARCH_MIN_QUERY_LENGTH || speakerId) {
+		const limited = await checkSearchBudget(c, 1);
+		if (limited) return limited;
+	}
 	const requestedLimit = Number(c.req.query('limit') || SEARCH_DEFAULT_PAGE_SIZE);
 	const limit = Number.isFinite(requestedLimit)
 		? Math.max(1, Math.min(SEARCH_MAX_PAGE_SIZE, Math.floor(requestedLimit)))
 		: SEARCH_DEFAULT_PAGE_SIZE;
-	const speakerParam = Number(c.req.query('p') || '');
-	const speakerId = Number.isFinite(speakerParam) && speakerParam > 0 ? Math.floor(speakerParam) : undefined;
-
-	const searchResult = await runSearchQuery(c, { query, page: 1, pageSize: limit, speakerId });
+	const searchResult = await runSearchQuery(c, { query, page: 1, pageSize: limit, speakerId, countSections: false });
 	const results = searchResult.sections.map((row) => {
 		const pageUrl = row.nest_filename
 			? `/${encodeURIComponent(row.filename)}/${encodeURIComponent(row.nest_filename)}`
