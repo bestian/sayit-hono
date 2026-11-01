@@ -1598,7 +1598,7 @@ describe('PATCH treats svg / iframe blocks as match anchors (issue #68)', () => 
 				previous_section_id: 100,
 				next_section_id: null,
 				section_speaker: 'A',
-				section_content: '<iframe src="https://old.example.com/embed/abc"></iframe>',
+				section_content: '<iframe src="https://www.youtube.com/embed/old"></iframe>',
 			},
 		];
 		const env = createMockEnv(speakerResolver('iframe-anchor', oldSections));
@@ -1609,7 +1609,7 @@ describe('PATCH treats svg / iframe blocks as match anchors (issue #68)', () => 
 			'',
 			'A note added between.',
 			'',
-			'<iframe src="https://new.example.com/embed/xyz"></iframe>',
+			'<iframe src="https://www.youtube.com/embed/new"></iframe>',
 		].join('\n');
 		const { res } = await dispatch('/api/upload_markdown', env, {
 			method: 'PATCH',
@@ -1624,7 +1624,7 @@ describe('PATCH treats svg / iframe blocks as match anchors (issue #68)', () => 
 		expect(iframeUpdate).toBeDefined();
 		const iframeContent = iframeUpdate!.args[3] as string;
 		expect(iframeContent).toContain('<iframe');
-		expect(iframeContent).toContain('new.example.com');
+		expect(iframeContent).toContain('www.youtube.com/embed/new');
 		const insertOps = boundStmts(env).filter((s) => s.sql.startsWith('INSERT INTO speech_content'));
 		const noteInsert = insertOps.find((s) => {
 			const content = s.args[7];

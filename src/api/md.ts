@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { getCorsHeaders } from './cors';
-import { ARTIFACT_CACHE_CONTROL, deleteR2Cache, r2MdKey, readR2Cache, writeR2Cache } from './cache';
+import { ARTIFACT_CACHE_CONTROL, r2MdKey, readR2Cache, writeR2Cache } from './cache';
 import type { ApiEnv } from './types';
 import { getAnContentAsString } from './an';
 import { isNumericAnKey } from './an';
@@ -234,24 +234,17 @@ export async function serveMdByKey(c: Context<ApiEnv>, objectKey: string) {
 
 	const anKey = objectKey.slice(0, -MD_FILE_EXTENSION.length) + '.an';
 	const baseKey = objectKey.slice(0, -MD_FILE_EXTENSION.length);
-	const purge = c.req.url.includes('?');
-
 	// 單一演講才快取，段落不快取
 	if (!isNumericAnKey(anKey)) {
 		const cacheKey = r2MdKey(baseKey);
-
-		if (purge) {
-			await deleteR2Cache(c.env.SPEECH_CACHE, cacheKey);
-		} else {
-			const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/markdown; charset=utf-8');
-			if (cached) {
-				const headers = new Headers(cached.headers);
-				headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
-				headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
-				Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
-				const body = await cached.text();
-				return new Response(body, { status: 200, headers });
-			}
+		const cached = await readR2Cache(c.env.SPEECH_CACHE, cacheKey, 'text/markdown; charset=utf-8');
+		if (cached) {
+			const headers = new Headers(cached.headers);
+			headers.set('Cache-Control', ARTIFACT_CACHE_CONTROL);
+			headers.set('Cache-Tag', `speech:${encodeURIComponent(baseKey)}`);
+			Object.entries(getCorsHeaders(origin)).forEach(([k, v]) => headers.set(k, v));
+			const body = await cached.text();
+			return new Response(body, { status: 200, headers });
 		}
 	}
 

@@ -142,13 +142,14 @@ describe('.an endpoints (full speech)', () => {
 		expect(await res.text()).toBe('');
 	});
 
-	it('clears caches when the URL contains a query (purge flag)', async () => {
+	it('does not let a public query string invalidate a cached artifact', async () => {
 		const env = createMockEnv(speechResolver, {
 			preSeedR2: { 'an/2026-demo': { body: 'C', contentType: 'text/plain; charset=utf-8' } },
 		});
 		const { res } = await dispatch('/api/an/2026-demo.an?purge', env);
 		expect(res.status).toBe(200);
-		expect(env.__r2Store.get('an/2026-demo')!.body).not.toBe('C'); // regenerated
+		expect(await res.text()).toBe('C');
+		expect(env.__r2Store.get('an/2026-demo')!.body).toBe('C');
 	});
 
 	it('returns 404 for empty DB result', async () => {
