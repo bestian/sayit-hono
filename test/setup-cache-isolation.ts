@@ -14,7 +14,8 @@ import type { cache as CloudflareWorkersCache } from 'cloudflare:workers';
  */
 const purgeMockHoisted = vi.hoisted(() => vi.fn<typeof CloudflareWorkersCache.purge>(async () => ({ success: true, errors: [] })));
 
-vi.mock('cloudflare:workers', () => ({
+vi.mock('cloudflare:workers', async (importOriginal) => ({
+	...(await importOriginal<typeof import('cloudflare:workers')>()),
 	cache: { purge: purgeMockHoisted },
 }));
 

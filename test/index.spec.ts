@@ -13,6 +13,7 @@ function createEnv() {
 		__r2Store: r2Store,
 		AUDREYT_TRANSCRIPT_TOKEN: 'test-audrey',
 		BESTIAN_TRANSCRIPT_TOKEN: 'test-bestian',
+		SEARCH_BUDGET: { getByName: () => ({ admit: async () => ({ allowed: true }) }) },
 		ASSETS: {
 			// 僅對已知靜態路徑回傳 200，其餘回傳 404
 			fetch: (url: string) => {
