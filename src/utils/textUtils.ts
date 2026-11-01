@@ -7,6 +7,7 @@
  * Note: this is regex/JSON string logic — LemmaScript annotation is out of
  * scope (lsc cannot model RegExp or JSON.parse).
  */
+import { sanitizeTranscriptHtml } from './sanitizeTranscriptHtml';
 
 /** Named HTML entities recognised by {@link decodeHtmlEntities}. */
 const NAMED_ENTITIES: Record<string, string> = {
@@ -38,11 +39,7 @@ export function parseContent(raw?: string | null): string {
  * emphasis around plain text or an inline link.
  */
 export function renderSpeechHtml(raw?: string | null): string {
-	const scriptWarning = '<!-- Warning: unexpected script removed -->';
-	const sanitized = parseContent(raw)
-		.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, scriptWarning)
-		.replace(/<script\b[^>]*\/\s*>/gi, scriptWarning)
-		.replace(/\*\*(<a\b[^>]*>[\s\S]*?<\/a>)\*\*/gi, '<strong>$1</strong>');
+	const sanitized = sanitizeTranscriptHtml(parseContent(raw)).replace(/\*\*(<a\b[^>]*>[\s\S]*?<\/a>)\*\*/gi, '<strong>$1</strong>');
 
 	return sanitized
 		.split(/(<[^>]+>)/g)

@@ -27,7 +27,7 @@ describe('Branch Coverage Core Gaps', () => {
 
 			const encoded = renderSpeechHtml(JSON.stringify('<p>**JSON emphasis**</p><script />'));
 			expect(encoded).toContain('<strong>JSON emphasis</strong>');
-			expect(encoded).toContain('unexpected script removed');
+			expect(encoded).not.toContain('<script');
 		});
 	});
 

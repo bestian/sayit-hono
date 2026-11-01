@@ -140,13 +140,14 @@ describe('/api/md/* and /speech/:id.md', () => {
 		expect(await res.text()).toContain('cached content');
 	});
 
-	it('purges caches when ?purge is present and regenerates the body', async () => {
+	it('does not let a public query string invalidate a cached artifact', async () => {
 		const env = createMockEnv(fullResolver, {
 			preSeedR2: { 'md/2026-demo': { body: 'STALE', contentType: 'text/markdown; charset=utf-8' } },
 		});
 		const { res } = await dispatch('/api/md/2026-demo.md?purge', env);
 		expect(res.status).toBe(200);
-		expect(env.__r2Store.get('md/2026-demo')!.body).not.toContain('STALE');
+		expect(await res.text()).toBe('STALE');
+		expect(env.__r2Store.get('md/2026-demo')!.body).toBe('STALE');
 	});
 
 	it('matches /:path{.md} catch-all for a filename', async () => {

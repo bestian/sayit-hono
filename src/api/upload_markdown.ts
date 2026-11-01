@@ -8,6 +8,7 @@ import { markSpeechDeletedInSearch, syncSearchStats, writeSearchOverlayForSpeech
 import { orderSectionsByLinks, assignPatchedSections, withSectionLinks } from '../utils/sectionPatch';
 import type { NormalizedSection, ExistingSection, PatchAssignedSection } from '../utils/sectionPatch';
 import { planSpeechInvalidation, planSpeakerInvalidation, planListInvalidation } from '../utils/cachePlan';
+import { sanitizeTranscriptHtml } from '../utils/sanitizeTranscriptHtml';
 
 const corsMethods = 'GET, HEAD, OPTIONS, POST, PATCH, DELETE';
 
@@ -111,11 +112,6 @@ function normalizeSpeakerName(raw: string): string | null {
 	if (!withoutColon) return null;
 	const mapped = withoutColon === '唐鳳' ? '唐鳳-3' : withoutColon;
 	return encodeURIComponent(mapped);
-}
-
-/** 移除 HTML 中的 <script> 區塊，避免 XSS */
-function stripScripts(html: string) {
-	return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 }
 
 /**
@@ -290,9 +286,9 @@ async function reserveSectionIds(c: Context<ApiEnv>, count: number): Promise<num
 	return newNext - n;
 }
 
-/** Markdown 轉 HTML 並移除 <script> */
+/** Markdown 轉 HTML，保留可安全顯示的段落與嵌入內容 */
 function toHtml(markdown: string): string {
-	return stripScripts(marked.parse(markdown) as string);
+	return sanitizeTranscriptHtml(marked.parse(markdown) as string);
 }
 
 /** 若第一行是 # 標題則清空，避免重複當成段落內容 */
