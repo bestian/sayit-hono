@@ -24,6 +24,10 @@
 	"cache": {
 		"enabled": true
 	},
+	"ratelimits": [
+		{ "name": "SEARCH_CLIENT_LIMIT", "namespace_id": "20261101", "simple": { "limit": 10, "period": 60 } },
+		{ "name": "SEARCH_LOCATION_LIMIT", "namespace_id": "20261102", "simple": { "limit": 60, "period": 60 } }
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -73,6 +77,10 @@
 			"cache": {
 				"enabled": true
 			},
+			"ratelimits": [
+				{ "name": "SEARCH_CLIENT_LIMIT", "namespace_id": "20261103", "simple": { "limit": 10, "period": 60 } },
+				{ "name": "SEARCH_LOCATION_LIMIT", "namespace_id": "20261104", "simple": { "limit": 60, "period": 60 } }
+			],
 			"d1_databases": [
 				{
 					"binding": "DB",
@@ -106,6 +114,10 @@
 			"cache": {
 				"enabled": true
 			},
+			"ratelimits": [
+				{ "name": "SEARCH_CLIENT_LIMIT", "namespace_id": "20261105", "simple": { "limit": 10, "period": 60 } },
+				{ "name": "SEARCH_LOCATION_LIMIT", "namespace_id": "20261106", "simple": { "limit": 60, "period": 60 } }
+			],
 			"vars": {
 				"PROD_DATA_ORIGIN": "https://archive.tw"
 			},

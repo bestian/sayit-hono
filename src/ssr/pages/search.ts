@@ -8,6 +8,7 @@ import { escapeHtml, parseContent, toPlainText } from '../../utils/textUtils';
 import Footer, { styles as FooterStyles } from '../../components/Footer.vue';
 import Navbar, { styles as NavbarStyles } from '../../components/Navbar.vue';
 import SearchResultView, { styles as SearchResultViewStyles } from '../../views/SearchResultView.vue';
+import { checkSearchRateLimit } from '../../search/rateLimit';
 
 export const SEARCH_MIN_QUERY_LENGTH = 2;
 export const SEARCH_MAX_QUERY_LENGTH = 80;
@@ -118,11 +119,13 @@ export async function runSearchQuery(
 		page = 1,
 		pageSize = SEARCH_DEFAULT_PAGE_SIZE,
 		speakerId,
+		countSections = true,
 	}: {
 		query: string;
 		page?: number;
 		pageSize?: number;
 		speakerId?: number;
+		countSections?: boolean;
 	},
 ): Promise<SearchPageResult> {
 	const normalizedQuery = normalizeSearchQuery(query);
@@ -161,6 +164,21 @@ export async function runSearchQuery(
 	const normalizedLowerQuery = normalizedQuery.toLowerCase();
 	const sectionFilterSql = filteredSpeakerRoutePathname ? 'AND sc.section_speaker = ?' : '';
 	const sectionFilterBindings = filteredSpeakerRoutePathname ? [filteredSpeakerRoutePathname] : [];
+	const totalSectionsPromise: Promise<{ count: number | string | null } | null> = countSections
+		? c.env.DB.prepare(
+				`SELECT COUNT(*) AS count
+			FROM speech_content sc
+			LEFT JOIN speech_index si ON sc.filename = si.filename
+			LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
+			WHERE (
+				instr(lower(COALESCE(si.display_name, '')), ?) > 0
+				OR instr(lower(COALESCE(sp.name, '')), ?) > 0
+				OR instr(lower(COALESCE(sc.section_content, '')), ?) > 0
+			) ${sectionFilterSql}`,
+			)
+				.bind(normalizedLowerQuery, normalizedLowerQuery, normalizedLowerQuery, ...sectionFilterBindings)
+				.first()
+		: Promise.resolve(null);
 
 	const [speakerResult, totalSectionsRow] = await Promise.all([
 		filteredSpeakerRoutePathname
@@ -174,19 +192,7 @@ export async function runSearchQuery(
 				)
 					.bind(normalizedLowerQuery, normalizedLowerQuery, SEARCH_SPEAKER_LIMIT)
 					.all(),
-		c.env.DB.prepare(
-			`SELECT COUNT(*) AS count
-			FROM speech_content sc
-			LEFT JOIN speech_index si ON sc.filename = si.filename
-			LEFT JOIN speakers sp ON sc.section_speaker = sp.route_pathname
-			WHERE (
-				instr(lower(COALESCE(si.display_name, '')), ?) > 0
-				OR instr(lower(COALESCE(sp.name, '')), ?) > 0
-				OR instr(lower(COALESCE(sc.section_content, '')), ?) > 0
-			) ${sectionFilterSql}`,
-		)
-			.bind(normalizedLowerQuery, normalizedLowerQuery, normalizedLowerQuery, ...sectionFilterBindings)
-			.first() as Promise<{ count: number | string | null } | null>,
+		totalSectionsPromise,
 	]);
 
 	if (!speakerResult.success) {
@@ -268,7 +274,7 @@ export async function runSearchQuery(
 		page: resolvedPage,
 		page_size: safePageSize,
 		total_pages: totalPages,
-		total_sections: totalSections,
+		total_sections: countSections ? totalSections : sectionResult.results.length,
 		pagination_pages: buildPaginationPages(resolvedPage, totalPages),
 		filteredSpeakerId,
 		filteredSpeakerName,
@@ -278,10 +284,14 @@ export async function runSearchQuery(
 export async function renderSearchPage(c: AppContext) {
 	const url = new URL(c.req.url);
 	const query = normalizeSearchQuery(url.searchParams.get('q'));
-	const pageParam = Number(url.searchParams.get('page') || '1');
-	const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
 	const speakerParam = Number(url.searchParams.get('p') || '');
 	const speakerId = Number.isFinite(speakerParam) && speakerParam > 0 ? Math.floor(speakerParam) : undefined;
+	if (query.length >= SEARCH_MIN_QUERY_LENGTH || speakerId) {
+		const limited = await checkSearchRateLimit(c);
+		if (limited) return limited;
+	}
+	const pageParam = Number(url.searchParams.get('page') || '1');
+	const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
 
 	let result: SearchPageResult;
 	try {
