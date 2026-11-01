@@ -11,6 +11,8 @@
 	"observability": {
 		"enabled": true
 	},
+	"durable_objects": { "bindings": [{ "name": "SEARCH_BUDGET", "class_name": "SearchBudget" }] },
+	"migrations": [{ "tag": "v1-search-budget", "new_sqlite_classes": ["SearchBudget"] }],
 	"d1_databases": [
 		{
 			"binding": "DB",

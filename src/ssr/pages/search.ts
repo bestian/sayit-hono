@@ -8,7 +8,7 @@ import { escapeHtml, parseContent, toPlainText } from '../../utils/textUtils';
 import Footer, { styles as FooterStyles } from '../../components/Footer.vue';
 import Navbar, { styles as NavbarStyles } from '../../components/Navbar.vue';
 import SearchResultView, { styles as SearchResultViewStyles } from '../../views/SearchResultView.vue';
-import { checkSearchRateLimit } from '../../search/rateLimit';
+import { checkSearchBudget } from '../../search/budget';
 
 export const SEARCH_MIN_QUERY_LENGTH = 2;
 export const SEARCH_MAX_QUERY_LENGTH = 80;
@@ -287,7 +287,7 @@ export async function renderSearchPage(c: AppContext) {
 	const speakerParam = Number(url.searchParams.get('p') || '');
 	const speakerId = Number.isFinite(speakerParam) && speakerParam > 0 ? Math.floor(speakerParam) : undefined;
 	if (query.length >= SEARCH_MIN_QUERY_LENGTH || speakerId) {
-		const limited = await checkSearchRateLimit(c);
+		const limited = await checkSearchBudget(c, 2);
 		if (limited) return limited;
 	}
 	const pageParam = Number(url.searchParams.get('page') || '1');
