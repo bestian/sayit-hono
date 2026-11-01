@@ -23,6 +23,8 @@ export interface MockWorkerEnv {
 	ASSETS: { fetch: () => Response };
 	SPEECH_CACHE: MockR2Bucket;
 	DB: MockD1Database;
+	SEARCH_CLIENT_LIMIT: { limit: (options: { key: string }) => Promise<{ success: boolean }> };
+	SEARCH_LOCATION_LIMIT: { limit: (options: { key: string }) => Promise<{ success: boolean }> };
 	/** Statements passed to `DB.batch()`, captured in call order for assertions. */
 	__batchedStatements: PreparedStatement[];
 	/** Statements run directly via `.bind(...).run()` (outside a `batch()` call), captured in call order. */
@@ -119,6 +121,8 @@ export function createMockEnv(resolver: QueryResolver, options: { preSeedR2?: Re
 		AUDREYT_TRANSCRIPT_TOKEN: 'token-audrey',
 		BESTIAN_TRANSCRIPT_TOKEN: 'token-bestian',
 		ASSETS: { fetch: () => new Response('Not Found', { status: 404 }) },
+		SEARCH_CLIENT_LIMIT: { limit: async () => ({ success: true }) },
+		SEARCH_LOCATION_LIMIT: { limit: async () => ({ success: true }) },
 		SPEECH_CACHE: {
 			get: async (key) => {
 				const entry = r2Store.get(key);
