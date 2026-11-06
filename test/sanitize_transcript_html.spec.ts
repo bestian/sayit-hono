@@ -30,6 +30,33 @@ describe('transcript HTML boundary', () => {
 		expect(html).toContain('customer-07bto6bf9uibrlc3.cloudflarestream.com');
 	});
 
+	it.each(['webp', 'png', 'jpeg', 'jpg', 'gif', 'avif'])('preserves embedded %s slides through import and rendering', (format) => {
+		const src = `data:image/${format};base64,AA==`;
+		const html = renderSpeechHtml(sanitizeTranscriptHtml(`<img src="${src}" width="1600" height="900" alt="Slide" onerror="alert(1)">`));
+		expect(html).toContain(`src="${src}"`);
+		expect(html).toContain('width="1600" height="900" alt="Slide"');
+		expect(html).not.toContain('onerror');
+	});
+
+	it.each([
+		'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+		'data:text/html;base64,PHNjcmlwdD4=',
+		'data:image/webp,unencoded',
+		'data:image/webp;base64,',
+		'data:image/webp;base64,AA==!',
+	])('rejects unsupported or malformed embedded images: %s', (src) => {
+		expect(sanitizeTranscriptHtml(`<img src="${src}" alt="Slide">`)).toBe('<img alt="Slide">');
+	});
+
+	it('does not allow image data URLs in links, frames, or other media', () => {
+		const src = 'data:image/webp;base64,AA==';
+		const html = sanitizeTranscriptHtml(
+			`<a href="${src}">link</a><iframe src="${src}"></iframe><video src="${src}" poster="${src}"></video><source src="${src}">`,
+		);
+		expect(html).not.toContain('data:');
+		expect(html).not.toContain('<iframe');
+	});
+
 	it('rejects unapproved iframe destinations and active URI schemes', () => {
 		const html = sanitizeTranscriptHtml(
 			'<iframe src="https://example.org/embed"></iframe><iframe src="javascript:alert(1)"></iframe><a href="data:text/html,test">data</a><a href="/speech/1">local</a>',
