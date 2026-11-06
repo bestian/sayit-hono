@@ -145,6 +145,7 @@ function safeStyle(raw: string, tag: string): string {
 }
 
 function safeUrl(raw: string, tag: string, attr: string): boolean {
+	if (tag === 'img' && attr === 'src' && /^data:image\/(?:webp|png|jpe?g|gif|avif);base64,[a-z0-9+/]+={0,2}$/i.test(raw)) return true;
 	try {
 		const parsed = new URL(raw, 'https://archive.tw/');
 		if (tag === 'a' && attr === 'href' && parsed.protocol === 'mailto:') return true;
