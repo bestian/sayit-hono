@@ -971,11 +971,15 @@ body.sayit-popup-open::before {
 }
 
 .sayit-search__result-excerpt {
-	max-inline-size: var(--reading-en);
+	min-width: 0;
 	font-family: var(--font-record);
 	font-size: 1.05rem;
 	line-height: 1.55;
 	text-wrap: pretty;
+}
+
+.sayit-search__result-excerpt:only-child {
+	grid-column: 1 / -1;
 }
 
 .sayit-search__more {
